@@ -72,7 +72,7 @@
                     value={value.note}
                     onChange={(e) => onChange({ ...value, note: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="主催者向けメモ"
+                    placeholder="管理者向けメモ"
                   />
                 </label>
               </div>
@@ -223,7 +223,7 @@
             <header className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Mock</p>
-                <h1 className="mt-1 text-2xl font-bold">Scheduly 主催者コンソール</h1>
+                <h1 className="mt-1 text-2xl font-bold">Scheduly 管理者コンソール</h1>
                 <p className="mt-2 text-sm text-zinc-500">イベントを作成し、URLベースのアクセス制御や回答形式を設定するためのモックUIです。</p>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
@@ -232,7 +232,7 @@
               </div>
             </header>
 
-            <main className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr,1.3fr]">
+            <main className="grid grid-cols-1 gap-6">
               <div className="space-y-6">
                 <Section
                   title="イベント基本情報"
