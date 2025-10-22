@@ -368,7 +368,7 @@ function SchedulyMock() {
               className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
               onClick={() => openDetail(current.id)}
             >
-              <span aria-hidden="true">ℹ</span> ICS詳細を表示
+              <span aria-hidden="true">ℹ</span> 詳細を表示
             </button>
           </div>
 
@@ -519,6 +519,10 @@ function SchedulyMock() {
       >
         {detailDay && (
           <>
+            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailDay.id, "o")} />
+            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailDay.id, "d")} />
+            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailDay.id, "x")} />
+            <hr className="my-3 border-gray-200" />
             <section className="space-y-2 text-xs text-gray-600">
               <p className="text-sm font-semibold text-gray-800">{detailDay.summary}</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -549,11 +553,6 @@ function SchedulyMock() {
                 </div>
               </dl>
             </section>
-
-            <hr className="my-3 border-gray-200" />
-            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailDay.id, "o")} />
-            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailDay.id, "d")} />
-            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailDay.id, "x")} />
           </>
         )}
       </Modal>
