@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Scheduly – Organizer Mock</title>
+    <title>Scheduly – Admin Mock</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -23,9 +23,12 @@
 
       const blankCandidate = () => ({
         id: crypto.randomUUID(),
-        summary: "",
-        detail: "",
-        note: ""
+        uid: `scheduly-${crypto.randomUUID()}`,
+        title: "",
+        start: "",
+        end: "",
+        location: "",
+        description: ""
       });
 
       function Section({ title, children, action }) {
@@ -43,47 +46,83 @@
       function CandidateRow({ value, onChange, onRemove, disableRemove }) {
         return (
           <div className="rounded-xl border border-zinc-200 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1 space-y-3">
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
-                  <span className="text-xs font-semibold text-zinc-500">候補日時・場所</span>
+                  <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
                   <input
                     type="text"
-                    value={value.summary}
-                    onChange={(e) => onChange({ ...value, summary: e.target.value })}
+                    value={value.title}
+                    onChange={(e) => onChange({ ...value, title: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="例: 10/26(日) 13:00-17:00 三鷹市文化ホール"
+                    placeholder="例: 秋の合宿 調整会議 Day1"
                   />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-semibold text-zinc-500">補足情報（任意）</span>
+                  <span className="text-xs font-semibold text-zinc-500">識別子（UID）</span>
                   <input
                     type="text"
-                    value={value.detail}
-                    onChange={(e) => onChange({ ...value, detail: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="アクセス情報など"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-zinc-500">メモ（任意）</span>
-                  <input
-                    type="text"
-                    value={value.note}
-                    onChange={(e) => onChange({ ...value, note: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="管理者向けメモ"
+                    value={value.uid}
+                    onChange={(e) => onChange({ ...value, uid: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm font-mono"
+                    placeholder="scheduly-xxxx"
                   />
                 </label>
               </div>
-              <button
-                type="button"
-                className="h-10 w-full shrink-0 rounded-lg border border-zinc-300 px-3 text-xs text-zinc-500 hover:border-rose-400 hover:text-rose-600 disabled:opacity-40 sm:w-auto sm:self-start"
-                onClick={onRemove}
-                disabled={disableRemove}
-              >
-                削除
-              </button>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-xs font-semibold text-zinc-500">開始日時（DTSTART）</span>
+                  <input
+                    type="datetime-local"
+                    value={value.start}
+                    onChange={(e) => onChange({ ...value, start: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-zinc-500">終了日時（DTEND）</span>
+                  <input
+                    type="datetime-local"
+                    value={value.end}
+                    onChange={(e) => onChange({ ...value, end: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-zinc-500">場所（LOCATION）</span>
+                <input
+                  type="text"
+                  value={value.location}
+                  onChange={(e) => onChange({ ...value, location: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  placeholder="例: 三鷹市文化ホール メインホール（120名）"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-zinc-500">説明（DESCRIPTION）</span>
+                <textarea
+                  value={value.description}
+                  onChange={(e) => onChange({ ...value, description: e.target.value })}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  placeholder="イベントの概要や連携メモ"
+                />
+              </label>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="h-10 w-full shrink-0 rounded-lg border border-zinc-300 px-3 text-xs text-zinc-500 hover:border-rose-400 hover:text-rose-600 disabled:opacity-40 sm:w-32"
+                  onClick={onRemove}
+                  disabled={disableRemove}
+                >
+                  削除
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -134,21 +173,27 @@
 
       function OrganizerMock() {
         const [title, setTitle] = useState("秋の合宿 調整会議");
-        const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補日から都合の良いものを選択してください。");
+        const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
         const [password, setPassword] = useState("mitaka2025");
         const [responses, setResponses] = useState(["○", "△", "×"]);
         const [candidates, setCandidates] = useState([
           {
             id: crypto.randomUUID(),
-            summary: "10/26(日) 13:00-17:00 三鷹市文化ホール",
-            detail: "メインホール（120名）",
-            note: "第一候補"
+            uid: `scheduly-${crypto.randomUUID()}`,
+            title: "秋の合宿 調整会議 Day1",
+            start: "2024-10-26T13:00",
+            end: "2024-10-26T17:00",
+            location: "三鷹市文化ホール メインホール（120名）",
+            description: "初日: キックオフと全体ミーティング"
           },
           {
             id: crypto.randomUUID(),
-            summary: "10/27(月) 18:00-21:00 三鷹市文化ホール",
-            detail: "会議室B（30名）",
-            note: "平日ナイター"
+            uid: `scheduly-${crypto.randomUUID()}`,
+            title: "秋の合宿 調整会議 Day2",
+            start: "2024-10-27T18:00",
+            end: "2024-10-27T21:00",
+            location: "三鷹市文化ホール 会議室B（30名）",
+            description: "2日目: 平日夕方のフォローアップ"
           }
         ]);
         const [urls, setUrls] = useState({ admin: "", guest: "" });
@@ -173,7 +218,7 @@
 
         const addCandidate = () => {
           setCandidates((prev) => [...prev, blankCandidate()]);
-          popToast("候補日を追加しました");
+          popToast("日程を追加しました");
         };
 
         const popToast = (message) => {
@@ -203,9 +248,14 @@
             candidates: candidates.map((c, index) => ({
               id: c.id,
               order: index + 1,
-              summary: c.summary,
-              detail: c.detail,
-              note: c.note
+              ics: {
+                UID: c.uid,
+                SUMMARY: c.title,
+                DTSTART: c.start,
+                DTEND: c.end,
+                LOCATION: c.location,
+                DESCRIPTION: c.description
+              }
             })),
             metadata: {
               createdAt: "2024-05-01T10:00:00+09:00",
@@ -222,7 +272,7 @@
           <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-4 sm:p-8">
             <header className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Mock</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Admin Mock</p>
                 <h1 className="mt-1 text-2xl font-bold">Scheduly 管理者コンソール</h1>
                 <p className="mt-2 text-sm text-zinc-500">イベントを作成し、URLベースのアクセス制御や回答形式を設定するためのモックUIです。</p>
               </div>
@@ -283,14 +333,14 @@
                 </Section>
 
                 <Section
-                  title="候補日程"
+                  title="日程一覧"
                   action={
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
                       onClick={addCandidate}
                     >
-                      候補を追加
+                      日程を追加
                     </button>
                   }
                 >
@@ -303,7 +353,9 @@
                       disableRemove={candidates.length === 1}
                     />
                   ))}
-                  <p className="text-xs text-zinc-500">※ ドラッグ&ドロップによる並び替えは実装予定（モックでは未対応）。</p>
+                  <p className="text-xs text-zinc-500">
+                    ※ iCal (ICS) の主要キー（SUMMARY／DTSTART／DTEND／LOCATION／DESCRIPTION）に合わせた入力項目です。ドラッグ&ドロップによる並び替えは実装予定（モックでは未対応）。
+                  </p>
                 </Section>
 
                 <Section
