@@ -43,10 +43,30 @@
         );
       }
 
-      function CandidateRow({ value, onChange, onRemove, disableRemove }) {
+      function CandidateRow({ index, value, onChange, onRemove, disableRemove }) {
+        const startLabel = value.start ? value.start.replace("T", " ") : "未設定";
+        const endLabel = value.end ? value.end.replace("T", " ") : "未設定";
+
         return (
-          <div className="rounded-xl border border-zinc-200 p-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="inline-flex w-fit items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  日程 {index + 1}
+                </span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+                  <span>開始: {startLabel}</span>
+                  <span className="hidden sm:inline">／</span>
+                  <span>終了: {endLabel}</span>
+                  {value.location && (
+                    <>
+                      <span className="hidden sm:inline">／</span>
+                      <span className="max-w-xs truncate">場所: {value.location}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
@@ -332,6 +352,19 @@
                   <ResponseSelector responses={responses} onToggle={toggleResponse} />
                 </Section>
 
+                <Section title="共有URL" action={null}>
+                  <KeyValueList
+                    items={[
+                      { key: "編集用URL（管理者）", value: urls.admin },
+                      { key: "閲覧用URL（参加者）", value: urls.guest },
+                      { key: "最終更新", value: "2024/05/01 10:00 更新済み（モック）" }
+                    ]}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    管理者URLを知っている人だけがイベント内容を更新できます。閲覧URLは参加者に共有します。
+                  </p>
+                </Section>
+
                 <Section
                   title="日程一覧"
                   action={
@@ -346,6 +379,7 @@
                 >
                   {candidates.map((candidate, index) => (
                     <CandidateRow
+                      index={index}
                       key={candidate.id}
                       value={candidate}
                       onChange={(next) => updateCandidate(candidate.id, next)}
@@ -353,9 +387,6 @@
                       disableRemove={candidates.length === 1}
                     />
                   ))}
-                  <p className="text-xs text-zinc-500">
-                    ※ iCal (ICS) の主要キー（SUMMARY／DTSTART／DTEND／LOCATION／DESCRIPTION）に合わせた入力項目です。ドラッグ&ドロップによる並び替えは実装予定（モックでは未対応）。
-                  </p>
                 </Section>
 
                 <Section
@@ -374,13 +405,6 @@
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={mockDownloadJson}
-                    >
-                      JSONをダウンロード（モック）
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
                       onClick={() => popToast("iCalファイルをエクスポートしました（モック）")}
                     >
                       iCalをエクスポート（モック）
@@ -388,42 +412,29 @@
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={() => popToast("JSONをアップロードして更新しました（モック）")}
+                      onClick={() => popToast("iCalファイルをインポートしました（モック）")}
                     >
-                      JSONをインポート（モック）
+                      iCalをインポート（モック）
                     </button>
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={() => popToast("出欠の更新履歴を表示しました（モック）")}
+                      onClick={mockDownloadJson}
                     >
-                      更新履歴を見る（モック）
+                      参加者情報をエクスポート（JSON）
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
+                      onClick={() => popToast("JSONをアップロードして更新しました（モック）")}
+                    >
+                      参加者情報をインポート（JSON）
                     </button>
                   </div>
                   <p className="text-xs text-zinc-500">管理系機能のワークフローを確認するためのダミー操作です。</p>
                 </Section>
               </div>
 
-              <aside className="space-y-6">
-                <Section title="共有URL" action={null}>
-                  <KeyValueList
-                    items={[
-                      { key: "編集用URL（管理者）", value: urls.admin },
-                      { key: "閲覧用URL（参加者）", value: urls.guest },
-                      { key: "最終更新", value: "2024/05/01 10:00 更新済み（モック）" }
-                    ]}
-                  />
-                  <p className="text-xs text-zinc-500">
-                    管理者URLを知っている人だけがイベント内容を更新できます。閲覧URLは参加者に共有します。
-                  </p>
-                </Section>
-
-                <Section title="出欠表（JSONプレビュー）" action={null}>
-                  <pre className="max-h-80 overflow-x-auto overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-900 p-4 text-xs text-emerald-100">
-{`// 保存時のAPIペイロード参考（モック）\n${JSON.stringify(eventPayload, null, 2)}`}
-                  </pre>
-                </Section>
-              </aside>
             </main>
 
             {toast && (
