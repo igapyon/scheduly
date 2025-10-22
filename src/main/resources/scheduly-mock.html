@@ -18,10 +18,58 @@ const { useState, useRef, useEffect } = React;
 
 /* ================= Mock Data ================= */
 const DAYS = [
-  { id: "2025-10-26", date: "10/26（日）", time: "13:00〜17:00", place: "三鷹市文化ホール", tally: { o: 12, d: 3, x: 2 } },
-  { id: "2025-10-27", date: "10/27（月）", time: "18:00〜21:00", place: "三鷹市文化ホール", tally: { o: 8, d: 4, x: 5 } },
-  { id: "2025-10-28", date: "10/28（火）", time: "18:00〜21:00", place: "三鷹市文化ホール", tally: { o: 10, d: 2, x: 3 } },
-  { id: "2025-11-03", date: "11/3（祝）", time: "10:00〜12:00", place: "三鷹市文化ホール", tally: { o: 14, d: 1, x: 0 } },
+  {
+    id: "2025-10-26",
+    uid: "scheduly-day1-9ba2",
+    summary: "秋の合宿 調整会議 Day1",
+    dtstart: "2025-10-26T13:00:00+09:00",
+    dtend: "2025-10-26T17:00:00+09:00",
+    tzid: "Asia/Tokyo",
+    status: "CONFIRMED",
+    sequence: 1,
+    dtstamp: "2024-04-01T01:00:00Z",
+    location: "三鷹市文化ホール メインホール",
+    tally: { o: 12, d: 3, x: 2 }
+  },
+  {
+    id: "2025-10-27",
+    uid: "scheduly-day2-c1f4",
+    summary: "秋の合宿 調整会議 Day2",
+    dtstart: "2025-10-27T18:00:00+09:00",
+    dtend: "2025-10-27T21:00:00+09:00",
+    tzid: "Asia/Tokyo",
+    status: "TENTATIVE",
+    sequence: 0,
+    dtstamp: "2024-04-01T01:05:00Z",
+    location: "三鷹市文化ホール 会議室B",
+    tally: { o: 8, d: 4, x: 5 }
+  },
+  {
+    id: "2025-10-28",
+    uid: "scheduly-day3-d73e",
+    summary: "秋の合宿 調整会議 Day3",
+    dtstart: "2025-10-28T18:00:00+09:00",
+    dtend: "2025-10-28T21:00:00+09:00",
+    tzid: "Asia/Tokyo",
+    status: "TENTATIVE",
+    sequence: 0,
+    dtstamp: "2024-04-01T01:10:00Z",
+    location: "三鷹市文化ホール 会議室B",
+    tally: { o: 10, d: 2, x: 3 }
+  },
+  {
+    id: "2025-11-03",
+    uid: "scheduly-day4-3a0d",
+    summary: "秋の合宿 調整会議 予備日",
+    dtstart: "2025-11-03T10:00:00+09:00",
+    dtend: "2025-11-03T12:00:00+09:00",
+    tzid: "Asia/Tokyo",
+    status: "CONFIRMED",
+    sequence: 2,
+    dtstamp: "2024-04-01T01:20:00Z",
+    location: "三鷹市文化ホール",
+    tally: { o: 14, d: 1, x: 0 }
+  }
 ];
 
 const PARTICIPANTS = {
@@ -39,6 +87,70 @@ const PARTICIPANTS = {
     { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }, { name: "高橋", mark: "o" }
   ],
 };
+
+const STATUS_LABELS = {
+  CONFIRMED: "確定",
+  TENTATIVE: "仮予定",
+  CANCELLED: "取消し"
+};
+
+const STATUS_BADGE_CLASSES = {
+  CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
+  TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
+  CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+};
+
+function formatStatusLabel(status) {
+  const label = STATUS_LABELS[status] || status;
+  return `${label}（${status}）`;
+}
+
+function statusBadgeClass(status) {
+  return STATUS_BADGE_CLASSES[status] || "border-gray-200 bg-gray-50 text-gray-500";
+}
+
+function formatDateLabel(day) {
+  const date = new Date(day.dtstart);
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    timeZone: day.tzid
+  }).formatToParts(date);
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const dayNum = parts.find((p) => p.type === "day")?.value || "";
+  const weekday = parts.find((p) => p.type === "weekday")?.value || "";
+  return `${month}/${dayNum}（${weekday}）`;
+}
+
+function formatTimeRange(day) {
+  const start = new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: day.tzid
+  }).format(new Date(day.dtstart));
+  const end = new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: day.tzid
+  }).format(new Date(day.dtend));
+  return `${start}〜${end}`;
+}
+
+function formatDateTimeWithZone(iso, tz) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: tz,
+    hour12: false
+  }).format(new Date(iso));
+}
 
 /* ================= UI Bits ================= */
 function Pill({ children }) {
@@ -222,7 +334,8 @@ function SchedulyMock() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold">Scheduly</h1>
-            <p className="text-xs text-gray-500">📍 {current.place}</p>
+            <p className="text-xs font-semibold text-gray-700 mt-0.5">{current.summary}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">📍 {current.location}</p>
           </div>
           <div className="text-right">
             <Pill>{completeCount}/{DAYS.length}日 完了</Pill>
@@ -235,9 +348,28 @@ function SchedulyMock() {
       <main className="flex-1 overflow-y-auto p-4 select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* Day Card */}
         <article className="rounded-2xl border p-4 shadow-sm">
-          <div className="mb-2">
-            <div className="text-2xl font-bold tracking-wide">{current.date}</div>
-            <div className="text-sm text-gray-600">{current.time}</div>
+          <div className="mb-3 space-y-1">
+            <div className="flex items-center gap-2 text-xs">
+              <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + statusBadgeClass(current.status)}>
+                {formatStatusLabel(current.status)}
+              </span>
+              <span className="text-[11px] text-gray-400">{current.tzid}</span>
+            </div>
+            <div className="text-2xl font-bold tracking-wide">{current.summary}</div>
+            <div className="text-sm text-gray-600">
+              {formatDateLabel(current)}・{formatTimeRange(current)}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <span role="img" aria-hidden="true">📍</span>
+              <span>{current.location}</span>
+            </div>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+              onClick={() => openDetail(current.id)}
+            >
+              <span aria-hidden="true">ℹ</span> ICS詳細を表示
+            </button>
           </div>
 
           {/* Big ○ △ × buttons */}
@@ -336,12 +468,18 @@ function SchedulyMock() {
                       onPointerCancel={onPressEnd}
                       onContextMenu={(e) => e.preventDefault()}
                     >
-                      <div className="text-sm font-medium">
-                        {d.date}
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        {formatDateLabel(d)}
                         {isCurrent && <span className="ml-2 text-emerald-600 text-xs font-semibold">（現在）</span>}
                       </div>
-                      <div className="text-xs text-gray-500">{d.time}</div>
-                      <div className="text-[10px] text-gray-400">（長押しで参加者を見る）</div>
+                      <div className="text-xs text-gray-500">{formatTimeRange(d)}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                        <span className={"inline-flex items-center rounded-full border px-2 py-0.5 " + statusBadgeClass(d.status)}>
+                          {formatStatusLabel(d.status)}
+                        </span>
+                        <span className="truncate max-w-[12rem]">{d.location}</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-1">（長押しで参加者を見る）</div>
                     </button>
                   </div>
 
@@ -374,9 +512,45 @@ function SchedulyMock() {
       </footer>
 
       {/* Detail Modal */}
-      <Modal open={!!detailDay} title={detailDay ? (detailDay.date + " の参加者") : ""} onClose={closeDetail}>
+      <Modal
+        open={!!detailDay}
+        title={detailDay ? `${formatDateLabel(detailDay)} の詳細` : ""}
+        onClose={closeDetail}
+      >
         {detailDay && (
           <>
+            <section className="space-y-2 text-xs text-gray-600">
+              <p className="text-sm font-semibold text-gray-800">{detailDay.summary}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + statusBadgeClass(detailDay.status)}>
+                  {formatStatusLabel(detailDay.status)}
+                </span>
+                <span className="text-[11px] text-gray-400">{detailDay.tzid}</span>
+              </div>
+              <p>{formatDateLabel(detailDay)}・{formatTimeRange(detailDay)}</p>
+              <p>📍 {detailDay.location}</p>
+              <dl className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-[11px] text-gray-600">
+                <div className="flex items-start gap-3">
+                  <dt className="w-20 font-semibold text-gray-500">UID</dt>
+                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailDay.uid}</dd>
+                </div>
+                <div className="flex items-start gap-3">
+                  <dt className="w-20 font-semibold text-gray-500">SEQUENCE</dt>
+                  <dd className="flex-1 text-gray-700">{detailDay.sequence}</dd>
+                </div>
+                <div className="flex items-start gap-3">
+                  <dt className="w-20 font-semibold text-gray-500">DTSTAMP</dt>
+                  <dd className="flex-1">
+                    <div className="font-mono break-all text-gray-700">{detailDay.dtstamp}</div>
+                    <div className="text-[10px] text-gray-400">
+                      {formatDateTimeWithZone(detailDay.dtstamp, detailDay.tzid)} （{detailDay.tzid}）
+                    </div>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <hr className="my-3 border-gray-200" />
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailDay.id, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailDay.id, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailDay.id, "x")} />
