@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scheduly – Mobile Scheduling Mock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>html,body{height:100%;}</style>
+</head>
+<body class="bg-white text-gray-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+/* ================= Mock Data ================= */
+const DAYS = [
+  { id: "2025-10-26", date: "10/26（日）", time: "13:00〜17:00", place: "三鷹市文化ホール", tally: { o: 12, d: 3, x: 2 } },
+  { id: "2025-10-27", date: "10/27（月）", time: "18:00〜21:00", place: "三鷹市文化ホール", tally: { o: 8, d: 4, x: 5 } },
+  { id: "2025-10-28", date: "10/28（火）", time: "18:00〜21:00", place: "三鷹市文化ホール", tally: { o: 10, d: 2, x: 3 } },
+  { id: "2025-11-03", date: "11/3（祝）", time: "10:00〜12:00", place: "三鷹市文化ホール", tally: { o: 14, d: 1, x: 0 } },
+];
+
+const PARTICIPANTS = {
+  "2025-10-26": [
+    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" },
+    { name: "高橋", mark: "d" }, { name: "伊藤", mark: "x" }
+  ],
+  "2025-10-27": [
+    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "d" }, { name: "田中", mark: "x" }, { name: "高橋", mark: "x" }
+  ],
+  "2025-10-28": [
+    { name: "佐藤", mark: "d" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }
+  ],
+  "2025-11-03": [
+    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }, { name: "高橋", mark: "o" }
+  ],
+};
+
+/* ================= UI Bits ================= */
+function Pill({ children }) {
+  return <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">{children}</span>;
+}
+
+function StatRow({ day }) {
+  const maxO = Math.max(...DAYS.map((d) => d.tally.o));
+  const star = day.tally.o === maxO && maxO > 0 ? "★ 最有力" : "";
+  return (
+    <div className="flex items-center justify-between text-sm mt-3">
+      <div className="flex gap-3">
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{day.tally.o}</span>
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{day.tally.d}</span>
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{day.tally.x}</span>
+      </div>
+      <span className="text-emerald-600 text-xs font-semibold">{star}</span>
+    </div>
+  );
+}
+
+// Responsive Modal (overlay click + Esc key to close)
+function Modal({ open, title, onClose, children }) {
+  useEffect(() => {
+    const handleKey = (e) => e.key === "Escape" && onClose();
+    if (open) document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-black/40 cursor-pointer" onClick={onClose}></div>
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center">
+        <div
+          className="w-full max-w-sm mx-4 sm:mx-0 rounded-t-2xl sm:rounded-2xl border bg-white shadow-xl mb-4 sm:mb-0 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h3 className="text-sm font-semibold">{title}</h3>
+            <button className="text-sm text-gray-500" onClick={onClose}>閉じる</button>
+          </div>
+          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ParticipantList({ list, label, color }){
+  return (
+    <div>
+      <div className={"text-xs font-semibold " + color + " mb-1"}>{label}</div>
+      {list && list.length ? (
+        <ul className="flex flex-wrap gap-2 text-sm">
+          {list.map((p,i)=>(<li key={i} className="rounded-full border px-2 py-0.5">{p.name}</li>))}
+        </ul>
+      ) : (
+        <div className="text-xs text-gray-400">—</div>
+      )}
+    </div>
+  );
+}
+
+/* ================= Main App ================= */
+function SchedulyMock() {
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState({}); // { [id]: { mark: 'o'|'d'|'x'|null, comment: '' } }
+  const [savedAt, setSavedAt] = useState("");
+  const [toast, setToast] = useState("");
+  const [detailDayId, setDetailDayId] = useState(null);
+
+  // ▼ サマリー側の各行参照
+  const itemRefs = useRef({});
+
+  // ▼ 「サマリーをタップしたときのみ」自動スクロールするためのフラグ
+  const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
+
+  const startX = useRef(null);
+  const pressTimer = useRef(null);
+  const pressStart = useRef({x:0,y:0,moved:false});
+
+  const current = DAYS[index];
+  const mark = (answers[current.id] && answers[current.id].mark) || null;
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const t = new Date();
+      setSavedAt(String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0"));
+    }, 250);
+    return () => clearTimeout(id);
+  }, [answers, index]);
+
+  useEffect(() => {
+    if (detailDayId) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [detailDayId]);
+
+  // ▼ インデックス変更時：必要な場合のみ（サマリーからの遷移時のみ）スクロール
+  useEffect(() => {
+    const el = itemRefs.current[current.id];
+    if (el) {
+      // フォーカスは常に付与（スクロールは抑制）
+      el.focus({ preventScroll: true });
+      if (shouldScrollToCurrent) {
+        el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        setShouldScrollToCurrent(false); // 一度だけ
+      }
+    }
+  }, [index, current.id, shouldScrollToCurrent]);
+
+  const setMark = (m) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [current.id]: { mark: (prev[current.id] && prev[current.id].mark) === m ? null : m, comment: (prev[current.id] && prev[current.id].comment) || "" }
+    }));
+  };
+
+  const setComment = (v) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [current.id]: { mark: (prev[current.id] && prev[current.id].mark) || null, comment: v }
+    }));
+  };
+
+  // 前/次ボタンやスワイプではスクロールさせない
+  const go = (dir) => {
+    setShouldScrollToCurrent(false);
+    setIndex((i) => Math.max(0, Math.min(DAYS.length - 1, i + dir)));
+  };
+
+  const onTouchStart = (e) => (startX.current = e.touches[0].clientX);
+  const onTouchEnd = (e) => {
+    if (startX.current == null) return;
+    const dx = e.changedTouches[0].clientX - startX.current;
+    if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+    startX.current = null;
+  };
+
+  const completeCount = Object.values(answers).filter((a) => a && a.mark).length;
+
+  const submit = () => {
+    setToast("送信しました。ありがとうございました！");
+    setTimeout(() => setToast(""), 1800);
+  };
+
+  const openDetail = (dayId) => setDetailDayId(dayId);
+  const closeDetail = () => setDetailDayId(null);
+
+  const onPressStart = (dayId, e) => {
+    pressStart.current = { x: e.clientX, y: e.clientY, moved: false };
+    if (pressTimer.current) window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => {
+      if (!pressStart.current.moved) {
+        if (navigator.vibrate) navigator.vibrate(10);
+        openDetail(dayId);
+      }
+    }, 500);
+  };
+  const onPressMove = (e) => {
+    const dx = Math.abs(e.clientX - pressStart.current.x);
+    const dy = Math.abs(e.clientY - pressStart.current.y);
+    if (dx > 8 || dy > 8) pressStart.current.moved = true;
+  };
+  const onPressEnd = () => {
+    if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; }
+  };
+
+  const participantsFor = (dayId, m) => (PARTICIPANTS[dayId] || []).filter(p => p.mark === m);
+  const detailDay = detailDayId ? (DAYS.find(d => d.id === detailDayId) || null) : null;
+
+  return (
+    <div className="mx-auto max-w-sm h-dvh flex flex-col bg-white text-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b p-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold">Scheduly</h1>
+            <p className="text-xs text-gray-500">📍 {current.place}</p>
+          </div>
+          <div className="text-right">
+            <Pill>{completeCount}/{DAYS.length}日 完了</Pill>
+            <div className="text-[10px] text-gray-500 mt-1">👤 匿名参加者</div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto p-4 select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {/* Day Card */}
+        <article className="rounded-2xl border p-4 shadow-sm">
+          <div className="mb-2">
+            <div className="text-2xl font-bold tracking-wide">{current.date}</div>
+            <div className="text-sm text-gray-600">{current.time}</div>
+          </div>
+
+          {/* Big ○ △ × buttons */}
+          <div className="grid grid-cols-3 gap-2 my-2">
+            {["o","d","x"].map((k) => {
+              const pressed = mark === k;
+              const color =
+                k === "o"
+                  ? (pressed ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 text-emerald-700 border-emerald-300")
+                  : k === "d"
+                  ? (pressed ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-300")
+                  : (pressed ? "bg-rose-500 text-white border-rose-500" : "bg-rose-50 text-rose-700 border-rose-300");
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={pressed}
+                  onClick={() => setMark(k)}
+                  className={"h-14 rounded-xl border text-2xl font-bold transition-colors " + color}
+                >
+                  {k === "o" ? "○" : k === "d" ? "△" : "×"}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tally */}
+          <StatRow day={current} />
+
+          {/* Comment */}
+          <label className="block mt-3">
+            <span className="text-xs text-gray-500">コメント（任意）</span>
+            <textarea
+              className="mt-1 w-full rounded-xl border p-2 text-sm"
+              rows={2}
+              placeholder="この日はテストの可能性が…"
+              value={(answers[current.id] && answers[current.id].comment) || ""}
+              onChange={(e) => setComment(e.target.value)}
+            />
+          </label>
+        </article>
+
+        {/* Nav */}
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <button className="h-12 rounded-xl border disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
+          <button className="h-12 rounded-xl border disabled:opacity-40" onClick={() => go(1)} disabled={index === DAYS.length - 1}>次の日 →</button>
+        </div>
+
+        {/* Overview list */}
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold mb-2">📊 出欠サマリー</h2>
+          <ul className="space-y-1">
+            {DAYS.map((d) => {
+              const isCurrent = d.id === current.id;
+              const my = (answers[d.id] && answers[d.id].mark) || null;
+              const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
+              const myClass =
+                my === "o" ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+              : my === "d" ? "border-amber-300 text-amber-700 bg-amber-50"
+              : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
+              : "border-gray-200 text-gray-500 bg-gray-50";
+
+              return (
+                <li
+                  key={d.id}
+                  className={
+                    "flex items-center justify-between rounded-lg border px-3 py-2 transition " +
+                    (isCurrent
+                      ? "border-emerald-500 ring-2 ring-emerald-500/70 bg-emerald-50/50"
+                      : "hover:bg-gray-50")
+                  }
+                  aria-current={isCurrent ? "true" : undefined}
+                  ref={(el) => (itemRefs.current[d.id] = el)}
+                  tabIndex={-1}
+                >
+                  <div className="flex items-center gap-2">
+                    {/* 左側カーソル（現在のみ表示） */}
+                    <span
+                      className={
+                        "w-1.5 h-6 rounded-full transition " +
+                        (isCurrent ? "bg-emerald-500" : "bg-transparent")
+                      }
+                      aria-hidden="true"
+                    />
+                    <button
+                      className="text-left py-3"
+                      onClick={() => {
+                        // サマリーからのジャンプ時のみスクロール
+                        setShouldScrollToCurrent(true);
+                        setIndex(DAYS.findIndex((x) => x.id === d.id));
+                      }}
+                      onPointerDown={(e) => onPressStart(d.id, e)}
+                      onPointerMove={onPressMove}
+                      onPointerUp={onPressEnd}
+                      onPointerLeave={onPressEnd}
+                      onPointerCancel={onPressEnd}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <div className="text-sm font-medium">
+                        {d.date}
+                        {isCurrent && <span className="ml-2 text-emerald-600 text-xs font-semibold">（現在）</span>}
+                      </div>
+                      <div className="text-xs text-gray-500">{d.time}</div>
+                      <div className="text-[10px] text-gray-400">（長押しで参加者を見る）</div>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{d.tally.o}</span>
+                    <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{d.tally.d}</span>
+                    <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{d.tally.x}</span>
+                    {/* ▼ あなたの選択表示（未選択は—） */}
+                    <span
+                      className={"ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border " + myClass}
+                      aria-label="あなたの選択"
+                      title="あなたの選択"
+                    >
+                      <span className="font-medium">あなた:</span> {myLabel}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="sticky bottom-0 bg-white/95 backdrop-blur border-t p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-500">✓ 自動保存済み {savedAt && "・" + savedAt}</span>
+          <button className="h-10 px-4 rounded-xl bg-black text-white font-semibold" onClick={submit}>送信を確定</button>
+        </div>
+      </footer>
+
+      {/* Detail Modal */}
+      <Modal open={!!detailDay} title={detailDay ? (detailDay.date + " の参加者") : ""} onClose={closeDetail}>
+        {detailDay && (
+          <>
+            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailDay.id, "o")} />
+            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailDay.id, "d")} />
+            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailDay.id, "x")} />
+          </>
+        )}
+      </Modal>
+
+      {/* Toast */}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-16 flex justify-center px-4">
+          <div className="pointer-events-auto rounded-xl border bg-white px-4 py-2 text-sm shadow-lg">{toast}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<SchedulyMock />);
+  </script>
+</body>
+</html>
