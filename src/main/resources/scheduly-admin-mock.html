@@ -82,7 +82,7 @@
                 </div>
               </div>
 
-              <div className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
                   <input
@@ -92,6 +92,18 @@
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                     placeholder="例: 秋の合宿 調整会議 Day1"
                   />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-zinc-500">ステータス（STATUS）</span>
+                  <select
+                    value={value.status}
+                    onChange={(e) => onChange({ ...value, status: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  >
+                    <option value="CONFIRMED">確定（CONFIRMED）</option>
+                    <option value="TENTATIVE">仮予定（TENTATIVE）</option>
+                    <option value="CANCELLED">取消し（CANCELLED）</option>
+                  </select>
                 </label>
               </div>
 
@@ -129,18 +141,6 @@
                         {tz}
                       </option>
                     ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-zinc-500">ステータス（STATUS）</span>
-                  <select
-                    value={value.status}
-                    onChange={(e) => onChange({ ...value, status: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  >
-                    <option value="CONFIRMED">CONFIRMED</option>
-                    <option value="TENTATIVE">TENTATIVE</option>
-                    <option value="CANCELLED">CANCELLED</option>
                   </select>
                 </label>
               </div>
