@@ -174,6 +174,45 @@
         return candidate;
       };
 
+      
+                  const exportAllCandidatesToIcs = (candidates) => {
+        const now = new Date();
+        const dtstampIso = now.toISOString();
+        const dtstampLine = formatUtcForIcs(dtstampIso);
+
+        const lines = [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//Scheduly//Mock//JA",
+          "CALSCALE:GREGORIAN",
+          "METHOD:PUBLISH"
+        ];
+
+        candidates.forEach(function (candidate) {
+          const sequence = typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1;
+          const dtstartLine = formatUtcForIcs(candidate.dtstart);
+          const dtendLine = formatUtcForIcs(candidate.dtend);
+          const statusValue = (candidate.status ? String(candidate.status) : "CONFIRMED").toUpperCase();
+          const tzidValue = (candidate.tzid && candidate.tzid.trim()) ? candidate.tzid.trim() : defaultTzid;
+
+          lines.push("BEGIN:VEVENT");
+          lines.push("UID:" + (candidate.uid || `scheduly-${crypto.randomUUID()}`));
+          lines.push("SEQUENCE:" + sequence);
+          if (dtstampLine) lines.push("DTSTAMP:" + dtstampLine);
+          if (dtstartLine) lines.push("DTSTART:" + dtstartLine);
+          if (dtendLine) lines.push("DTEND:" + dtendLine);
+          lines.push("STATUS:" + (statusValue || "CONFIRMED"));
+          lines.push("SUMMARY:" + escapeIcsText(candidate.summary || ""));
+          lines.push("LOCATION:" + escapeIcsText(candidate.location || ""));
+          lines.push("DESCRIPTION:" + escapeIcsText(candidate.description || ""));
+          if (tzidValue) lines.push("X-SCHEDULY-TZID:" + escapeIcsText(tzidValue));
+          lines.push("END:VEVENT");
+        });
+
+        lines.push("END:VCALENDAR");
+        const filteredLines = lines.filter(Boolean);
+        return filteredLines.join("\r\n") + "\r\n";
+      };
       const exportCandidateToIcs = (candidate) => {
         const now = new Date();
         const sequence = typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1;
@@ -207,7 +246,9 @@
         lines.push("END:VCALENDAR");
 
         const filteredLines = lines.filter(Boolean);
-        const icsText = filteredLines.join("\r\n") + "\r\n";
+        const icsText = filteredLines.join("
+") + "
+";
 
         let updatedRaw = candidate.rawVevent;
         try {
@@ -221,7 +262,7 @@
           console.warn("Failed to parse generated ICS back to component", parseError);
         }
 
-        const safeName = (candidate.summary || candidate.uid || "event").replace(/[\\/:*?"<>|]+/g, "_");
+        const safeName = (candidate.summary || candidate.uid || "event").replace(/[\/:*?"<>|]+/g, "_");
 
         return {
           icsText,
