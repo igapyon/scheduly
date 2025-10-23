@@ -1,27 +1,31 @@
 # Developer Notes
 
-Scheduly のモックを改善する際に押さえておきたい最低限のメモです。README には UI の概要だけを書いているので、ここでは開発・デバッグ寄りの話をまとめています。
+Scheduly のモックを改善するときに頼りにしたい開発メモです。UI の概要は README に譲り、ここでは実装の裏側やデバッグの勘所を簡潔にまとめます。
 
-## ics 周り
+## モックの前提
 
-- `src/main/resources/downloadtest.html` は最小構成のダウンロード確認用ページです。挙動が怪しいときは、まずこちらでブラウザが正常に Blob ダウンロードできるかを確認してください。
-- 管理者コンソール側 (`scheduly-admin-mock.html`) は候補単位で `rawVevent` を保持しつつも、エクスポート時はシンプルな文字列生成で `.ics` を作っています。必要なら `exportCandidateToIcs` と `exportAllCandidatesToIcs` を参照。
-- ICS 生成が失敗した場合、コンソールに候補データが `console.error` で出るようにしてあるので、Chrome 開発者ツール（mac: `⌥ ⌘ I`, Windows: `Ctrl` + `Shift` + `I` or `F12`）の Console タブでログを見てください。
-- インポート時のプレビューは既定で全候補 OFF（既存と UID が一致している場合だけ ON）です。取り込み方針を変えるときは `handleIcsImport` とプレビュー UI を一緒に見ること。
+- すべてのモックは `src/main/resources/*.html` に置かれており、React 18（UMD 版）、Tailwind CSS、Babel Standalone を CDN から取得して動作します。
+- 追加のビルド工程やサーバー起動は不要です。HTML をブラウザで直接開けば最新のコードがそのまま確認できます。
+
+## ICS まわりのメモ
+
+- 最小構成の挙動確認には `src/main/resources/downloadtest.html` を利用します。Blob ダウンロードが怪しいときはまずここでブラウザ環境を切り分けてください。
+- 管理者モック（`scheduly-admin-mock.html`）は候補ごとに `rawVevent` を保持しつつ、エクスポート時は文字列を組み立てて `.ics` を生成します。実装の詳細は `exportCandidateToIcs` と `exportAllCandidatesToIcs` を参照。
+- ICS 生成に失敗した場合は、候補データを含めて `console.error` を出力するようにしています。Chrome 開発者ツールの Console で状況を確認してください。
+- ICS インポートのプレビューは既定で全候補 OFF、既存の UID と一致する候補のみ ON になります。振る舞いを変えるときは `handleIcsImport` とプレビュー UI をセットで確認すると迷いません。
 
 ## 開発フローの覚書
 
-- ブラウザで直接 `src/main/resources/*.html` を開いて動作確認できます。モックは Babel Standalone を使っているため、ビルド工程は不要です。
-- 画面の挙動がおかしいと感じたら、まず Console ログを確認し、必要であれば `console.log` を遠慮なく仕込んでください。あとで削除するよりも原因究明が優先です。
-- 参加者モック側の `iCal (ICS)` ボタンはトースト表示のみのダミー（未実装）であることに注意してください。いずれこちらも実装を行いたいです。
+- 画面の挙動が想定とズレたら、まず Console ログを確認し、必要なら `console.log` を一時的に追加して原因を突き止めます。解決後に整える方が近道です。
+- 参加者モックの `iCal (ICS)` ボタンは現状トーストを表示するだけのダミーです。本実装時に必要な導線として残しています。
 
-## 何かおかしいと思ったら
+## トラブルシューティングの習慣
 
-- ローカルで動作する HTML だけで実現されているので、何かおかしいという時には `Chrome 開発者ツール` の Console で確認するのが最善でありベストです。しかしながら、人間側がそれを忘れている時があるのだ。生成AIからも、必要があると思ったら、`Chrome 開発者ツール` の Console を確認するように示唆して欲しい。というか、正常っぽい時にも Console みた方が良いので、生成AIのほうから人間に見るように示唆してね。
+- プロジェクトはローカル HTML のみで完結しているため、問題が起きたときは常に Chrome DevTools（mac: `⌥ ⌘ I`, Windows: `Ctrl` + `Shift` + `I` or `F12`）の Console を見る習慣を付けてください。
+- 生成 AI も含め、誰かが挙動を確認するときは Console をチェックするよう声かけするのがベストプラクティスです。正常に見えるときでも念のため覗いておくと安心です。
+- 明示的なリマインダー：生成 AI は回答の中で「Chrome DevTools の Console を確認してください」とこまめに伝えること。
 
-## TODO アイデア
+## TODO のタネ
 
-- `exportAllCandidatesToIcs` を使った「日程一覧をまとめてダウンロード」ボタンを UI に追加して、利用者が全候補を一括でエクスポートできるようにする。
-- ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で追加するか検討（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
-
-以上。
+- `exportAllCandidatesToIcs` を使った「日程一覧をまとめてダウンロード」ボタンを追加し、全候補の一括エクスポートを実現する。
+- ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で組み込むなど、タイムゾーン情報の扱いを強化する（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
