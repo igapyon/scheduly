@@ -174,8 +174,8 @@
         return candidate;
       };
 
-      
-                  const exportAllCandidatesToIcs = (candidates) => {
+
+      const exportAllCandidatesToIcs = (candidates) => {
         const now = new Date();
         const dtstampIso = now.toISOString();
         const dtstampLine = formatUtcForIcs(dtstampIso);
@@ -213,6 +213,7 @@
         const filteredLines = lines.filter(Boolean);
         return filteredLines.join("\r\n") + "\r\n";
       };
+
       const exportCandidateToIcs = (candidate) => {
         const now = new Date();
         const sequence = typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1;
@@ -246,9 +247,7 @@
         lines.push("END:VCALENDAR");
 
         const filteredLines = lines.filter(Boolean);
-        const icsText = filteredLines.join("
-") + "
-";
+        const icsText = filteredLines.join("\r\n") + "\r\n";
 
         let updatedRaw = candidate.rawVevent;
         try {
@@ -581,6 +580,22 @@
           popToast("日程を追加しました");
         };
 
+        const handleExportAllCandidates = () => {
+          if (!candidates.length) {
+            popToast("ダウンロード対象の日程がありません");
+            return;
+          }
+          try {
+            const icsText = exportAllCandidatesToIcs(candidates);
+            const filename = `scheduly-all-${new Date().toISOString().split('T')[0]}.ics`;
+            downloadTextFile(filename, icsText);
+            popToast("全候補を iCal (ICS) でダウンロードしました（モック）");
+          } catch (error) {
+            console.error("ICS bulk export error", error);
+            popToast("全候補のICS生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
+          }
+        };
+
         const handleExportCandidate = (candidateId) => {
           const target = candidates.find(function (item) { return item.id === candidateId; });
           if (!target) {
@@ -900,6 +915,14 @@
                         }}
                       >
                         ICSから追加
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
+                        onClick={handleExportAllCandidates}
+                        disabled={!candidates.length}
+                      >
+                        ICSを一括ダウンロード
                       </button>
                       <input
                         ref={importInputRef}
