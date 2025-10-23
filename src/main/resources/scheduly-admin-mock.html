@@ -30,17 +30,25 @@
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
       };
 
-      const timeFromLocalInput = (value, tzid) => {
+      const timeFromLocalInput = (value) => {
         if (!value) return null;
-        const [datePart, timePart] = value.split("T");
-        if (!datePart || !timePart) return null;
-        const [year, month, day] = datePart.split("-").map(Number);
-        const [hour, minute] = timePart.split(":").map(Number);
-        const tz = ICAL.TimezoneService.get(tzid);
-        const zone = tz || ICAL.Timezone.localTimezone || ICAL.Timezone.utcTimezone;
-        const time = new ICAL.Time({ year, month, day, hour, minute, second: 0 });
-        time.zone = zone;
-        return time;
+        const parts = value.split("T");
+        if (parts.length !== 2) return null;
+        const datePart = parts[0];
+        const timePart = parts[1];
+        const dateSegments = datePart.split("-").map(Number);
+        const timeSegments = timePart.split(":").map(Number);
+        if (dateSegments.length < 3 || timeSegments.length < 2) return null;
+        const jsDate = new Date(Date.UTC(
+          dateSegments[0],
+          dateSegments[1] - 1,
+          dateSegments[2],
+          timeSegments[0],
+          timeSegments[1],
+          0,
+          0
+        ));
+        return ICAL.Time.fromJSDate(jsDate, true);
       };
 
       const toLocalInputFromICAL = (icalTime) => {
@@ -60,9 +68,9 @@
         event.status = candidate.status || "CONFIRMED";
         const initialSequence = typeof candidate.sequence === "number" ? candidate.sequence : 0;
         event.sequence = initialSequence;
-        const dtstartTime = timeFromLocalInput(candidate.dtstart, candidate.tzid);
+        const dtstartTime = timeFromLocalInput(candidate.dtstart);
         if (dtstartTime) event.startDate = dtstartTime;
-        const dtendTime = timeFromLocalInput(candidate.dtend, candidate.tzid);
+        const dtendTime = timeFromLocalInput(candidate.dtend);
         if (dtendTime) event.endDate = dtendTime;
         const dtstampTime = candidate.dtstamp ? ICAL.Time.fromJSDate(new Date(candidate.dtstamp)) : ICAL.Time.fromJSDate(new Date());
         event.component.updatePropertyWithValue("dtstamp", dtstampTime);
@@ -396,6 +404,7 @@
 
       function formatLocalDisplay(value) {
         if (!value) return "未設定";
+        if (value.indexOf("T") === -1) return value;
         return value.replace("T", " ");
       }
 
@@ -441,10 +450,13 @@
           const link = document.createElement("a");
           link.href = url;
           link.download = filename;
+          link.style.display = "none";
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
+          setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }, 0);
         };
 
         const updateCandidate = (id, next) => {
@@ -473,19 +485,25 @@
         };
 
         const handleExportCandidate = (candidateId) => {
-          let result = null;
-          setCandidates(function (prev) {
-            return prev.map(function (item) {
-              if (item.id !== candidateId) {
-                return item;
-              }
-              result = exportCandidateToIcs(item);
-              return result.updatedCandidate;
+          let exportResult = null;
+          try {
+            setCandidates(function (prev) {
+              return prev.map(function (item) {
+                if (item.id !== candidateId) {
+                  return item;
+                }
+                exportResult = exportCandidateToIcs(item);
+                return exportResult.updatedCandidate;
+              });
             });
-          });
-          if (result) {
-            downloadTextFile(result.filename, result.icsText);
-            popToast(`${result.filename} をダウンロードしました（モック）`);
+          } catch (error) {
+            console.error("ICS export error", error);
+            popToast("ICSの生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
+            return;
+          }
+          if (exportResult) {
+            downloadTextFile(exportResult.filename, exportResult.icsText);
+            popToast(`${exportResult.filename} をダウンロードしました（モック）`);
           }
         };
 
@@ -533,7 +551,7 @@
             const existingInfo = existingMap.get(candidate.uid);
             let status = "new";
             let message = "新規追加";
-            let selected = true;
+            let selected = false;
             let existingDtstamp = null;
             let existingIndex = -1;
             if (existingInfo) {
@@ -542,7 +560,6 @@
               if (existingInfo.candidate.dtstamp && candidate.dtstamp <= existingInfo.candidate.dtstamp) {
                 status = "older";
                 message = "既存より古いバージョン";
-                selected = false;
               } else {
                 status = "update";
                 message = "既存候補を更新";
