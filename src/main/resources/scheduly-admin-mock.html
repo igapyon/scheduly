@@ -57,7 +57,7 @@
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex w-fit items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                     日程 {index + 1}
                   </span>
@@ -67,6 +67,14 @@
                     onClick={() => setMetaOpen(true)}
                   >
                     ICS詳細
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-500 opacity-70"
+                    title="この候補の iCal エクスポートはモックのため未実装です"
+                  >
+                    <span aria-hidden="true">📅</span> iCal (ICS)
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
@@ -472,20 +480,6 @@
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={() => popToast("iCalファイルをエクスポートしました（モック）")}
-                    >
-                      iCalをエクスポート（モック）
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={() => popToast("iCalファイルをインポートしました（モック）")}
-                    >
-                      iCalをインポート（モック）
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
                       onClick={mockDownloadJson}
                     >
                       参加者情報をエクスポート（JSON）
@@ -498,7 +492,9 @@
                       参加者情報をインポート（JSON）
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-500">管理系機能のワークフローを確認するためのダミー操作です。</p>
+                  <p className="text-xs text-zinc-500">
+                    ICS のエクスポート／インポートは各候補の「iCal (ICS)」ボタン（モック）で個別に扱う設計を想定しています。
+                  </p>
                 </Section>
               </div>
 
