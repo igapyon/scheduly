@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 const DASHBOARD_META = {
@@ -8,13 +8,33 @@ const DASHBOARD_META = {
   lastUpdated: "2025/04/12 17:45"
 };
 
-const SCHEDULES = [
-  {
+const DEFAULT_TZID = "Asia/Tokyo";
+
+const ensureICAL = () => {
+  if (typeof window === "undefined" || !window.ICAL) {
+    throw new Error("ical.js が読み込まれていません。public/index.html に CDN スクリプトを追加してください。");
+  }
+  return window.ICAL;
+};
+
+const formatScheduleRange = (startDate, endDate, tzid) => {
+  if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
+  const zone = tzid || DEFAULT_TZID;
+  const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone });
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone });
+  const datePart = dateFormatter.format(startDate);
+  const startTime = timeFormatter.format(startDate);
+  const endTime = endDate instanceof Date && !Number.isNaN(endDate.getTime()) ? timeFormatter.format(endDate) : "";
+  return endTime ? `${datePart} ${startTime} – ${endTime}` : `${datePart} ${startTime}`;
+};
+
+const SAMPLE_SCHEDULE_DETAILS = {
+  "scheduly-sample-day1": {
     id: "day1",
     label: "Day 1",
-    datetime: "2025/10/26 13:00 – 17:00",
     location: "サントリーホール 大ホール",
     status: "CONFIRMED",
+    tzid: DEFAULT_TZID,
     counts: { o: 8, d: 3, x: 1 },
     summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
     responses: [
@@ -24,12 +44,12 @@ const SCHEDULES = [
       { participantId: "others", name: "・・・", mark: "pending", comment: "残り9名の回答は実装時に取得" }
     ]
   },
-  {
+  "scheduly-sample-day2": {
     id: "day2",
     label: "Day 2",
-    datetime: "2025/10/27 18:00 – 21:00",
     location: "サントリーホール ブルーローズ",
     status: "TENTATIVE",
+    tzid: DEFAULT_TZID,
     counts: { o: 4, d: 5, x: 3 },
     summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
     responses: [
@@ -39,12 +59,12 @@ const SCHEDULES = [
       { participantId: "others", name: "・・・", mark: "pending", comment: "他 8 名の回答を表示（実装時にロード）" }
     ]
   },
-  {
+  "scheduly-sample-day3": {
     id: "day3",
     label: "Day 3",
-    datetime: "2025/10/28 18:00 – 21:00",
     location: "サントリーホール ブルーローズ",
     status: "TENTATIVE",
+    tzid: DEFAULT_TZID,
     counts: { o: 6, d: 2, x: 4 },
     summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
     responses: [
@@ -53,7 +73,7 @@ const SCHEDULES = [
       { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "他会議とバッティング" }
     ]
   }
-];
+};
 
 const PARTICIPANTS = [
   {
@@ -312,6 +332,80 @@ function TabNavigation({ activeTab, onChange }) {
 
 function AdminResponsesApp() {
   const [activeTab, setActiveTab] = useState("schedule");
+  const [schedules, setSchedules] = useState([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSchedulesFromIcs = async () => {
+      setSchedulesLoading(true);
+      try {
+        const response = await fetch("/ics/sample-candidates.ics", { cache: "no-cache" });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
+        }
+        const text = await response.text();
+        const ICAL = ensureICAL();
+        const parsed = ICAL.parse(text);
+        const component = new ICAL.Component(parsed);
+        const vevents = component.getAllSubcomponents("vevent") || [];
+        if (!vevents.length) {
+          throw new Error("No VEVENT entries in sample ICS");
+        }
+        const converted = [];
+        for (let i = 0; i < vevents.length; i += 1) {
+          const vevent = vevents[i];
+          const event = new ICAL.Event(vevent);
+          if (!event.uid) continue;
+          const details = SAMPLE_SCHEDULE_DETAILS[event.uid];
+          const startDate = event.startDate ? event.startDate.toJSDate() : null;
+          const endDate = event.endDate ? event.endDate.toJSDate() : null;
+          const tzid = (event.startDate && event.startDate.zone && event.startDate.zone.tzid) || details?.tzid || DEFAULT_TZID;
+          const datetime = startDate && endDate ? formatScheduleRange(startDate, endDate, tzid) : "";
+
+          converted.push({
+            uid: event.uid,
+            id: details?.id || event.uid,
+            label: details?.label || event.summary || event.uid,
+            datetime,
+            location: event.location || details?.location || "",
+            status: event.status || details?.status || "TENTATIVE",
+            tzid,
+            startsAt: startDate ? startDate.toISOString() : null,
+            endsAt: endDate ? endDate.toISOString() : null,
+            counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
+            summaryText: details?.summaryText || "",
+            responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
+          });
+        }
+        converted.sort((a, b) => {
+          if (a.startsAt && b.startsAt) {
+            return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+          }
+          return (a.label || "").localeCompare(b.label || "", "ja");
+        });
+        if (!cancelled) {
+          setSchedules(converted);
+        }
+      } catch (error) {
+        console.warn("[Scheduly] failed to hydrate participant schedules from ICS, leaving schedules empty", error);
+        if (!cancelled) {
+          setSchedules([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSchedulesLoading(false);
+        }
+      }
+    };
+
+    loadSchedulesFromIcs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -358,9 +452,17 @@ function AdminResponsesApp() {
       {activeTab === "schedule" && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">日程ごとの回答サマリー</h2>
-          {SCHEDULES.map((schedule) => (
-            <ScheduleSummary key={schedule.id} schedule={schedule} />
-          ))}
+          {schedulesLoading && !schedules.length ? (
+            <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center text-xs text-emerald-600">
+              日程データを読み込んでいます…
+            </div>
+          ) : schedules.length ? (
+            schedules.map((schedule) => <ScheduleSummary key={schedule.id} schedule={schedule} />)
+          ) : (
+            <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
+              表示できる日程がありません。
+            </div>
+          )}
         </section>
       )}
 

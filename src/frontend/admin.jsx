@@ -158,52 +158,6 @@ const createBlankICalCandidate = () => {
   return candidate;
 };
 
-const seedICalCandidate = (data) => {
-  const candidate = {
-    id: randomUUID(),
-    uid: data.uid || `scheduly-${randomUUID()}`,
-    summary: data.summary || "",
-    dtstart: data.dtstart || "",
-    dtend: data.dtend || "",
-    tzid: data.tzid || DEFAULT_TZID,
-    status: data.status || "CONFIRMED",
-    sequence: data.sequence || 0,
-    dtstamp: data.dtstamp || createDtstampIso(),
-    location: data.location || "",
-    description: data.description || "",
-    rawICalVevent: null
-  };
-  candidate.rawICalVevent = data.rawICalVevent || buildICalVeventJCal(candidate);
-  return candidate;
-};
-
-const defaultSeedCandidates = () => [
-  seedICalCandidate({
-    uid: "scheduly-sample-day1",
-    summary: "秋の合宿 調整会議 Day1",
-    dtstart: toInputValue(new Date("2024-10-26T13:00:00+09:00")),
-    dtend: toInputValue(new Date("2024-10-26T17:00:00+09:00")),
-    tzid: DEFAULT_TZID,
-    status: "CONFIRMED",
-    sequence: 1,
-    dtstamp: "2024-04-01T01:00:00Z",
-    location: "サントリーホール 大ホール（2046席）",
-    description: "初日: キックオフと全体ミーティング"
-  }),
-  seedICalCandidate({
-    uid: "scheduly-sample-day2",
-    summary: "秋の合宿 調整会議 Day2",
-    dtstart: toInputValue(new Date("2024-10-27T18:00:00+09:00")),
-    dtend: toInputValue(new Date("2024-10-27T21:00:00+09:00")),
-    tzid: DEFAULT_TZID,
-    status: "TENTATIVE",
-    sequence: 0,
-    dtstamp: "2024-04-01T01:05:00Z",
-    location: "サントリーホール ブルーローズ（小ホール）",
-    description: "2日目: 平日夕方のフォローアップ"
-  })
-];
-
 const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
 
 const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
@@ -539,7 +493,7 @@ function OrganizerApp() {
   const [summary, setSummary] = useState("秋の合宿 調整会議");
   const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
   const responseOptions = ["○", "△", "×"];
-  const [candidates, setCandidates] = useState(defaultSeedCandidates);
+  const [candidates, setCandidates] = useState([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [urls, setUrls] = useState({ admin: "", guest: "" });
   const [toast, setToast] = useState("");
@@ -574,9 +528,9 @@ function OrganizerApp() {
           setCandidates(loadedCandidates);
         }
       } catch (error) {
-        console.warn("[Scheduly] sample ICS load failed, falling back to inline seed data", error);
+        console.warn("[Scheduly] sample ICS load failed; candidates will remain empty until manual input", error);
         if (!cancelled) {
-          setCandidates(defaultSeedCandidates());
+          setCandidates([]);
         }
       } finally {
         if (!cancelled) {
