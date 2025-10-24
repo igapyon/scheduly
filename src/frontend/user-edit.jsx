@@ -503,7 +503,6 @@ function SchedulyMock() {
 
       <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-gray-500">✓ 自動保存済み {savedAt && `・${savedAt}`}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -519,7 +518,7 @@ function SchedulyMock() {
               className="h-10 rounded-xl bg-black px-4 font-semibold text-white"
               onClick={submit}
             >
-              回答
+              保存
             </button>
           </div>
         </div>
