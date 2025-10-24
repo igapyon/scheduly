@@ -25,6 +25,13 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - 生成 AI も含め、誰かが挙動を確認するときは Console をチェックするよう声かけするのがベストプラクティスです。正常に見えるときでも念のため覗いておくと安心です。
 - 明示的なリマインダー：生成 AI は節目ごと（新機能着手前後や検証の直前など）に「Chrome DevTools の Console を確認してください」と促し、毎返信ではなく適度な頻度で案内すること。
 
+## Webpack への移行メモ
+
+- `src/frontend/` に React エントリ（参加者向け `index.jsx`、管理者向け `admin.jsx`）を配置し、スタイルは当面シンプルな CSS で代用。バンドルは `webpack.config.js` で `index.bundle.js` / `admin.bundle.js` として生成する。
+- 開発時は `npm run dev` で `webpack-dev-server`（ポート 5173）を起動。`public/index.html` や `public/admin.html` を開き、必要に応じて `http://localhost:5173/admin.html` へアクセスする。Console を必ず確認。
+- ビルドは `npm run build` → `npm run postbuild` の流れ（`postbuild` は `scripts/copy-static.js` により `public` ディレクトリを `dist` へ複製）。生成された `dist` を静的ホスティングへ配置できる。
+- 既存の HTML モックを移行する際は、まず共通関数（ICS のユーティリティなど）を `src/frontend/utils/` に切り出し、小さなコンポーネント単位で JSX に置き換える。UI の差異が出ないよう段階的に差し替える。
+
 ## TODO のタネ
 
 - `exportAllCandidatesToIcs` を使った「日程一覧をまとめてダウンロード」ボタンを追加し、全候補の一括エクスポートを実現する。
