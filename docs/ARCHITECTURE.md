@@ -8,15 +8,18 @@ Scheduly のフロントエンド構成と今後想定している拡張ポイ�
 public/
 ├── index.html        # 管理者 UI (React / webpack -> index.bundle.js)
 ├── user.html         # 参加者 UI (React / webpack -> user.bundle.js)
+├── responses.html    # 回答ダッシュボード UI (React / webpack -> responses.bundle.js)
 └── legacy/           # 旧 HTML モック一式（参照用・比較用）
 src/frontend/
 ├── admin.jsx         # プロジェクト（候補）管理画面
-└── user.jsx          # 参加者向け回答画面
+├── user.jsx          # 参加者向け回答画面
+└── admin-responses.jsx # 回答ダッシュボード（管理者向け回答サマリー）
 ```
 
 - **Webpack エントリ**
-  - `admin.jsx` → `index.bundle.js`（`public/index.html`で読み込み）
-  - `user.jsx` → `user.bundle.js`（`public/user.html`で読み込み）
+- `admin.jsx` → `index.bundle.js`（`public/index.html`で読み込み）
+- `user.jsx` → `user.bundle.js`（`public/user.html`で読み込み）
+- `admin-responses.jsx` → `responses.bundle.js`（`public/responses.html`で読み込み）
 - **Tailwind**
   - 現状は CDN で読み込み、最低限の UI を構築。将来 PostCSS 化する予定。
 - **ical.js**

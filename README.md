@@ -11,13 +11,14 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者画面（`user.html`）へのリンクを設置済みです。
+- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者画面（`user.html`）や回答ダッシュボード（`responses.html`）へのリンクを設置済みです。
 - `user.jsx`（ビルド後は `user.bundle.js`）: 参加者向けモバイル UI を React 化した画面。長押しモーダル、○△× 回答、コメント入力などレガシーモックと同等に動作し、`public/user.html` からアクセスできます。
+- `admin-responses.jsx`（ビルド後は `responses.bundle.js`）: 管理者向け回答ダッシュボードの React モック。日程別／参加者別のタブ切り替え、ハイライトカード、アクション類を試作しており、`public/responses.html` で読み込みます。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
-     - `http://localhost:5173/index.html`（管理者）または `http://localhost:5173/user.html`（参加者）を開く
+    - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者）、`http://localhost:5173/responses.html`（回答ダッシュボード）を必要に応じて開く
      - Console の警告・エラーを節目ごとに確認
   3. 本番ビルド: `npm run build`
   4. 静的資産のコピー: `npm run postbuild`（`dist/` に `public/` 内容がコピーされます）
@@ -33,7 +34,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
 - `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
-- 管理者向けの回答管理画面については [docs/RESPONSE_MANAGEMENT.md](docs/RESPONSE_MANAGEMENT.md) を参照しながら設計を進める。
+- 回答ダッシュボードの React 版（`admin-responses.jsx`）をもとに、実データ連携やマトリクス表示を整備する。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
 
 ## レガシーモック（`public/legacy/`）
