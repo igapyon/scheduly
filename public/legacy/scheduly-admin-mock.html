@@ -399,7 +399,7 @@
                   onChange={(e) => onChange({ ...value, description: e.target.value })}
                   rows={3}
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="イベントの概要や連携メモ"
+                  placeholder="プロジェクトの概要や連携メモ"
                 />
               </label>
 
@@ -812,7 +812,7 @@
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Admin Mock</p>
                 <h1 className="mt-1 text-2xl font-bold">Scheduly 管理者コンソール</h1>
-                <p className="mt-2 text-sm text-zinc-500">イベントを作成し、URLベースのアクセス制御や回答形式を設定するためのモックUIです。</p>
+                <p className="mt-2 text-sm text-zinc-500">プロジェクトを作成し、URLベースのアクセス制御や回答形式を設定するためのモックUIです。</p>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
                 <span className="font-semibold">URL = 認証キー</span>
@@ -823,7 +823,7 @@
             <main className="grid grid-cols-1 gap-6">
               <div className="space-y-6">
                 <Section
-                  title="イベント基本情報"
+                  title="プロジェクト基本情報"
                   action={
                     <button
                       type="button"
@@ -835,13 +835,13 @@
                   }
                 >
                   <label className="block">
-                    <span className="text-xs font-semibold text-zinc-500">イベントタイトル（SUMMARY）</span>
+                    <span className="text-xs font-semibold text-zinc-500">プロジェクトタイトル（SUMMARY）</span>
                     <input
                       type="text"
                       value={summary}
                       onChange={(e) => setSummary(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                      placeholder="イベント名を入力"
+                      placeholder="プロジェクト名を入力"
                     />
                   </label>
                   <label className="block">
@@ -851,11 +851,11 @@
                       onChange={(e) => setDescription(e.target.value)}
                       rows={3}
                       className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                      placeholder="イベントの概要を入力"
+                      placeholder="プロジェクトの概要を入力"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold text-zinc-500">イベントパスワード</span>
+                    <span className="text-xs font-semibold text-zinc-500">プロジェクトパスワード</span>
                     <div className="mt-1 flex gap-2">
                       <input
                         type="text"
@@ -879,7 +879,7 @@
                     ]}
                   />
                   <p className="text-xs text-zinc-500">
-                    管理者URLを知っている人だけがイベント内容を更新できます。閲覧URLは参加者に共有します。
+                    管理者URLを知っている人だけがプロジェクト内容を更新できます。閲覧URLは参加者に共有します。
                   </p>
                 </Section>
 
@@ -942,9 +942,9 @@
                     <button
                       type="button"
                       className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-rose-500 hover:border-rose-400"
-                      onClick={() => popToast("イベントを削除しました（モック）")}
+                    onClick={() => popToast("プロジェクトを削除しました（モック）")}
                     >
-                      イベント削除（モック）
+                      プロジェクト削除（モック）
                     </button>
                   }
                 >

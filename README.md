@@ -1,44 +1,51 @@
 # scheduly
 
-Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリの UI プロトタイプです。現時点ではブラウザで開くだけで動作するモックを提供し、参加者向け・管理者向けの双方から操作感を確認できます。
+Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリの UI プロトタイプです。現在は以下の 2 系統のフロント資産を併走させています。
 
-## プロジェクトについて
+| 種別 | 主な用途 | 配置 | 起動方法 |
+| ---- | -------- | ---- | -------- |
+| レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
+| React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
 
-- すべてのモックは `src/main/resources/` 配下の HTML として収録されており、React 18（UMD 版）、Tailwind CSS、Babel Standalone を CDN から読み込んで動作します。
-- ビルドやサーバーのセットアップは不要で、ブラウザでファイルを直接開くだけで利用できます。
-- ICS の `SUMMARY` / `DTSTART` / `DTEND` / `TZID` / `STATUS` / `UID` / `SEQUENCE` / `DTSTAMP` といったメタデータを UI 上で扱うことを意識して設計しています。
+どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。
 
-## 主要モック
+## レガシーモック（`public/legacy/`）
 
-### 参加者向けモック（`src/main/resources/scheduly-mock.html`）
-- スマートフォンを想定したタッチ操作 UI を再現し、候補ごとの詳細を長押しで確認できます。
-- 各候補は ICS 仕様に沿ったメタデータを持ち、参加者の出欠集計（○／△／×）を一覧表示します。
-- ICS ダウンロードを想定したボタンや、回答・コメントの入力、トースト通知などをモックとして体験できます。
+- React 18（UMD 版）・Tailwind CDN・Babel Standalone による HTML モック。ビルドやサーバーなしでブラウザから直接動かせます。
+- 主なファイル
+  - `scheduly-mock.html`: 参加者向けスマホ UI。候補の長押しによる詳細表示、○△× 回答、コメント入力などを体験できます。
+  - `scheduly-admin-mock.html`: 管理者向け UI。ical.js によるインポート／エクスポート、UID・SEQUENCE・DTSTAMP の確認、Blob ダウンロード動線をモックしています。
+  - `downloadtest.html`: Blob ダウンロードがブラウザで正常に動作するか単独で検証するページ。
+- 使い方
+  1. 対象の HTML をブラウザで直接開く
+  2. 画面を操作して挙動を確認する
+  3. 想定外の動きがあれば Console ログを確認し、必要に応じて `console.log` 等で原因を追跡する
 
-### 管理者向けモック（`src/main/resources/scheduly-admin-mock.html`）
-- ical.js を活用して ICS ファイルをインポートし、UID と DTSTAMP を基準に候補の追加・更新を判定するプレビュー UI を備えています。
-- ICS キーに合わせた候補入力フォームを提供し、UID・SEQUENCE・DTSTAMP の編集や確認をダイアログで行えます。
-- 候補単位でのエクスポートを Blob ダウンロードとしてモック実装しており、最終的な ICS 出力の流れを確認できます。
+## React / webpack 版（`src/frontend/`）
 
-### ダウンロード確認用ページ（`src/main/resources/downloadtest.html`）
-- ブラウザが Blob 生成からのファイルダウンロードを正しく処理できているかを単独で検証するための最小構成サンプルです。
-
-## 使い方
-
-1. 利用したい HTML ファイルをブラウザで直接開きます。
-2. 画面上のボタンやフォームを操作して、想定されるユーザーフローや ICS との連動イメージを確認します。
-3. 挙動が想定と異なる場合は Google Chrome の開発者ツール（mac: `⌥ ⌘ I`, Windows: `Ctrl` + `Shift` + `I` もしくは `F12`）を開き、Console のログをチェックしてください。
+- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者画面（`user.html`）へのリンクを設置済みです。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者向けモバイル UI を React 化した画面。長押しモーダル、○△× 回答、コメント入力などレガシーモックと同等に動作し、`public/user.html` からアクセスできます。
+- スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
+- 開発フロー
+  1. 依存関係のインストール（初回のみ）: `npm install`
+  2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
+     - `http://localhost:5173/index.html`（管理者）または `http://localhost:5173/user.html`（参加者）を開く
+     - Console の警告・エラーを節目ごとに確認
+  3. 本番ビルド: `npm run build`
+  4. 静的資産のコピー: `npm run postbuild`（`dist/` に `public/` 内容がコピーされます）
+- React / ReactDOM を含むためバンドルは大きめです。最終的な最適化は移植後に検討します。
 
 ## 開発・デバッグのヒント
 
-- Babel Standalone を使っているため、ブラウザをリロードするだけで変更を反映できます。
-- 調査のための `console.log` 追加は遠慮なく実施し、原因が特定できたら必要に応じて整理してください。
-- ICS 生成が失敗した際には `console.error` に候補データが出力されます。ログの確認がトラブルシューティングの近道です。
+- 想定外の挙動はまず Console ログを確認する。必要に応じて `console.log` を仕込み、原因把握後に整理する。
+- ICS 生成が失敗した場合は `console.error` に候補データを出力しているため、Console が最短の手掛かりになります。
+- レガシーモックはリロードだけで変更を反映できます。Webpack 版はホットリロードしつつ Console をウォッチしてください。
 
 ## TODO の種
 
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
 - `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
+- レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
 
 ## ライセンス
 
