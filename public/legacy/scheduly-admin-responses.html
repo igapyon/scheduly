@@ -68,7 +68,27 @@
         </div>
       </section>
 
-      <section class="space-y-3">
+      <nav class="rounded-2xl border border-zinc-200 bg-white/90 p-1 shadow-sm">
+        <div class="flex gap-1">
+          <button
+            type="button"
+            class="tab-trigger flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-emerald-50 data-[active=true]:bg-emerald-600 data-[active=true]:text-white"
+            data-tab-target="schedule"
+            data-active="true"
+          >
+            日程ごと
+          </button>
+          <button
+            type="button"
+            class="tab-trigger flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-emerald-50 data-[active=true]:bg-emerald-600 data-[active=true]:text-white"
+            data-tab-target="participant"
+          >
+            参加者ごと
+          </button>
+        </div>
+      </nav>
+
+      <section class="space-y-3" data-tab-panel="schedule">
         <h2 class="text-sm font-semibold text-zinc-600">日程ごとの回答サマリー</h2>
 
         <details class="rounded-2xl border border-zinc-200 bg-white shadow-sm" open>
@@ -239,6 +259,197 @@
         </details>
       </section>
 
+      <section class="space-y-3" data-tab-panel="participant" hidden>
+        <h2 class="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
+
+        <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div class="border-b border-zinc-200 px-4 py-3">
+            <div class="text-sm font-semibold text-zinc-800">参加者状況のスナップショット</div>
+            <p class="mt-1 text-xs text-zinc-500">
+              直近の回答や未回答者のフォロー状況を把握できます。フィルターと連動し、必要な参加者だけを抽出します。
+            </p>
+          </div>
+          <div class="space-y-3 px-4 py-4 text-sm">
+            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" open>
+              <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+                  <div class="text-base font-semibold text-zinc-800">佐藤 太郎</div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                    <span>最終更新: 2025/04/12 17:42</span>
+                    <span>コメント記入: Day2</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 3</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 0</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span>
+                </div>
+              </summary>
+              <div class="border-t border-zinc-200 bg-white/90 px-4 py-3 text-xs text-zinc-600">
+                各候補に対する回答とコメントを日程順にまとめています。コメントを含む候補は上部のハイライトと連動します。
+              </div>
+              <ul class="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day1 2025/10/26 13:00 – 17:00</div>
+                    <div class="text-xs text-zinc-500">コメント: オフィス参加可</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day2 2025/10/27 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: オンラインなら参加可能</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">△</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day3 2025/10/28 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 特になし</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day4 2025/11/03 10:00 – 12:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 終日参加可能</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+              </ul>
+              <div class="flex flex-wrap gap-2 border-t border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-600">
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">フォロー済みにする</button>
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">コメントに返信</button>
+              </div>
+            </details>
+
+            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+              <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+                  <div class="text-base font-semibold text-zinc-800">鈴木 花子</div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                    <span>最終更新: 2025/04/10 09:15</span>
+                    <span>コメント記入: Day1 / Day3</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 2</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 1</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span>
+                </div>
+              </summary>
+              <div class="border-t border-zinc-200 px-4 py-3 text-xs text-zinc-600">
+                平日夜は調整が必要との回答が多めです。Day2 の要望を反映すると参加しやすくなる可能性があります。
+              </div>
+              <ul class="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day1 2025/10/26 13:00 – 17:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 子どものお迎えがあるため 16:30 まで</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">△</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day2 2025/10/27 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 開始時間を 19:00 にできれば参加可</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-semibold text-rose-700">×</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day3 2025/10/28 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 20:00 までなら参加可</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day4 2025/11/03 10:00 – 12:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 午前は在宅参加になります</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+              </ul>
+              <div class="flex flex-wrap gap-2 border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">Day2 の代替案を検討</button>
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">フォローを記録</button>
+              </div>
+            </details>
+
+            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+              <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+                  <div class="text-base font-semibold text-zinc-800">田中 一郎</div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                    <span>最終更新: 2025/04/05 21:03</span>
+                    <span>コメント記入: Day2 / Day3</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 1</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 0</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 2</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 1</span>
+                </div>
+              </summary>
+              <div class="border-t border-zinc-200 bg-white/90 px-4 py-3 text-xs text-zinc-600">
+                平日日程の参加が難しいとのコメントが複数あり。予備日の回答が未入力のため、フォローが必要です。
+              </div>
+              <ul class="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day1 2025/10/26 13:00 – 17:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 自家用車で参加予定</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">○</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day2 2025/10/27 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 平日は別件の会議があり難しい</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-semibold text-rose-700">×</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-zinc-800">Day3 2025/10/28 18:00 – 21:00</div>
+                    <div class="text-xs text-zinc-500">コメント: 他プロジェクトとバッティング</div>
+                  </div>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-xs font-semibold text-rose-700">×</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-dashed border-amber-200 px-3 py-2">
+                  <div>
+                    <div class="text-sm font-semibold text-amber-800">Day4 2025/11/03 10:00 – 12:00</div>
+                    <div class="text-xs text-amber-700">コメント: 未回答（フォロー待ち）</div>
+                  </div>
+                  <span class="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full border border-amber-300 bg-white text-xs font-semibold text-amber-700">—</span>
+                </li>
+              </ul>
+              <div class="flex flex-wrap gap-2 border-t border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-600">
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">未回答フォローを送信</button>
+                <button class="rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300">代替日程を提案</button>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
+          <p class="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
+          <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li>未回答者を抽出して個別フォローのメモを残すなど、管理タスク整理に活用します。</li>
+            <li>将来的には参加者カードから回答修正や再送リマインダーを起動できるようにします。</li>
+            <li>参加者 × 候補のマトリクス表示と連動し、詳細ドリルダウンへ誘導します。</li>
+          </ul>
+        </div>
+      </section>
+
       <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
@@ -263,5 +474,24 @@
         </ul>
       </section>
     </div>
+
+    <script>
+      document.querySelectorAll(".tab-trigger").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.getAttribute("data-tab-target");
+          if (!target) return;
+
+          document.querySelectorAll(".tab-trigger").forEach((btn) => {
+            const isActive = btn === button;
+            btn.setAttribute("data-active", String(isActive));
+          });
+
+          document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
+            const panelTarget = panel.getAttribute("data-tab-panel");
+            panel.hidden = panelTarget !== target;
+          });
+        });
+      });
+    </script>
   </body>
 </html>
