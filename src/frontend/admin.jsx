@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useId, useRef } from "react";
+import React, { useEffect, useMemo, useState, useId, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 const DEFAULT_TZID = "Asia/Tokyo";
@@ -176,6 +176,33 @@ const seedICalCandidate = (data) => {
   candidate.rawICalVevent = data.rawICalVevent || buildICalVeventJCal(candidate);
   return candidate;
 };
+
+const defaultSeedCandidates = () => [
+  seedICalCandidate({
+    uid: "scheduly-sample-day1",
+    summary: "秋の合宿 調整会議 Day1",
+    dtstart: toInputValue(new Date("2024-10-26T13:00:00+09:00")),
+    dtend: toInputValue(new Date("2024-10-26T17:00:00+09:00")),
+    tzid: DEFAULT_TZID,
+    status: "CONFIRMED",
+    sequence: 1,
+    dtstamp: "2024-04-01T01:00:00Z",
+    location: "サントリーホール 大ホール（2046席）",
+    description: "初日: キックオフと全体ミーティング"
+  }),
+  seedICalCandidate({
+    uid: "scheduly-sample-day2",
+    summary: "秋の合宿 調整会議 Day2",
+    dtstart: toInputValue(new Date("2024-10-27T18:00:00+09:00")),
+    dtend: toInputValue(new Date("2024-10-27T21:00:00+09:00")),
+    tzid: DEFAULT_TZID,
+    status: "TENTATIVE",
+    sequence: 0,
+    dtstamp: "2024-04-01T01:05:00Z",
+    location: "サントリーホール ブルーローズ（小ホール）",
+    description: "2日目: 平日夕方のフォローアップ"
+  })
+];
 
 const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
 
@@ -512,36 +539,58 @@ function OrganizerApp() {
   const [summary, setSummary] = useState("秋の合宿 調整会議");
   const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
   const responseOptions = ["○", "△", "×"];
-  const [candidates, setCandidates] = useState(() => [
-    seedICalCandidate({
-      uid: `scheduly-${randomUUID()}`,
-      summary: "秋の合宿 調整会議 Day1",
-      dtstart: toInputValue(new Date("2024-10-26T13:00:00+09:00")),
-      dtend: toInputValue(new Date("2024-10-26T17:00:00+09:00")),
-      tzid: DEFAULT_TZID,
-      status: "CONFIRMED",
-      sequence: 1,
-      dtstamp: "2024-04-01T01:00:00Z",
-      location: "サントリーホール 大ホール（2046席）",
-      description: "初日: キックオフと全体ミーティング"
-    }),
-    seedICalCandidate({
-      uid: `scheduly-${randomUUID()}`,
-      summary: "秋の合宿 調整会議 Day2",
-      dtstart: toInputValue(new Date("2024-10-27T18:00:00+09:00")),
-      dtend: toInputValue(new Date("2024-10-27T21:00:00+09:00")),
-      tzid: DEFAULT_TZID,
-      status: "TENTATIVE",
-      sequence: 0,
-      dtstamp: "2024-04-01T01:05:00Z",
-      location: "サントリーホール ブルーローズ（小ホール）",
-      description: "2日目: 平日夕方のフォローアップ"
-    })
-  ]);
+  const [candidates, setCandidates] = useState(defaultSeedCandidates);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [urls, setUrls] = useState({ admin: "", guest: "" });
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSampleIcs = async () => {
+      try {
+        const response = await fetch("/ics/sample-candidates.ics", { cache: "no-cache" });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
+        }
+        const text = await response.text();
+        const ICAL = ensureICAL();
+        const parsed = ICAL.parse(text);
+        const component = new ICAL.Component(parsed);
+        const vevents = component.getAllSubcomponents("vevent") || [];
+        const loadedCandidates = [];
+        for (let i = 0; i < vevents.length; i += 1) {
+          const candidate = createCandidateFromVevent(vevents[i]);
+          if (candidate) {
+            loadedCandidates.push(candidate);
+          }
+        }
+        if (!loadedCandidates.length) {
+          throw new Error("No VEVENT entries found in sample ICS");
+        }
+        if (!cancelled) {
+          setCandidates(loadedCandidates);
+        }
+      } catch (error) {
+        console.warn("[Scheduly] sample ICS load failed, falling back to inline seed data", error);
+        if (!cancelled) {
+          setCandidates(defaultSeedCandidates());
+        }
+      } finally {
+        if (!cancelled) {
+          setInitialDataLoaded(true);
+        }
+      }
+    };
+
+    loadSampleIcs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const downloadTextFile = (filename, text) => {
     const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
@@ -897,17 +946,27 @@ function OrganizerApp() {
               </div>
             }
           >
-            {candidates.map((candidate, index) => (
-              <CandidateCard
-                index={index}
-                key={candidate.id}
-                value={candidate}
-                onChange={(next) => updateCandidate(candidate.id, next)}
-                onRemove={() => removeCandidate(candidate.id)}
-                onExport={() => handleExportCandidate(candidate.id)}
-                disableRemove={candidates.length === 1}
-              />
-            ))}
+            {!initialDataLoaded && !candidates.length ? (
+              <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-6 text-center text-xs text-emerald-600">
+                サンプルの ICS を読み込んでいます…
+              </div>
+            ) : !candidates.length ? (
+              <div className="rounded-xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
+                日程がまだありません。右上のボタンから追加してください。
+              </div>
+            ) : (
+              candidates.map((candidate, index) => (
+                <CandidateCard
+                  index={index}
+                  key={candidate.id}
+                  value={candidate}
+                  onChange={(next) => updateCandidate(candidate.id, next)}
+                  onRemove={() => removeCandidate(candidate.id)}
+                  onExport={() => handleExportCandidate(candidate.id)}
+                  disableRemove={candidates.length === 1}
+                />
+              ))
+            )}
           </SectionCard>
         </main>
 
