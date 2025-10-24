@@ -23,6 +23,8 @@ const randomUUID = () => {
   return Math.random().toString(36).slice(2);
 };
 
+const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
+
 const pad = (n) => String(n).padStart(2, "0");
 
 const toInputValue = (date) => {
@@ -142,7 +144,7 @@ const createBlankICalCandidate = () => {
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   const candidate = {
     id: randomUUID(),
-    uid: `scheduly-${randomUUID()}`,
+    uid: generateSchedulyUid(),
     summary: "",
     dtstart: toInputValue(start),
     dtend: toInputValue(end),
@@ -168,7 +170,7 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
   const veventLines = [
     "BEGIN:VEVENT",
-    "UID:" + (candidate.uid || `scheduly-${randomUUID()}`),
+    "UID:" + (candidate.uid || generateSchedulyUid()),
     "SEQUENCE:" + sequence
   ];
 
