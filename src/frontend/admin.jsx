@@ -792,19 +792,27 @@ function OrganizerApp() {
     <div className="min-h-screen bg-zinc-100 px-4 py-6 text-gray-900 sm:px-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
               <p className="mt-2 text-sm text-zinc-600">
                 iCal (ICS) を活用した日程管理アプリです。
               </p>
             </div>
-            <a
-              href="./user.html"
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-            >
-              参加者画面（モック）を開く
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="./user.html"
+                className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+              >
+                参加者画面（モック）を開く
+              </a>
+              <a
+                href="./scheduly-admin-responses.html"
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                回答管理ワイヤーフレーム
+              </a>
+            </div>
           </div>
         </header>
 
