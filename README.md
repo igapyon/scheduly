@@ -23,8 +23,8 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `index.jsx`（参加者向け）と `admin.jsx`（管理者向け）のエントリポイントを用意し、レガシーモックを段階的に移植する土台です。現在はプレースホルダー表示のみ。
-- スタイルは最初の段階ではインライン CSS で最小限を確保し、移植進行に合わせて整理していきます。
+- `index.jsx`（参加者向け）はまだプレースホルダー状態ですが、`admin.jsx` には管理者モックの挙動を React 化した実装が入っています。
+- スタイルは当面 HTML テンプレートで読み込む Tailwind CDN（`public/index.html` / `public/admin.html`）と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
