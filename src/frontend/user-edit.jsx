@@ -136,10 +136,6 @@ const formatIcalDateTimeWithZone = (iso, tz) => {
   }).format(new Date(iso));
 };
 
-const Pill = ({ children }) => (
-  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">{children}</span>
-);
-
 const StatRow = ({ candidate }) => {
   const maxO = Math.max(...ICAL_CANDIDATES.map((entry) => entry.tally.o));
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
@@ -322,24 +318,39 @@ function SchedulyMock() {
   const detailCandidate = detailCandidateId ? (ICAL_CANDIDATES.find((candidate) => candidate.id === detailCandidateId) || null) : null;
 
   return (
-    <div className="mx-auto flex h-dvh max-w-sm flex-col bg-white text-gray-900">
-      <header className="sticky top-0 z-10 border-b bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-between">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
+      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold">Scheduly 回答編集</h1>
-            <p className="mt-0.5 text-xs font-semibold text-gray-700">{currentCandidate.summary}</p>
-            <p className="mt-0.5 text-[11px] text-gray-500">📍 {currentCandidate.location}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
+            <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
+            <p className="mt-2 text-sm text-zinc-600">現在編集中: {currentCandidate.summary}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
+              <span className="flex items-center gap-1">
+                <span role="img" aria-hidden="true">📍</span>
+                {currentCandidate.location}
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-emerald-600">
+                <span aria-hidden="true">✓</span> {completeCount}/{ICAL_CANDIDATES.length} 日完了
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1 text-right">
-            <Pill>{completeCount}/{ICAL_CANDIDATES.length}日 完了</Pill>
-            <div className="text-[10px] text-gray-500">👤 匿名参加者</div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-xs text-zinc-500">👤 匿名参加者</span>
+            <a
+              href="./user.html"
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+            >
+              参加者一覧へ
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 select-none overflow-y-auto bg-gray-50 p-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <article className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="mb-3 space-y-1">
+      <main className="grid flex-1 gap-5 lg:grid-cols-[2fr,1fr]" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <section className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs">
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(currentCandidate.status)}`}>
                 {formatIcalStatusLabel(currentCandidate.status)}
@@ -350,7 +361,7 @@ function SchedulyMock() {
             <div className="text-sm text-gray-600">
               {formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}
             </div>
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
               <span role="img" aria-hidden="true">📍</span>
               <span>{currentCandidate.location}</span>
             </div>
@@ -373,7 +384,7 @@ function SchedulyMock() {
             </div>
           </div>
 
-          <div className="my-2 grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {["o", "d", "x"].map((k) => {
               const pressed = mark === k;
               const color =
@@ -398,94 +409,96 @@ function SchedulyMock() {
 
           <StatRow candidate={currentCandidate} />
 
-          <label className="mt-3 block">
+          <label className="block">
             <span className="text-xs text-gray-500">コメント（任意）</span>
             <textarea
               className="mt-1 w-full rounded-xl border p-2 text-sm"
-              rows={2}
+              rows={3}
               placeholder="この日はテストの可能性が…"
               value={(answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""}
               onChange={(e) => setComment(e.target.value)}
             />
           </label>
-        </article>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button className="h-12 rounded-xl border bg-white disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
-          <button className="h-12 rounded-xl border bg-white disabled:opacity-40" onClick={() => go(1)} disabled={index === ICAL_CANDIDATES.length - 1}>次の日 →</button>
-        </div>
-
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold">📊 出欠サマリー</h2>
-          <ul className="space-y-1">
-            {ICAL_CANDIDATES.map((candidate) => {
-              const isCurrent = candidate.id === currentCandidate.id;
-              const my = (answers[candidate.id] && answers[candidate.id].mark) || null;
-              const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
-              const myClass =
-                my === "o" ? "border-emerald-300 text-emerald-700 bg-emerald-50"
-                : my === "d" ? "border-amber-300 text-amber-700 bg-amber-50"
-                : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
-                : "border-gray-200 text-gray-500 bg-gray-50";
-
-              return (
-                <li
-                  key={candidate.id}
-                  className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/70" : "hover:bg-gray-50"}`}
-                  aria-current={isCurrent ? "true" : undefined}
-                  ref={(el) => (itemRefs.current[candidate.id] = el)}
-                  tabIndex={-1}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-6 w-1.5 rounded-full transition ${isCurrent ? "bg-emerald-500" : "bg-transparent"}`}
-                      aria-hidden="true"
-                    />
-                    <button
-                      className="py-3 text-left"
-                      onClick={() => {
-                        setShouldScrollToCurrent(true);
-                        setIndex(ICAL_CANDIDATES.findIndex((entry) => entry.id === candidate.id));
-                      }}
-                      onPointerDown={(e) => onPressStart(candidate.id, e)}
-                      onPointerMove={onPressMove}
-                      onPointerUp={onPressEnd}
-                      onPointerLeave={onPressEnd}
-                      onPointerCancel={onPressEnd}
-                      onContextMenu={(e) => e.preventDefault()}
-                    >
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        {formatCandidateDateLabel(candidate)}
-                        {isCurrent && <span className="ml-2 text-xs font-semibold text-emerald-600">（選択）</span>}
-                      </div>
-                      <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 ${icalStatusBadgeClass(candidate.status)}`}>
-                          {formatIcalStatusLabel(candidate.status)}
-                        </span>
-                        <span className="max-w-[12rem] truncate">{candidate.location}</span>
-                      </div>
-                      <div className="mt-1 text-[10px] text-gray-400">（長押しで参加者を見る）</div>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
-                    <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
-                    <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
-                    <span
-                      className={`ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${myClass}`}
-                      aria-label="あなたの選択"
-                      title="あなたの選択"
-                    >
-                      <span className="font-medium">あなた:</span> {myLabel}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
+            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(1)} disabled={index === ICAL_CANDIDATES.length - 1}>次の日 →</button>
+          </div>
         </section>
+
+        <aside className="space-y-5">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold text-zinc-600">📊 出欠サマリー</h2>
+            <ul className="space-y-2">
+              {ICAL_CANDIDATES.map((candidate) => {
+                const isCurrent = candidate.id === currentCandidate.id;
+                const my = (answers[candidate.id] && answers[candidate.id].mark) || null;
+                const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
+                const myClass =
+                  my === "o" ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                  : my === "d" ? "border-amber-300 text-amber-700 bg-amber-50"
+                  : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
+                  : "border-gray-200 text-gray-500 bg-gray-50";
+
+                return (
+                  <li
+                    key={candidate.id}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/50" : "hover:bg-zinc-50"}`}
+                    aria-current={isCurrent ? "true" : undefined}
+                    ref={(el) => (itemRefs.current[candidate.id] = el)}
+                    tabIndex={-1}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-6 w-1.5 rounded-full transition ${isCurrent ? "bg-emerald-500" : "bg-transparent"}`}
+                        aria-hidden="true"
+                      />
+                      <button
+                        className="py-3 text-left"
+                        onClick={() => {
+                          setShouldScrollToCurrent(true);
+                          setIndex(ICAL_CANDIDATES.findIndex((entry) => entry.id === candidate.id));
+                        }}
+                        onPointerDown={(e) => onPressStart(candidate.id, e)}
+                        onPointerMove={onPressMove}
+                        onPointerUp={onPressEnd}
+                        onPointerLeave={onPressEnd}
+                        onPointerCancel={onPressEnd}
+                        onContextMenu={(e) => e.preventDefault()}
+                      >
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          {formatCandidateDateLabel(candidate)}
+                          {isCurrent && <span className="ml-2 text-xs font-semibold text-emerald-600">（選択中）</span>}
+                        </div>
+                        <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 ${icalStatusBadgeClass(candidate.status)}`}>
+                            {formatIcalStatusLabel(candidate.status)}
+                          </span>
+                          <span className="max-w-[12rem] truncate">{candidate.location}</span>
+                        </div>
+                        <div className="mt-1 text-[10px] text-gray-400">（長押しで参加者を見る）</div>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
+                      <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
+                      <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
+                      <span
+                        className={`ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${myClass}`}
+                        aria-label="あなたの選択"
+                        title="あなたの選択"
+                      >
+                        <span className="font-medium">あなた:</span> {myLabel}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </aside>
       </main>
 
       <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
