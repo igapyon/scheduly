@@ -515,7 +515,7 @@ function SchedulyMock() {
             </button>
             <button
               type="button"
-              className="h-10 rounded-xl bg-black px-4 font-semibold text-white"
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               onClick={submit}
             >
               保存
