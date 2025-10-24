@@ -23,7 +23,8 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `index.jsx`（参加者向け）はまだプレースホルダー状態ですが、`admin.jsx` には管理者モックの挙動を React 化した実装が入っています。
+- `index.jsx`: 参加者向けモバイル UI を React 化したもの。候補の長押しによる詳細表示、○△× 回答、コメント入力、自動保存表示などレガシーモックと同等に動作します。
+- `admin.jsx`: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しています。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN（`public/index.html` / `public/admin.html`）と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
