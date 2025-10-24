@@ -1,6 +1,6 @@
 # VERIFY CHECKLIST
 
-Scheduly のモックを目視確認するときに使うチェックリストです。対象は `src/main/resources/` 配下の HTML（特に `scheduly-admin-mock.html`）をブラウザで開いた際の動作確認を想定しています。
+Scheduly のモックを目視確認するときに使うチェックリストです。対象は `public/legacy/` 配下の HTML（特に `scheduly-admin-mock.html`）をブラウザで開いた際の動作確認を想定しています。
 
 ## 事前準備
 

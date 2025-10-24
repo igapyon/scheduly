@@ -4,12 +4,12 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## モックの前提
 
-- すべてのモックは `src/main/resources/*.html` に置かれており、React 18（UMD 版）、Tailwind CSS、Babel Standalone を CDN から取得して動作します。
+- すべてのモックは `public/legacy/*.html` に置かれており、React 18（UMD 版）、Tailwind CSS、Babel Standalone を CDN から取得して動作します。
 - 追加のビルド工程やサーバー起動は不要です。HTML をブラウザで直接開けば最新のコードがそのまま確認できます。
 
 ## ICS まわりのメモ
 
-- 最小構成の挙動確認には `src/main/resources/downloadtest.html` を利用します。Blob ダウンロードが怪しいときはまずここでブラウザ環境を切り分けてください。
+- 最小構成の挙動確認には `public/legacy/downloadtest.html` を利用します。Blob ダウンロードが怪しいときはまずここでブラウザ環境を切り分けてください。
 - 管理者モック（`scheduly-admin-mock.html`）は候補ごとに `rawVevent` を保持しつつ、エクスポート時は文字列を組み立てて `.ics` を生成します。実装の詳細は `exportCandidateToIcs` と `exportAllCandidatesToIcs` を参照。
 - ICS 生成に失敗した場合は、候補データを含めて `console.error` を出力するようにしています。Chrome 開発者ツールの Console で状況を確認してください。
 - ICS インポートのプレビューは既定で全候補 OFF、既存の UID と一致する候補のみ ON になります。振る舞いを変えるときは `handleIcsImport` とプレビュー UI をセットで確認すると迷いません。
