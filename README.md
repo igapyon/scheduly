@@ -4,22 +4,10 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
-| レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
 | React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
+| レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
 
 どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。
-
-## レガシーモック（`public/legacy/`）
-
-- React 18（UMD 版）・Tailwind CDN・Babel Standalone による HTML モック。ビルドやサーバーなしでブラウザから直接動かせます。
-- 主なファイル
-  - `scheduly-mock.html`: 参加者向けスマホ UI。候補の長押しによる詳細表示、○△× 回答、コメント入力などを体験できます。
-  - `scheduly-admin-mock.html`: 管理者向け UI。ical.js によるインポート／エクスポート、UID・SEQUENCE・DTSTAMP の確認、Blob ダウンロード動線をモックしています。
-  - `downloadtest.html`: Blob ダウンロードがブラウザで正常に動作するか単独で検証するページ。
-- 使い方
-  1. 対象の HTML をブラウザで直接開く
-  2. 画面を操作して挙動を確認する
-  3. 想定外の動きがあれば Console ログを確認し、必要に応じて `console.log` 等で原因を追跡する
 
 ## React / webpack 版（`src/frontend/`）
 
@@ -46,6 +34,18 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
 - `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
+
+## レガシーモック（`public/legacy/`）
+
+- React 18（UMD 版）・Tailwind CDN・Babel Standalone による HTML モック。ビルドやサーバーなしでブラウザから直接動かせます。
+- 主なファイル
+  - `scheduly-mock.html`: 参加者向けスマホ UI。候補の長押しによる詳細表示、○△× 回答、コメント入力などを体験できます。
+  - `scheduly-admin-mock.html`: 管理者向け UI。ical.js によるインポート／エクスポート、UID・SEQUENCE・DTSTAMP の確認、Blob ダウンロード動線をモックしています。
+  - `downloadtest.html`: Blob ダウンロードがブラウザで正常に動作するか単独で検証するページ。
+- 使い方
+  1. 対象の HTML をブラウザで直接開く
+  2. 画面を操作して挙動を確認する
+  3. 想定外の動きがあれば Console ログを確認し、必要に応じて `console.log` 等で原因を追跡する
 
 ## ライセンス
 
