@@ -444,20 +444,6 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
 }
 
 
-function ResponseSelector({ responses }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold text-zinc-500">回答形式</div>
-      <div className="mt-2 flex flex-wrap gap-2 text-sm text-zinc-500">
-        <span className="inline-flex items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1 font-semibold text-zinc-600">
-          {responses.join(" / ")}
-        </span>
-        <span className="text-xs">※ 現在は固定設定です（編集不可）。</span>
-      </div>
-    </div>
-  );
-}
-
 function CandidateMetaTable({ candidate }) {
   if (!candidate) return null;
 
@@ -525,7 +511,6 @@ function candidateToDisplayMeta(candidate) {
 function OrganizerApp() {
   const [summary, setSummary] = useState("秋の合宿 調整会議");
   const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
-  const [password, setPassword] = useState("mitaka2025");
   const responseOptions = ["○", "△", "×"];
   const [candidates, setCandidates] = useState(() => [
     seedICalCandidate({
@@ -796,7 +781,6 @@ function OrganizerApp() {
       summary,
       description,
       responseOptions: responseOptions,
-      accessControl: password ? { passwordEnabled: true, hint: "保存時にハッシュ化されます" } : { passwordEnabled: false },
       candidates: candidates.map((c, index) => ({
         id: c.id,
         order: index + 1,
@@ -819,12 +803,12 @@ function OrganizerApp() {
         hint: "ダッシュボードから参照できます"
       }
     };
-  }, [summary, description, password, responseOptions, candidates]);
+  }, [summary, description, responseOptions, candidates]);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
             <h1 className="mt-1 text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
@@ -835,7 +819,7 @@ function OrganizerApp() {
           <div className="flex flex-wrap items-center gap-2">
             <a
               href="./user.html"
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
             >
               参加者画面を開く
             </a>
@@ -848,7 +832,7 @@ function OrganizerApp() {
         <main className="space-y-5">
           <SectionCard
             title="プロジェクト情報"
-            description="参加者に共有される基本情報と回答設定を編集します。"
+            description="参加者に共有される基本情報を編集します。"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -870,20 +854,6 @@ function OrganizerApp() {
                 placeholder="プロジェクトの概要を入力"
               />
             </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-zinc-500">プロジェクトパスワード</span>
-              <div className="mt-1 flex gap-2">
-                <input
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="空欄でパスワードなし"
-                />
-              </div>
-              <p className="mt-1 text-xs text-zinc-500">閲覧制限のための任意設定です。保存時にサーバー側でハッシュ化される想定です。</p>
-            </label>
-            <ResponseSelector responses={responseOptions} />
           </SectionCard>
 
           <SectionCard
