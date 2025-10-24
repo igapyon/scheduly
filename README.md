@@ -1,13 +1,13 @@
 # scheduly
 
-Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。
+Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
 | React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
 | レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
 
-どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。
+どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
 
 ## React / webpack 版（`src/frontend/`）
 
@@ -33,6 +33,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
 - `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
+- 管理者向けの回答管理画面については [docs/RESPONSE_MANAGEMENT.md](docs/RESPONSE_MANAGEMENT.md) を参照しながら設計を進める。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
 
 ## レガシーモック（`public/legacy/`）
