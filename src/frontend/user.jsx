@@ -29,7 +29,7 @@ const formatScheduleRange = (startDate, endDate, tzid) => {
 };
 
 const SAMPLE_SCHEDULE_DETAILS = {
-  "scheduly-sample-day1": {
+  "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     id: "day1",
     label: "Day 1",
     location: "サントリーホール 大ホール",
@@ -44,7 +44,7 @@ const SAMPLE_SCHEDULE_DETAILS = {
       { participantId: "others", name: "・・・", mark: "pending", comment: "残り9名の回答は実装時に取得" }
     ]
   },
-  "scheduly-sample-day2": {
+  "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
     id: "day2",
     label: "Day 2",
     location: "サントリーホール ブルーローズ",
@@ -59,7 +59,7 @@ const SAMPLE_SCHEDULE_DETAILS = {
       { participantId: "others", name: "・・・", mark: "pending", comment: "他 8 名の回答を表示（実装時にロード）" }
     ]
   },
-  "scheduly-sample-day3": {
+  "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
     id: "day3",
     label: "Day 3",
     location: "サントリーホール ブルーローズ",
