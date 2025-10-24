@@ -16,15 +16,17 @@
   <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
+const DEFAULT_TZID = "Asia/Tokyo";
+
 /* ================= Mock Data ================= */
-const DAYS = [
+const ICAL_CANDIDATES = [
   {
     id: "2025-10-26",
     uid: "scheduly-day1-9ba2",
     summary: "秋の合宿 調整会議 Day1",
     dtstart: "2025-10-26T13:00:00+09:00",
     dtend: "2025-10-26T17:00:00+09:00",
-    tzid: "Asia/Tokyo",
+    tzid: DEFAULT_TZID,
     status: "CONFIRMED",
     sequence: 1,
     dtstamp: "2024-04-01T01:00:00Z",
@@ -37,7 +39,7 @@ const DAYS = [
     summary: "秋の合宿 調整会議 Day2",
     dtstart: "2025-10-27T18:00:00+09:00",
     dtend: "2025-10-27T21:00:00+09:00",
-    tzid: "Asia/Tokyo",
+    tzid: DEFAULT_TZID,
     status: "TENTATIVE",
     sequence: 0,
     dtstamp: "2024-04-01T01:05:00Z",
@@ -50,7 +52,7 @@ const DAYS = [
     summary: "秋の合宿 調整会議 Day3",
     dtstart: "2025-10-28T18:00:00+09:00",
     dtend: "2025-10-28T21:00:00+09:00",
-    tzid: "Asia/Tokyo",
+    tzid: DEFAULT_TZID,
     status: "TENTATIVE",
     sequence: 0,
     dtstamp: "2024-04-01T01:10:00Z",
@@ -63,7 +65,7 @@ const DAYS = [
     summary: "秋の合宿 調整会議 予備日",
     dtstart: "2025-11-03T10:00:00+09:00",
     dtend: "2025-11-03T12:00:00+09:00",
-    tzid: "Asia/Tokyo",
+    tzid: DEFAULT_TZID,
     status: "CONFIRMED",
     sequence: 2,
     dtstamp: "2024-04-01T01:20:00Z",
@@ -72,7 +74,7 @@ const DAYS = [
   }
 ];
 
-const PARTICIPANTS = {
+const PARTICIPANT_RESPONSES = {
   "2025-10-26": [
     { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" },
     { name: "高橋", mark: "d" }, { name: "伊藤", mark: "x" }
@@ -88,34 +90,34 @@ const PARTICIPANTS = {
   ],
 };
 
-const STATUS_LABELS = {
+const ICAL_STATUS_LABELS = {
   CONFIRMED: "確定",
   TENTATIVE: "仮予定",
   CANCELLED: "取消し"
 };
 
-const STATUS_BADGE_CLASSES = {
+const ICAL_STATUS_BADGE_CLASSES = {
   CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
   TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
   CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
 };
 
-function formatStatusLabel(status) {
-  const label = STATUS_LABELS[status] || status;
+function formatIcalStatusLabel(status) {
+  const label = ICAL_STATUS_LABELS[status] || status;
   return `${label}（${status}）`;
 }
 
-function statusBadgeClass(status) {
-  return STATUS_BADGE_CLASSES[status] || "border-gray-200 bg-gray-50 text-gray-500";
+function icalStatusBadgeClass(status) {
+  return ICAL_STATUS_BADGE_CLASSES[status] || "border-gray-200 bg-gray-50 text-gray-500";
 }
 
-function formatDateLabel(day) {
-  const date = new Date(day.dtstart);
+function formatCandidateDateLabel(candidate) {
+  const date = new Date(candidate.dtstart);
   const parts = new Intl.DateTimeFormat("ja-JP", {
     month: "numeric",
     day: "numeric",
     weekday: "short",
-    timeZone: day.tzid
+    timeZone: candidate.tzid
   }).formatToParts(date);
   const month = parts.find((p) => p.type === "month")?.value || "";
   const dayNum = parts.find((p) => p.type === "day")?.value || "";
@@ -123,23 +125,23 @@ function formatDateLabel(day) {
   return `${month}/${dayNum}（${weekday}）`;
 }
 
-function formatTimeRange(day) {
+function formatCandidateTimeRange(candidate) {
   const start = new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: day.tzid
-  }).format(new Date(day.dtstart));
+    timeZone: candidate.tzid
+  }).format(new Date(candidate.dtstart));
   const end = new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: day.tzid
-  }).format(new Date(day.dtend));
+    timeZone: candidate.tzid
+  }).format(new Date(candidate.dtend));
   return `${start}〜${end}`;
 }
 
-function formatDateTimeWithZone(iso, tz) {
+function formatIcalDateTimeWithZone(iso, tz) {
   return new Intl.DateTimeFormat("ja-JP", {
     year: "numeric",
     month: "2-digit",
@@ -157,15 +159,15 @@ function Pill({ children }) {
   return <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">{children}</span>;
 }
 
-function StatRow({ day }) {
-  const maxO = Math.max(...DAYS.map((d) => d.tally.o));
-  const star = day.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
+function StatRow({ candidate }) {
+  const maxO = Math.max(...ICAL_CANDIDATES.map((entry) => entry.tally.o));
+  const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
     <div className="flex items-center justify-between text-sm mt-3">
       <div className="flex gap-3">
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{day.tally.o}</span>
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{day.tally.d}</span>
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{day.tally.x}</span>
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{candidate.tally.o}</span>
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{candidate.tally.d}</span>
+        <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{candidate.tally.x}</span>
       </div>
       <span className="text-emerald-600 text-xs font-semibold">{star}</span>
     </div>
@@ -223,7 +225,7 @@ function SchedulyMock() {
   const [answers, setAnswers] = useState({}); // { [id]: { mark: 'o'|'d'|'x'|null, comment: '' } }
   const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
-  const [detailDayId, setDetailDayId] = useState(null);
+  const [detailCandidateId, setDetailCandidateId] = useState(null);
 
   // ▼ サマリー側の各行参照
   const itemRefs = useRef({});
@@ -234,9 +236,10 @@ function SchedulyMock() {
   const startX = useRef(null);
   const pressTimer = useRef(null);
   const pressStart = useRef({x:0,y:0,moved:false});
+  const toastTimerRef = useRef(null);
 
-  const current = DAYS[index];
-  const mark = (answers[current.id] && answers[current.id].mark) || null;
+  const currentCandidate = ICAL_CANDIDATES[index];
+  const mark = (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null;
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -247,16 +250,16 @@ function SchedulyMock() {
   }, [answers, index]);
 
   useEffect(() => {
-    if (detailDayId) {
+    if (detailCandidateId) {
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => { document.body.style.overflow = prev; };
     }
-  }, [detailDayId]);
+  }, [detailCandidateId]);
 
   // ▼ インデックス変更時：必要な場合のみ（サマリーからの遷移時のみ）スクロール
   useEffect(() => {
-    const el = itemRefs.current[current.id];
+    const el = itemRefs.current[currentCandidate.id];
     if (el) {
       // フォーカスは常に付与（スクロールは抑制）
       el.focus({ preventScroll: true });
@@ -265,26 +268,26 @@ function SchedulyMock() {
         setShouldScrollToCurrent(false); // 一度だけ
       }
     }
-  }, [index, current.id, shouldScrollToCurrent]);
+  }, [index, currentCandidate.id, shouldScrollToCurrent]);
 
   const setMark = (m) => {
     setAnswers((prev) => ({
       ...prev,
-      [current.id]: { mark: (prev[current.id] && prev[current.id].mark) === m ? null : m, comment: (prev[current.id] && prev[current.id].comment) || "" }
+      [currentCandidate.id]: { mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) === m ? null : m, comment: (prev[currentCandidate.id] && prev[currentCandidate.id].comment) || "" }
     }));
   };
 
   const setComment = (v) => {
     setAnswers((prev) => ({
       ...prev,
-      [current.id]: { mark: (prev[current.id] && prev[current.id].mark) || null, comment: v }
+      [currentCandidate.id]: { mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) || null, comment: v }
     }));
   };
 
   // 前/次ボタンやスワイプではスクロールさせない
   const go = (dir) => {
     setShouldScrollToCurrent(false);
-    setIndex((i) => Math.max(0, Math.min(DAYS.length - 1, i + dir)));
+    setIndex((i) => Math.max(0, Math.min(ICAL_CANDIDATES.length - 1, i + dir)));
   };
 
   const onTouchStart = (e) => (startX.current = e.touches[0].clientX);
@@ -297,21 +300,36 @@ function SchedulyMock() {
 
   const completeCount = Object.values(answers).filter((a) => a && a.mark).length;
 
-  const submit = () => {
-    setToast("送信しました。ありがとうございました！");
-    setTimeout(() => setToast(""), 1800);
+  const showToast = (message) => {
+    setToast(message);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => setToast(""), 1800);
   };
 
-  const openDetail = (dayId) => setDetailDayId(dayId);
-  const closeDetail = () => setDetailDayId(null);
+  const submit = () => {
+    showToast("送信しました。ありがとうございました！");
+  };
 
-  const onPressStart = (dayId, e) => {
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const openDetail = (candidateId) => setDetailCandidateId(candidateId);
+  const closeDetail = () => setDetailCandidateId(null);
+
+  const onPressStart = (candidateId, e) => {
     pressStart.current = { x: e.clientX, y: e.clientY, moved: false };
     if (pressTimer.current) window.clearTimeout(pressTimer.current);
     pressTimer.current = window.setTimeout(() => {
       if (!pressStart.current.moved) {
         if (navigator.vibrate) navigator.vibrate(10);
-        openDetail(dayId);
+        openDetail(candidateId);
       }
     }, 500);
   };
@@ -324,8 +342,8 @@ function SchedulyMock() {
     if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; }
   };
 
-  const participantsFor = (dayId, m) => (PARTICIPANTS[dayId] || []).filter(p => p.mark === m);
-  const detailDay = detailDayId ? (DAYS.find(d => d.id === detailDayId) || null) : null;
+  const participantsFor = (candidateId, markType) => (PARTICIPANT_RESPONSES[candidateId] || []).filter((participant) => participant.mark === markType);
+  const detailCandidate = detailCandidateId ? (ICAL_CANDIDATES.find((candidate) => candidate.id === detailCandidateId) || null) : null;
 
   return (
     <div className="mx-auto max-w-sm h-dvh flex flex-col bg-white text-gray-900">
@@ -334,11 +352,11 @@ function SchedulyMock() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold">Scheduly</h1>
-            <p className="text-xs font-semibold text-gray-700 mt-0.5">{current.summary}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">📍 {current.location}</p>
+            <p className="text-xs font-semibold text-gray-700 mt-0.5">{currentCandidate.summary}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">📍 {currentCandidate.location}</p>
           </div>
           <div className="flex flex-col items-end gap-1 text-right">
-            <Pill>{completeCount}/{DAYS.length}日 完了</Pill>
+            <Pill>{completeCount}/{ICAL_CANDIDATES.length}日 完了</Pill>
             <div className="text-[10px] text-gray-500">👤 匿名参加者</div>
           </div>
         </div>
@@ -350,24 +368,24 @@ function SchedulyMock() {
         <article className="rounded-2xl border p-4 shadow-sm">
           <div className="mb-3 space-y-1">
             <div className="flex items-center gap-2 text-xs">
-              <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + statusBadgeClass(current.status)}>
-                {formatStatusLabel(current.status)}
+              <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + icalStatusBadgeClass(currentCandidate.status)}>
+                {formatIcalStatusLabel(currentCandidate.status)}
               </span>
-              <span className="text-[11px] text-gray-400">{current.tzid}</span>
+              <span className="text-[11px] text-gray-400">{currentCandidate.tzid}</span>
             </div>
-            <div className="text-2xl font-bold tracking-wide">{current.summary}</div>
+            <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
             <div className="text-sm text-gray-600">
-              {formatDateLabel(current)}・{formatTimeRange(current)}
+              {formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <span role="img" aria-hidden="true">📍</span>
-              <span>{current.location}</span>
+              <span>{currentCandidate.location}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-                onClick={() => openDetail(current.id)}
+                onClick={() => openDetail(currentCandidate.id)}
               >
                 <span aria-hidden="true">ℹ</span> 詳細を表示
               </button>
@@ -375,7 +393,7 @@ function SchedulyMock() {
                 type="button"
                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 opacity-70"
                 title="この候補の iCal ダウンロードはモックでは未実装です"
-                onClick={() => popToast("参加者向け iCal ダウンロードは未実装です（モック）")}
+                onClick={() => showToast("参加者向け iCal ダウンロードは未実装です（モック）")}
               >
                 <span aria-hidden="true">📅</span> iCal (ICS)
               </button>
@@ -407,7 +425,7 @@ function SchedulyMock() {
           </div>
 
           {/* Tally */}
-          <StatRow day={current} />
+          <StatRow candidate={currentCandidate} />
 
           {/* Comment */}
           <label className="block mt-3">
@@ -416,7 +434,7 @@ function SchedulyMock() {
               className="mt-1 w-full rounded-xl border p-2 text-sm"
               rows={2}
               placeholder="この日はテストの可能性が…"
-              value={(answers[current.id] && answers[current.id].comment) || ""}
+              value={(answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""}
               onChange={(e) => setComment(e.target.value)}
             />
           </label>
@@ -425,16 +443,16 @@ function SchedulyMock() {
         {/* Nav */}
         <div className="grid grid-cols-2 gap-2 mt-3">
           <button className="h-12 rounded-xl border disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
-          <button className="h-12 rounded-xl border disabled:opacity-40" onClick={() => go(1)} disabled={index === DAYS.length - 1}>次の日 →</button>
+          <button className="h-12 rounded-xl border disabled:opacity-40" onClick={() => go(1)} disabled={index === ICAL_CANDIDATES.length - 1}>次の日 →</button>
         </div>
 
         {/* Overview list */}
         <section className="mt-6">
           <h2 className="text-sm font-semibold mb-2">📊 出欠サマリー</h2>
           <ul className="space-y-1">
-            {DAYS.map((d) => {
-              const isCurrent = d.id === current.id;
-              const my = (answers[d.id] && answers[d.id].mark) || null;
+            {ICAL_CANDIDATES.map((candidate) => {
+              const isCurrent = candidate.id === currentCandidate.id;
+              const my = (answers[candidate.id] && answers[candidate.id].mark) || null;
               const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
               const myClass =
                 my === "o" ? "border-emerald-300 text-emerald-700 bg-emerald-50"
@@ -444,7 +462,7 @@ function SchedulyMock() {
 
               return (
                 <li
-                  key={d.id}
+                  key={candidate.id}
                   className={
                     "flex items-center justify-between rounded-lg border px-3 py-2 transition " +
                     (isCurrent
@@ -452,7 +470,7 @@ function SchedulyMock() {
                       : "hover:bg-gray-50")
                   }
                   aria-current={isCurrent ? "true" : undefined}
-                  ref={(el) => (itemRefs.current[d.id] = el)}
+                  ref={(el) => (itemRefs.current[candidate.id] = el)}
                   tabIndex={-1}
                 >
                   <div className="flex items-center gap-2">
@@ -469,9 +487,9 @@ function SchedulyMock() {
                       onClick={() => {
                         // サマリーからのジャンプ時のみスクロール
                         setShouldScrollToCurrent(true);
-                        setIndex(DAYS.findIndex((x) => x.id === d.id));
+                        setIndex(ICAL_CANDIDATES.findIndex((entry) => entry.id === candidate.id));
                       }}
-                      onPointerDown={(e) => onPressStart(d.id, e)}
+                      onPointerDown={(e) => onPressStart(candidate.id, e)}
                       onPointerMove={onPressMove}
                       onPointerUp={onPressEnd}
                       onPointerLeave={onPressEnd}
@@ -479,24 +497,24 @@ function SchedulyMock() {
                       onContextMenu={(e) => e.preventDefault()}
                     >
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        {formatDateLabel(d)}
+                        {formatCandidateDateLabel(candidate)}
                         {isCurrent && <span className="ml-2 text-emerald-600 text-xs font-semibold">（選択）</span>}
                       </div>
-                      <div className="text-xs text-gray-500">{formatTimeRange(d)}</div>
+                      <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                        <span className={"inline-flex items-center rounded-full border px-2 py-0.5 " + statusBadgeClass(d.status)}>
-                          {formatStatusLabel(d.status)}
+                        <span className={"inline-flex items-center rounded-full border px-2 py-0.5 " + icalStatusBadgeClass(candidate.status)}>
+                          {formatIcalStatusLabel(candidate.status)}
                         </span>
-                        <span className="truncate max-w-[12rem]">{d.location}</span>
+                        <span className="truncate max-w-[12rem]">{candidate.location}</span>
                       </div>
                       <div className="text-[10px] text-gray-400 mt-1">（長押しで参加者を見る）</div>
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{d.tally.o}</span>
-                    <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{d.tally.d}</span>
-                    <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{d.tally.x}</span>
+                    <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
+                    <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
+                    <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
                     {/* ▼ あなたの選択表示（未選択は—） */}
                     <span
                       className={"ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border " + myClass}
@@ -523,41 +541,41 @@ function SchedulyMock() {
 
       {/* Detail Modal */}
       <Modal
-        open={!!detailDay}
-        title={detailDay ? `${formatDateLabel(detailDay)} の詳細` : ""}
+        open={!!detailCandidate}
+        title={detailCandidate ? `${formatCandidateDateLabel(detailCandidate)} の詳細` : ""}
         onClose={closeDetail}
       >
-        {detailDay && (
+        {detailCandidate && (
           <>
-            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailDay.id, "o")} />
-            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailDay.id, "d")} />
-            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailDay.id, "x")} />
+            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate.id, "o")} />
+            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate.id, "d")} />
+            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate.id, "x")} />
             <hr className="my-3 border-gray-200" />
             <section className="space-y-2 text-xs text-gray-600">
-              <p className="text-sm font-semibold text-gray-800">{detailDay.summary}</p>
+              <p className="text-sm font-semibold text-gray-800">{detailCandidate.summary}</p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + statusBadgeClass(detailDay.status)}>
-                  {formatStatusLabel(detailDay.status)}
+                <span className={"inline-flex items-center rounded-full border px-2 py-0.5 font-semibold " + icalStatusBadgeClass(detailCandidate.status)}>
+                  {formatIcalStatusLabel(detailCandidate.status)}
                 </span>
-                <span className="text-[11px] text-gray-400">{detailDay.tzid}</span>
+                <span className="text-[11px] text-gray-400">{detailCandidate.tzid}</span>
               </div>
-              <p>{formatDateLabel(detailDay)}・{formatTimeRange(detailDay)}</p>
-              <p>📍 {detailDay.location}</p>
+              <p>{formatCandidateDateLabel(detailCandidate)}・{formatCandidateTimeRange(detailCandidate)}</p>
+              <p>📍 {detailCandidate.location}</p>
               <dl className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-[11px] text-gray-600">
                 <div className="flex items-start gap-3">
                   <dt className="w-20 font-semibold text-gray-500">UID</dt>
-                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailDay.uid}</dd>
+                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailCandidate.uid}</dd>
                 </div>
                 <div className="flex items-start gap-3">
                   <dt className="w-20 font-semibold text-gray-500">SEQUENCE</dt>
-                  <dd className="flex-1 text-gray-700">{detailDay.sequence}</dd>
+                  <dd className="flex-1 text-gray-700">{detailCandidate.sequence}</dd>
                 </div>
                 <div className="flex items-start gap-3">
                   <dt className="w-20 font-semibold text-gray-500">DTSTAMP</dt>
                   <dd className="flex-1">
-                    <div className="font-mono break-all text-gray-700">{detailDay.dtstamp}</div>
+                    <div className="font-mono break-all text-gray-700">{detailCandidate.dtstamp}</div>
                     <div className="text-[10px] text-gray-400">
-                      {formatDateTimeWithZone(detailDay.dtstamp, detailDay.tzid)} （{detailDay.tzid}）
+                      {formatIcalDateTimeWithZone(detailCandidate.dtstamp, detailCandidate.tzid)} （{detailCandidate.tzid}）
                     </div>
                   </dd>
                 </div>
