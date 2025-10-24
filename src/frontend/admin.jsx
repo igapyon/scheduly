@@ -410,17 +410,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           />
         </label>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="block">
-            <span className="text-xs font-semibold text-zinc-500">SEQUENCE</span>
-            <input
-              type="number"
-              value={value.sequence}
-              onChange={(e) => onChange({ ...value, sequence: Number(e.target.value) })}
-              className="mt-1 w-24 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-              min={0}
-            />
-          </label>
+        <div className="flex justify-end">
           <button
             type="button"
             className="h-10 rounded-lg border border-zinc-200 px-4 text-xs font-semibold text-rose-500 hover:border-rose-400 disabled:opacity-40"
@@ -431,7 +421,6 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           </button>
         </div>
 
-        <CandidateMetaTable candidate={value} />
       </div>
 
       {metaOpen && (
