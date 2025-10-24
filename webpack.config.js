@@ -6,7 +6,8 @@ const isProduction = process.env.NODE_ENV === "production";
 module.exports = {
   entry: {
     index: path.resolve(__dirname, "src/frontend/admin.jsx"),
-    user: path.resolve(__dirname, "src/frontend/user.jsx")
+    user: path.resolve(__dirname, "src/frontend/user.jsx"),
+    responses: path.resolve(__dirname, "src/frontend/admin-responses.jsx")
   },
   output: {
     filename: "[name].bundle.js",
