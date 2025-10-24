@@ -4,8 +4,8 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## モックの前提
 
-- すべてのモックは `public/legacy/*.html` に置かれており、React 18（UMD 版）、Tailwind CSS、Babel Standalone を CDN から取得して動作します。
-- 追加のビルド工程やサーバー起動は不要です。HTML をブラウザで直接開けば最新のコードがそのまま確認できます。
+- レガシーモックは `public/legacy/*.html` に置かれ、React 18（UMD 版）＋ Tailwind CDN ＋ Babel Standalone で動作します。ブラウザで直接開くだけで確認できます。
+- React / webpack 版は `src/frontend/` を起点に進めている再構築中のコードです。`npm run dev` や `npm run build` を利用して挙動を確認します。
 
 ## ICS まわりのメモ
 
@@ -16,6 +16,8 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## 開発フローの覚書
 
+- レガシーモックはブラウザで直接動かし、修正後はリロードで挙動を確認します。
+- Webpack 版は `npm run dev` でホットリロードしながら作業します。エントリポイントは `src/frontend/index.jsx` と `src/frontend/admin.jsx`。
 - 画面の挙動が想定とズレたら、まず Console ログを確認し、必要なら `console.log` を一時的に追加して原因を突き止めます。解決後に整える方が近道です。
 - 参加者モックの `iCal (ICS)` ボタンは現状トーストを表示するだけのダミーです。本実装時に必要な導線として残しています。
 
