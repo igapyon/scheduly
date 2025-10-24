@@ -201,7 +201,15 @@ function ScheduleSummary({ schedule }) {
         {schedule.responses.map((response) => (
           <li key={response.name} className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
             <div>
-              <div className="font-semibold text-zinc-800">{response.name}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="font-semibold text-zinc-800">{response.name}</div>
+                <a
+                  href="./user-edit.html"
+                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                >
+                  回答
+                </a>
+              </div>
               <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
                 {response.comment}
               </div>
@@ -237,10 +245,19 @@ function ParticipantSummary({ participant, defaultOpen }) {
 
   return (
     <details className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" defaultOpen={defaultOpen}>
-      <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
-          <div className="text-base font-semibold text-zinc-800">{participant.name}</div>
+          <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
+            <span>{participant.name}</span>
+            <a
+              href="./user-edit.html"
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+            >
+              回答
+            </a>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
             <span>最終更新: {participant.lastUpdated}</span>
             {participant.commentHighlights.map((text) => (
@@ -326,20 +343,12 @@ function AdminResponsesApp() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
-      <header className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Admin Responses</p>
-          <h1 className="mt-1 text-2xl font-bold">Scheduly 回答管理</h1>
-          <p className="mt-2 text-sm text-zinc-600">
-            プロジェクト「{DASHBOARD_META.projectName}」の参加者回答を一覧・集計するモックです。実データはまだ連携していません。
-          </p>
-        </div>
-        <a
-          href="./index.html"
-          className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-        >
-          プロジェクト管理へ戻る
-        </a>
+      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
+        <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者回答一覧</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          プロジェクト「{DASHBOARD_META.projectName}」の参加者回答を共有するモックです。実データはまだ連携していません。
+        </p>
       </header>
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">

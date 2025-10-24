@@ -11,7 +11,7 @@
 
 ## 画面方針
 
-- 仮称: `admin-responses.jsx` + `public/responses.html`
+- 仮称: `admin-responses.jsx` + `public/user.html`
 - ナビゲーション: `admin.jsx` のヘッダーやメニューから「参加者回答管理」を開けるようにする。
 - レイアウト案
   1. **上部**  

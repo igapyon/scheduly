@@ -326,7 +326,7 @@ function SchedulyMock() {
       <header className="sticky top-0 z-10 border-b bg-white/95 p-3 backdrop-blur">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">Scheduly 参加者</h1>
+            <h1 className="text-lg font-semibold">Scheduly 回答編集</h1>
             <p className="mt-0.5 text-xs font-semibold text-gray-700">{currentCandidate.summary}</p>
             <p className="mt-0.5 text-[11px] text-gray-500">📍 {currentCandidate.location}</p>
           </div>
