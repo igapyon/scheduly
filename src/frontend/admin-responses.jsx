@@ -329,7 +329,7 @@ function AdminResponsesApp() {
       <header className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Admin Responses</p>
-          <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者回答管理</h1>
+          <h1 className="mt-1 text-2xl font-bold">Scheduly 回答管理</h1>
           <p className="mt-2 text-sm text-zinc-600">
             プロジェクト「{DASHBOARD_META.projectName}」の参加者回答を一覧・集計するモックです。実データはまだ連携していません。
           </p>
