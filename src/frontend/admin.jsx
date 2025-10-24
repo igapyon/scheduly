@@ -792,19 +792,21 @@ function OrganizerApp() {
     <div className="min-h-screen bg-zinc-100 px-4 py-6 text-gray-900 sm:px-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
               <p className="mt-2 text-sm text-zinc-600">
                 iCal (ICS) を活用した日程管理アプリです。
               </p>
             </div>
-            <a
-              href="./user.html"
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-            >
-              参加者画面（モック）を開く
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="./user.html"
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                参加者
+              </a>
+            </div>
           </div>
         </header>
 
@@ -818,7 +820,7 @@ function OrganizerApp() {
                   className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
                   onClick={generateUrls}
                 >
-                  共有URLを生成（モック）
+                  共有URLを生成
                 </button>
               }
             >
@@ -932,28 +934,8 @@ function OrganizerApp() {
                 </button>
               }
             >
-              <div className="space-y-3 text-sm text-zinc-600">
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                  onClick={mockDownloadJson}
-                >
-                  出欠表を JSON でダウンロード（モック）
-                </button>
-                <p>ここでは API 連携やファイル出力のモック動作のみを確認できます。</p>
-              </div>
             </Section>
           </main>
-
-          <aside className="space-y-6">
-            <Section title="送信ペイロード（モック表示）" action={null}>
-              <div className="max-h-[420px] overflow-auto rounded-lg border border-zinc-200 bg-zinc-900">
-                <pre className="whitespace-pre-wrap px-4 py-3 text-xs text-emerald-100">
-                  {JSON.stringify(eventPayload, null, 2)}
-                </pre>
-              </div>
-            </Section>
-          </aside>
         </div>
 
         {importPreview && (

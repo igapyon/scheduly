@@ -17,7 +17,7 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 ## 開発フローの覚書
 
 - レガシーモックはブラウザで直接動かし、修正後はリロードで挙動を確認します。
-- Webpack 版は `npm run dev` でホットリロードしながら作業します。エントリポイントは参加者向け `src/frontend/user.jsx`（`public/user.html`）、管理者向け `src/frontend/admin.jsx`（`public/index.html`）。
+- Webpack 版は `npm run dev` でホットリロードしながら作業します。エントリポイントは管理者向け `src/frontend/admin.jsx`（`public/index.html`）、参加者回答一覧 `src/frontend/user.jsx`（`public/user.html`）、参加者回答編集 `src/frontend/user-edit.jsx`（`public/user-edit.html`）。
 - 画面の挙動が想定とズレたら、まず Console ログを確認し、必要なら `console.log` を一時的に追加して原因を突き止めます。解決後に整える方が近道です。
 - 参加者モックの `iCal (ICS)` ボタンは現状トーストを表示するだけのダミーです。本実装時に必要な導線として残しています。
 
@@ -29,9 +29,9 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## Webpack への移行メモ
 
-- `src/frontend/` に React エントリ（管理者向け `admin.jsx` → `index.bundle.js`、参加者向け `user.jsx` → `user.bundle.js`）を配置し、スタイルは当面 HTML 側で読み込む Tailwind CDN と最小限のインライン CSS で対応。
-- `public/index.html`（管理画面） / `public/user.html`（参加者画面）で Tailwind CDN を読み込みます。管理画面では ical.js CDN も読み込んでいます。
-- 開発時は `npm run dev` で `webpack-dev-server`（ポート 5173）を起動。`http://localhost:5173/index.html`（管理者）と `http://localhost:5173/user.html`（参加者）を必要に応じて開く。Console を必ず確認。
+- `src/frontend/` に React エントリ（管理者向け `admin.jsx` → `index.bundle.js`、参加者回答一覧 `user.jsx` → `user.bundle.js`、参加者回答編集 `user-edit.jsx` → `userEdit.bundle.js`）を配置し、スタイルは当面 HTML 側で読み込む Tailwind CDN と最小限のインライン CSS で対応。
+- `public/index.html`（管理画面） / `public/user.html`（参加者回答一覧） / `public/user-edit.html`（参加者回答編集）で Tailwind CDN を読み込みます。管理画面では ical.js CDN も読み込んでいます。
+- 開発時は `npm run dev` で `webpack-dev-server`（ポート 5173）を起動。`http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く。Console を必ず確認。
 - ビルドは `npm run build` → `npm run postbuild` の流れ（`postbuild` は `scripts/copy-static.js` により `public` ディレクトリを `dist` へ複製）。生成された `dist` を静的ホスティングへ配置できる。
 - 既存の HTML モックを移行する際は、まず共通関数（ICS のユーティリティなど）を `src/frontend/utils/` に切り出し、小さなコンポーネント単位で JSX に置き換える。UI の差異が出ないよう段階的に差し替える。
 
