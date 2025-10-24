@@ -17,9 +17,49 @@ const ensureICAL = () => {
   return window.ICAL;
 };
 
+const logDebug = (...messages) => {
+  // eslint-disable-next-line no-console
+  console.debug("[Scheduly][user]", ...messages);
+};
+
+const waitForIcal = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("window is undefined"));
+  }
+  if (window.ICAL) return Promise.resolve(window.ICAL);
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (window.ICAL) {
+        clearInterval(timer);
+        resolve(window.ICAL);
+      } else if (Date.now() - start > 5000) {
+        clearInterval(timer);
+        reject(new Error("ical.js did not load within timeout"));
+      }
+    }, 50);
+  });
+};
+
+const SAMPLE_ICS_RELATIVE_PATH = "ics/sample-candidates.ics";
+
+const resolveSampleIcsUrl = () => {
+  if (typeof window === "undefined") {
+    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+  }
+  try {
+    return new URL(SAMPLE_ICS_RELATIVE_PATH, window.location.href).toString();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("[Scheduly] failed to resolve sample ICS URL", error);
+    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+  }
+};
+
 const formatScheduleRange = (startDate, endDate, tzid) => {
   if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
-  const zone = tzid || DEFAULT_TZID;
+  const normalizedTz = typeof tzid === "string" ? tzid.trim() : "";
+  const zone = normalizedTz && normalizedTz.toLowerCase() !== "floating" ? normalizedTz : DEFAULT_TZID;
   const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone });
   const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone });
   const datePart = dateFormatter.format(startDate);
@@ -31,10 +71,6 @@ const formatScheduleRange = (startDate, endDate, tzid) => {
 const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     id: "day1",
-    label: "Day 1",
-    location: "サントリーホール 大ホール",
-    status: "CONFIRMED",
-    tzid: DEFAULT_TZID,
     counts: { o: 8, d: 3, x: 1 },
     summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
     responses: [
@@ -46,10 +82,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   },
   "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
     id: "day2",
-    label: "Day 2",
-    location: "サントリーホール ブルーローズ",
-    status: "TENTATIVE",
-    tzid: DEFAULT_TZID,
     counts: { o: 4, d: 5, x: 3 },
     summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
     responses: [
@@ -61,10 +93,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   },
   "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
     id: "day3",
-    label: "Day 3",
-    location: "サントリーホール ブルーローズ",
-    status: "TENTATIVE",
-    tzid: DEFAULT_TZID,
     counts: { o: 6, d: 2, x: 4 },
     summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
     responses: [
@@ -176,10 +204,20 @@ function participantTotals(participant) {
 }
 
 function ScheduleSummary({ schedule }) {
+  const [open, setOpen] = useState(schedule.id === "day1");
+
+  useEffect(() => {
+    setOpen((prev) => (schedule.id === "day1" ? true : prev));
+  }, [schedule.id]);
+
   const status = formatStatusBadge(schedule.status);
 
   return (
-    <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" defaultOpen={schedule.id === "day1"}>
+    <details
+      className="rounded-2xl border border-zinc-200 bg-white shadow-sm"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{schedule.label}</div>
@@ -234,9 +272,18 @@ function ScheduleSummary({ schedule }) {
 
 function ParticipantSummary({ participant, defaultOpen }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+
+  useEffect(() => {
+    setOpen(Boolean(defaultOpen));
+  }, [defaultOpen]);
 
   return (
-    <details className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" defaultOpen={defaultOpen}>
+    <details
+      className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
@@ -334,14 +381,19 @@ function AdminResponsesApp() {
   const [activeTab, setActiveTab] = useState("schedule");
   const [schedules, setSchedules] = useState([]);
   const [schedulesLoading, setSchedulesLoading] = useState(true);
+  const [schedulesError, setSchedulesError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     const loadSchedulesFromIcs = async () => {
       setSchedulesLoading(true);
+      setSchedulesError("");
       try {
-        const response = await fetch("/ics/sample-candidates.ics", { cache: "no-cache" });
+        await waitForIcal();
+        const icsUrl = resolveSampleIcsUrl();
+        logDebug("fetching ICS", icsUrl);
+        const response = await fetch(icsUrl, { cache: "no-cache" });
         if (!response.ok) {
           throw new Error(`Failed to fetch sample ICS: ${response.status}`);
         }
@@ -350,6 +402,7 @@ function AdminResponsesApp() {
         const parsed = ICAL.parse(text);
         const component = new ICAL.Component(parsed);
         const vevents = component.getAllSubcomponents("vevent") || [];
+        logDebug("parsed VEVENT count", vevents.length);
         if (!vevents.length) {
           throw new Error("No VEVENT entries in sample ICS");
         }
@@ -361,16 +414,16 @@ function AdminResponsesApp() {
           const details = SAMPLE_SCHEDULE_DETAILS[event.uid];
           const startDate = event.startDate ? event.startDate.toJSDate() : null;
           const endDate = event.endDate ? event.endDate.toJSDate() : null;
-          const tzid = (event.startDate && event.startDate.zone && event.startDate.zone.tzid) || details?.tzid || DEFAULT_TZID;
+          const tzid = ((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID || "").trim();
           const datetime = startDate && endDate ? formatScheduleRange(startDate, endDate, tzid) : "";
 
           converted.push({
             uid: event.uid,
             id: details?.id || event.uid,
-            label: details?.label || event.summary || event.uid,
+            label: event.summary || event.uid,
             datetime,
-            location: event.location || details?.location || "",
-            status: event.status || details?.status || "TENTATIVE",
+            location: event.location || "",
+            status: event.status || "TENTATIVE",
             tzid,
             startsAt: startDate ? startDate.toISOString() : null,
             endsAt: endDate ? endDate.toISOString() : null,
@@ -385,13 +438,17 @@ function AdminResponsesApp() {
           }
           return (a.label || "").localeCompare(b.label || "", "ja");
         });
+        logDebug("schedules after conversion", converted);
         if (!cancelled) {
           setSchedules(converted);
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.warn("[Scheduly] failed to hydrate participant schedules from ICS, leaving schedules empty", error);
         if (!cancelled) {
           setSchedules([]);
+          setSchedulesError(error instanceof Error ? error.message : String(error));
+          logDebug("load schedules error", error);
         }
       } finally {
         if (!cancelled) {
@@ -461,6 +518,11 @@ function AdminResponsesApp() {
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
               表示できる日程がありません。
+              {schedulesError && (
+                <span className="mt-2 block text-[11px] text-rose-500">
+                  読み込みエラー: {schedulesError}
+                </span>
+              )}
             </div>
           )}
         </section>

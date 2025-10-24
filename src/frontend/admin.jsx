@@ -25,6 +25,41 @@ const randomUUID = () => {
 
 const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
 
+const SAMPLE_ICS_RELATIVE_PATH = "ics/sample-candidates.ics";
+
+const logDebug = (...messages) => {
+  // eslint-disable-next-line no-console
+  console.debug("[Scheduly][admin]", ...messages);
+};
+
+const resolveSampleIcsUrl = () => {
+  if (typeof window === "undefined") return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+  try {
+    return new URL(SAMPLE_ICS_RELATIVE_PATH, window.location.href).toString();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("[Scheduly] failed to resolve sample ICS URL", error);
+    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+  }
+};
+const waitForIcal = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("window is undefined"));
+  }
+  if (window.ICAL) return Promise.resolve(window.ICAL);
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (window.ICAL) {
+        clearInterval(timer);
+        resolve(window.ICAL);
+      } else if (Date.now() - start > 5000) {
+        clearInterval(timer);
+        reject(new Error("ical.js did not load within timeout"));
+      }
+    }, 50);
+  });
+};
 const pad = (n) => String(n).padStart(2, "0");
 
 const toInputValue = (date) => {
@@ -507,7 +542,10 @@ function OrganizerApp() {
 
     const loadSampleIcs = async () => {
       try {
-        const response = await fetch("/ics/sample-candidates.ics", { cache: "no-cache" });
+        await waitForIcal();
+        const icsUrl = resolveSampleIcsUrl();
+        logDebug("fetching ICS", icsUrl);
+        const response = await fetch(icsUrl, { cache: "no-cache" });
         if (!response.ok) {
           throw new Error(`Failed to fetch sample ICS: ${response.status}`);
         }
@@ -517,6 +555,7 @@ function OrganizerApp() {
         const component = new ICAL.Component(parsed);
         const vevents = component.getAllSubcomponents("vevent") || [];
         const loadedCandidates = [];
+        logDebug("parsed VEVENT count", vevents.length);
         for (let i = 0; i < vevents.length; i += 1) {
           const candidate = createCandidateFromVevent(vevents[i]);
           if (candidate) {
@@ -530,9 +569,11 @@ function OrganizerApp() {
           setCandidates(loadedCandidates);
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.warn("[Scheduly] sample ICS load failed; candidates will remain empty until manual input", error);
         if (!cancelled) {
           setCandidates([]);
+          logDebug("load candidates error", error);
         }
       } finally {
         if (!cancelled) {
