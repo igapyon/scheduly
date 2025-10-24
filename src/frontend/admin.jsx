@@ -804,7 +804,7 @@ function OrganizerApp() {
                 href="./user.html"
                 className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
               >
-                参加者回答一覧
+                参加者
               </a>
             </div>
           </div>
@@ -820,7 +820,7 @@ function OrganizerApp() {
                   className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
                   onClick={generateUrls}
                 >
-                  共有URLを生成（モック）
+                  共有URLを生成
                 </button>
               }
             >
@@ -934,28 +934,8 @@ function OrganizerApp() {
                 </button>
               }
             >
-              <div className="space-y-3 text-sm text-zinc-600">
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                  onClick={mockDownloadJson}
-                >
-                  出欠表を JSON でダウンロード（モック）
-                </button>
-                <p>ここでは API 連携やファイル出力のモック動作のみを確認できます。</p>
-              </div>
             </Section>
           </main>
-
-          <aside className="space-y-6">
-            <Section title="送信ペイロード（モック表示）" action={null}>
-              <div className="max-h-[420px] overflow-auto rounded-lg border border-zinc-200 bg-zinc-900">
-                <pre className="whitespace-pre-wrap px-4 py-3 text-xs text-emerald-100">
-                  {JSON.stringify(eventPayload, null, 2)}
-                </pre>
-              </div>
-            </Section>
-          </aside>
         </div>
 
         {importPreview && (

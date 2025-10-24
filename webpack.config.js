@@ -7,7 +7,7 @@ module.exports = {
   entry: {
     index: path.resolve(__dirname, "src/frontend/admin.jsx"),
     user: path.resolve(__dirname, "src/frontend/user.jsx"),
-    responses: path.resolve(__dirname, "src/frontend/admin-responses.jsx")
+    userEdit: path.resolve(__dirname, "src/frontend/user-edit.jsx")
   },
   output: {
     filename: "[name].bundle.js",

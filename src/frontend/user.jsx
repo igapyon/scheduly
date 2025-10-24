@@ -1,550 +1,448 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
-const DEFAULT_TZID = "Asia/Tokyo";
+const DASHBOARD_META = {
+  projectName: "秋の合宿 調整会議",
+  deadline: "2025/05/01 23:59",
+  participantCount: 12,
+  lastUpdated: "2025/04/12 17:45"
+};
 
-const ICAL_CANDIDATES = [
+const SCHEDULES = [
   {
-    id: "2025-10-26",
-    uid: "scheduly-day1-9ba2",
-    summary: "秋の合宿 調整会議 Day1",
-    dtstart: "2025-10-26T13:00:00+09:00",
-    dtend: "2025-10-26T17:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "CONFIRMED",
-    sequence: 1,
-    dtstamp: "2024-04-01T01:00:00Z",
+    id: "day1",
+    label: "Day 1",
+    datetime: "2025/10/26 13:00 – 17:00",
     location: "サントリーホール 大ホール",
-    tally: { o: 12, d: 3, x: 2 }
-  },
-  {
-    id: "2025-10-27",
-    uid: "scheduly-day2-c1f4",
-    summary: "秋の合宿 調整会議 Day2",
-    dtstart: "2025-10-27T18:00:00+09:00",
-    dtend: "2025-10-27T21:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "TENTATIVE",
-    sequence: 0,
-    dtstamp: "2024-04-01T01:05:00Z",
-    location: "サントリーホール ブルーローズ",
-    tally: { o: 8, d: 4, x: 5 }
-  },
-  {
-    id: "2025-10-28",
-    uid: "scheduly-day3-d73e",
-    summary: "秋の合宿 調整会議 Day3",
-    dtstart: "2025-10-28T18:00:00+09:00",
-    dtend: "2025-10-28T21:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "TENTATIVE",
-    sequence: 0,
-    dtstamp: "2024-04-01T01:10:00Z",
-    location: "サントリーホール ブルーローズ",
-    tally: { o: 10, d: 2, x: 3 }
-  },
-  {
-    id: "2025-11-03",
-    uid: "scheduly-day4-3a0d",
-    summary: "秋の合宿 調整会議 予備日",
-    dtstart: "2025-11-03T10:00:00+09:00",
-    dtend: "2025-11-03T12:00:00+09:00",
-    tzid: DEFAULT_TZID,
     status: "CONFIRMED",
-    sequence: 2,
-    dtstamp: "2024-04-01T01:20:00Z",
-    location: "サントリーホール",
-    tally: { o: 14, d: 1, x: 0 }
+    counts: { o: 8, d: 3, x: 1 },
+    summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
+    actions: [
+      { label: "コメント要対応", variant: "outline" },
+      { label: "この候補を確定候補へ", variant: "solid" }
+    ],
+    responses: [
+      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "オフィス参加可" },
+      { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
+      { participantId: "tanaka", name: "田中 一郎", mark: "o", comment: "コメントなし" },
+      { participantId: "others", name: "・・・", mark: "pending", comment: "残り9名の回答は実装時に取得" }
+    ]
+  },
+  {
+    id: "day2",
+    label: "Day 2",
+    datetime: "2025/10/27 18:00 – 21:00",
+    location: "サントリーホール ブルーローズ",
+    status: "TENTATIVE",
+    counts: { o: 4, d: 5, x: 3 },
+    summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
+    actions: [
+      { label: "コメント要対応", variant: "outline" },
+      { label: "この候補を確定候補へ", variant: "solid" }
+    ],
+    responses: [
+      { participantId: "sato", name: "佐藤 太郎", mark: "d", comment: "オンラインなら可" },
+      { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "開始時間を 19:00 にできれば ○" },
+      { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "平日は難しいです。" },
+      { participantId: "others", name: "・・・", mark: "pending", comment: "他 8 名の回答を表示（実装時にロード）" }
+    ]
+  },
+  {
+    id: "day3",
+    label: "Day 3",
+    datetime: "2025/10/28 18:00 – 21:00",
+    location: "サントリーホール ブルーローズ",
+    status: "TENTATIVE",
+    counts: { o: 6, d: 2, x: 4 },
+    summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
+    actions: [
+      { label: "候補をアーカイブ", variant: "outline" },
+      { label: "別日案を作成", variant: "dark" }
+    ],
+    responses: [
+      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
+      { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
+      { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "他会議とバッティング" }
+    ]
   }
 ];
 
-const PARTICIPANT_RESPONSES = {
-  "2025-10-26": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" },
-    { name: "高橋", mark: "d" }, { name: "伊藤", mark: "x" }
-  ],
-  "2025-10-27": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "d" }, { name: "田中", mark: "x" }, { name: "高橋", mark: "x" }
-  ],
-  "2025-10-28": [
-    { name: "佐藤", mark: "d" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }
-  ],
-  "2025-11-03": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }, { name: "高橋", mark: "o" }
-  ]
+const PARTICIPANTS = [
+  {
+    id: "sato",
+    name: "佐藤 太郎",
+    lastUpdated: "2025/04/12 17:42",
+    commentHighlights: ["コメント記入: Day2"],
+    summary: "各候補に対する回答とコメントを日程順にまとめています。コメントを含む候補は上部のハイライトと連動します。",
+    actions: [
+      { label: "フォロー済みにする", variant: "outline" },
+      { label: "コメントに返信", variant: "outline" }
+    ],
+    responses: [
+      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
+      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
+      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
+      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
+    ]
+  },
+  {
+    id: "suzuki",
+    name: "鈴木 花子",
+    lastUpdated: "2025/04/10 09:15",
+    commentHighlights: ["コメント記入: Day1 / Day3"],
+    summary: "平日夜は調整が必要との回答が多めです。Day2 の要望を反映すると参加しやすくなる可能性があります。",
+    actions: [
+      { label: "Day2 の代替案を検討", variant: "outline" },
+      { label: "フォローを記録", variant: "outline" }
+    ],
+    responses: [
+      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
+      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
+      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
+      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
+    ]
+  },
+  {
+    id: "tanaka",
+    name: "田中 一郎",
+    lastUpdated: "2025/04/05 21:03",
+    commentHighlights: ["コメント記入: Day2 / Day3"],
+    summary: "平日日程の参加が難しいとのコメントが複数あり。予備日の回答が未入力のため、フォローが必要です。",
+    actions: [
+      { label: "未回答フォローを送信", variant: "outline" },
+      { label: "代替日程を提案", variant: "outline" }
+    ],
+    responses: [
+      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
+      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
+      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
+      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
+    ]
+  }
+];
+
+const STATUS_LABELS = {
+  CONFIRMED: { label: "確定", badgeClass: "bg-emerald-100 text-emerald-700" },
+  TENTATIVE: { label: "仮予定", badgeClass: "bg-amber-100 text-amber-700" },
+  CANCELLED: { label: "取消し", badgeClass: "bg-rose-100 text-rose-700" }
 };
 
-const ICAL_STATUS_LABELS = {
-  CONFIRMED: "確定",
-  TENTATIVE: "仮予定",
-  CANCELLED: "取消し"
+const MARK_BADGE = {
+  o: "inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700",
+  d: "inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700",
+  x: "inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700",
+  pending: "inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600"
 };
 
-const ICAL_STATUS_BADGE_CLASSES = {
-  CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
-  TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
-  CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+const MARK_SYMBOL = {
+  o: "○",
+  d: "△",
+  x: "×",
+  pending: "？"
 };
 
-const formatIcalStatusLabel = (status) => {
-  const label = ICAL_STATUS_LABELS[status] || status;
-  return `${label}（${status}）`;
-};
+function markBadgeClass(mark) {
+  return MARK_BADGE[mark] ?? "inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600";
+}
 
-const icalStatusBadgeClass = (status) => ICAL_STATUS_BADGE_CLASSES[status] || "border-gray-200 bg-gray-50 text-gray-500";
+function formatStatusBadge(status) {
+  const info = STATUS_LABELS[status] || { label: status, badgeClass: "bg-zinc-100 text-zinc-600" };
+  return {
+    text: `${info.label}（${status}）`,
+    className: `inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold ${info.badgeClass}`
+  };
+}
 
-const formatCandidateDateLabel = (candidate) => {
-  const date = new Date(candidate.dtstart);
-  const parts = new Intl.DateTimeFormat("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-    timeZone: candidate.tzid
-  }).formatToParts(date);
-  const month = parts.find((p) => p.type === "month")?.value || "";
-  const dayNum = parts.find((p) => p.type === "day")?.value || "";
-  const weekday = parts.find((p) => p.type === "weekday")?.value || "";
-  return `${month}/${dayNum}（${weekday}）`;
-};
-
-const formatCandidateTimeRange = (candidate) => {
-  const start = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: candidate.tzid
-  }).format(new Date(candidate.dtstart));
-  const end = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: candidate.tzid
-  }).format(new Date(candidate.dtend));
-  return `${start}〜${end}`;
-};
-
-const formatIcalDateTimeWithZone = (iso, tz) => {
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: tz,
-    hour12: false
-  }).format(new Date(iso));
-};
-
-const Pill = ({ children }) => (
-  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">{children}</span>
-);
-
-const StatRow = ({ candidate }) => {
-  const maxO = Math.max(...ICAL_CANDIDATES.map((entry) => entry.tally.o));
-  const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
-  return (
-    <div className="mt-3 flex items-center justify-between text-sm">
-      <div className="flex gap-3">
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{candidate.tally.o}</span>
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{candidate.tally.d}</span>
-        <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{candidate.tally.x}</span>
-      </div>
-      <span className="text-xs font-semibold text-emerald-600">{star}</span>
-    </div>
-  );
-};
-
-function Modal({ open, title, onClose, children }) {
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    if (open) document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="absolute inset-0 cursor-pointer bg-black/40" onClick={onClose} />
-      <div className="absolute inset-0 flex items-end justify-center sm:items-center">
-        <div
-          className="mx-4 mb-4 w-full max-w-sm overflow-hidden rounded-t-2xl border bg-white shadow-xl sm:mx-0 sm:mb-0 sm:rounded-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <button className="text-sm text-gray-500" onClick={onClose}>閉じる</button>
-          </div>
-          <div className="max-h-[60vh] space-y-4 overflow-y-auto p-4">
-            {children}
-          </div>
-        </div>
-      </div>
-    </div>
+function participantTotals(participant) {
+  return participant.responses.reduce(
+    (totals, response) => {
+      if (response.mark === "o" || response.mark === "d" || response.mark === "x") {
+        totals[response.mark] += 1;
+      } else {
+        totals.pending += 1;
+      }
+      return totals;
+    },
+    { o: 0, d: 0, x: 0, pending: 0 }
   );
 }
 
-const ParticipantList = ({ list, label, color }) => (
-  <div>
-    <div className={`mb-1 text-xs font-semibold ${color}`}>{label}</div>
-    {list && list.length ? (
-      <ul className="flex flex-wrap gap-2 text-sm">
-        {list.map((p, index) => (
-          <li key={`${p.name}-${index}`} className="rounded-full border px-2 py-0.5">{p.name}</li>
-        ))}
-      </ul>
-    ) : (
-      <div className="text-xs text-gray-400">—</div>
-    )}
-  </div>
-);
-
-function SchedulyMock() {
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [savedAt, setSavedAt] = useState("");
-  const [toast, setToast] = useState("");
-  const [detailCandidateId, setDetailCandidateId] = useState(null);
-
-  const itemRefs = useRef({});
-  const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
-  const startX = useRef(null);
-  const pressTimer = useRef(null);
-  const pressStart = useRef({ x: 0, y: 0, moved: false });
-
-  const currentCandidate = ICAL_CANDIDATES[index];
-  const mark = (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null;
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      const t = new Date();
-      setSavedAt(`${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`);
-    }, 250);
-    return () => clearTimeout(id);
-  }, [answers, index]);
-
-  useEffect(() => {
-    if (detailCandidateId) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = prev; };
-    }
-  }, [detailCandidateId]);
-
-  useEffect(() => {
-    const el = itemRefs.current[currentCandidate.id];
-    if (el) {
-      el.focus({ preventScroll: true });
-      if (shouldScrollToCurrent) {
-        el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-        setShouldScrollToCurrent(false);
-      }
-    }
-  }, [index, currentCandidate.id, shouldScrollToCurrent]);
-
-  const setMark = (m) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) === m ? null : m,
-        comment: (prev[currentCandidate.id] && prev[currentCandidate.id].comment) || ""
-      }
-    }));
-  };
-
-  const setComment = (value) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) || null,
-        comment: value
-      }
-    }));
-  };
-
-  const go = (dir) => {
-    setShouldScrollToCurrent(false);
-    setIndex((prev) => Math.max(0, Math.min(ICAL_CANDIDATES.length - 1, prev + dir)));
-  };
-
-  const onTouchStart = (e) => {
-    startX.current = e.touches[0].clientX;
-  };
-
-  const onTouchEnd = (e) => {
-    if (startX.current == null) return;
-    const dx = e.changedTouches[0].clientX - startX.current;
-    if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
-    startX.current = null;
-  };
-
-  const completeCount = Object.values(answers).filter((a) => a && a.mark).length;
-
-  const showToast = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(""), 1800);
-  };
-
-  const submit = () => {
-    showToast("送信しました。ありがとうございました！");
-  };
-
-  const openDetail = (candidateId) => setDetailCandidateId(candidateId);
-  const closeDetail = () => setDetailCandidateId(null);
-
-  const onPressStart = (candidateId, e) => {
-    pressStart.current = { x: e.clientX, y: e.clientY, moved: false };
-    if (pressTimer.current) window.clearTimeout(pressTimer.current);
-    pressTimer.current = window.setTimeout(() => {
-      if (!pressStart.current.moved) {
-        if (navigator && typeof navigator.vibrate === "function") navigator.vibrate(10);
-        openDetail(candidateId);
-      }
-    }, 500);
-  };
-
-  const onPressMove = (e) => {
-    const dx = Math.abs(e.clientX - pressStart.current.x);
-    const dy = Math.abs(e.clientY - pressStart.current.y);
-    if (dx > 8 || dy > 8) pressStart.current.moved = true;
-  };
-
-  const onPressEnd = () => {
-    if (pressTimer.current) {
-      window.clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
-
-  const participantsFor = (candidateId, markType) => (PARTICIPANT_RESPONSES[candidateId] || []).filter((participant) => participant.mark === markType);
-  const detailCandidate = detailCandidateId ? (ICAL_CANDIDATES.find((candidate) => candidate.id === detailCandidateId) || null) : null;
+function ScheduleSummary({ schedule }) {
+  const status = formatStatusBadge(schedule.status);
 
   return (
-    <div className="mx-auto flex h-dvh max-w-sm flex-col bg-white text-gray-900">
-      <header className="sticky top-0 z-10 border-b bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">Scheduly 回答編集</h1>
-            <p className="mt-0.5 text-xs font-semibold text-gray-700">{currentCandidate.summary}</p>
-            <p className="mt-0.5 text-[11px] text-gray-500">📍 {currentCandidate.location}</p>
-          </div>
-          <div className="flex flex-col items-end gap-1 text-right">
-            <Pill>{completeCount}/{ICAL_CANDIDATES.length}日 完了</Pill>
-            <div className="text-[10px] text-gray-500">👤 匿名参加者</div>
+    <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" defaultOpen={schedule.id === "day1"}>
+      <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{schedule.label}</div>
+          <div className="text-base font-semibold text-zinc-800">{schedule.datetime}</div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+            <span>{schedule.location}</span>
+            <span className="text-zinc-400">/</span>
+            <span className="text-zinc-500">
+              状態: <span className={status.className}>{status.text}</span>
+            </span>
           </div>
         </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
+            ○ {schedule.counts.o}
+          </span>
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-amber-100 px-3 font-semibold text-amber-700">
+            △ {schedule.counts.d}
+          </span>
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-rose-100 px-3 font-semibold text-rose-700">
+            × {schedule.counts.x}
+          </span>
+        </div>
+      </summary>
+      <div className="border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">{schedule.summaryText}</div>
+      <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
+        {schedule.responses.map((response) => (
+          <li key={response.name} className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="font-semibold text-zinc-800">{response.name}</div>
+                <a
+                  href="./user-edit.html"
+                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                >
+                  回答
+                </a>
+              </div>
+              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
+                {response.comment}
+              </div>
+            </div>
+            <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
+              {MARK_SYMBOL[response.mark] ?? "？"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2 border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">
+        {schedule.actions.map((action) => (
+          <button
+            key={action.label}
+            className={
+              action.variant === "solid"
+                ? "rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-700"
+                : action.variant === "dark"
+                  ? "rounded-lg bg-zinc-900 px-3 py-2 font-semibold text-white hover:bg-zinc-800"
+                  : "rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300"
+            }
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ParticipantSummary({ participant, defaultOpen }) {
+  const totals = useMemo(() => participantTotals(participant), [participant]);
+
+  return (
+    <details className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" defaultOpen={defaultOpen}>
+      <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+          <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
+            <span>{participant.name}</span>
+            <a
+              href="./user-edit.html"
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+            >
+              回答
+            </a>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+            <span>最終更新: {participant.lastUpdated}</span>
+            {participant.commentHighlights.map((text) => (
+              <span key={text}>{text}</span>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ {totals.o}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ {totals.d}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× {totals.x}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
+        </div>
+      </summary>
+      <div className="border-t border-zinc-200 bg-white/90 px-4 py-3 text-xs text-zinc-600">{participant.summary}</div>
+      <ul className="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+        {participant.responses.map((response) => (
+          <li
+            key={`${participant.id}-${response.scheduleId}`}
+            className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+              response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
+            }`}
+          >
+            <div>
+              <div className="text-sm font-semibold text-zinc-800">{response.datetime}</div>
+              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+            </div>
+            <span
+              className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+            >
+              {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2 border-t border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-600">
+        {participant.actions.map((action) => (
+          <button
+            key={action.label}
+            className={
+              action.variant === "outline"
+                ? "rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300"
+                : "rounded-lg bg-zinc-900 px-3 py-2 font-semibold text-white hover:bg-zinc-800"
+            }
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function TabNavigation({ activeTab, onChange }) {
+  return (
+    <nav className="rounded-2xl border border-zinc-200 bg-white/90 p-1 shadow-sm">
+      <div className="flex gap-1">
+        <button
+          type="button"
+          className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "schedule" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-emerald-50"
+          }`}
+          onClick={() => onChange("schedule")}
+        >
+          日程ごと
+        </button>
+        <button
+          type="button"
+          className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            activeTab === "participant" ? "bg-emerald-600 text-white" : "text-zinc-700 hover:bg-emerald-50"
+          }`}
+          onClick={() => onChange("participant")}
+        >
+          参加者ごと
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+function AdminResponsesApp() {
+  const [activeTab, setActiveTab] = useState("schedule");
+
+  return (
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
+        <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          プロジェクト「{DASHBOARD_META.projectName}」の回答状況を参加者と管理者が共有するモックです。実データはまだ連携していません。
+        </p>
       </header>
 
-      <main className="flex-1 select-none overflow-y-auto bg-gray-50 p-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <article className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="mb-3 space-y-1">
-            <div className="flex items-center gap-2 text-xs">
-              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(currentCandidate.status)}`}>
-                {formatIcalStatusLabel(currentCandidate.status)}
-              </span>
-              <span className="text-[11px] text-gray-400">{currentCandidate.tzid}</span>
-            </div>
-            <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
-            <div className="text-sm text-gray-600">
-              {formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-gray-500">
-              <span role="img" aria-hidden="true">📍</span>
-              <span>{currentCandidate.location}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-                onClick={() => openDetail(currentCandidate.id)}
-              >
-                <span aria-hidden="true">ℹ</span> 詳細を表示
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 opacity-70"
-                title="この候補の iCal ダウンロードはモックでは未実装です"
-                onClick={() => showToast("参加者向け iCal ダウンロードは未実装です（モック）")}
-              >
-                <span aria-hidden="true">📅</span> iCal (ICS)
-              </button>
-            </div>
-          </div>
-
-          <div className="my-2 grid grid-cols-3 gap-2">
-            {["o", "d", "x"].map((k) => {
-              const pressed = mark === k;
-              const color =
-                k === "o"
-                  ? (pressed ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 text-emerald-700 border-emerald-300")
-                  : k === "d"
-                    ? (pressed ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-300")
-                    : (pressed ? "bg-rose-500 text-white border-rose-500" : "bg-rose-50 text-rose-700 border-rose-300");
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  aria-pressed={pressed}
-                  onClick={() => setMark(k)}
-                  className={`h-14 rounded-xl border text-2xl font-bold transition-colors ${color}`}
-                >
-                  {k === "o" ? "○" : k === "d" ? "△" : "×"}
-                </button>
-              );
-            })}
-          </div>
-
-          <StatRow candidate={currentCandidate} />
-
-          <label className="mt-3 block">
-            <span className="text-xs text-gray-500">コメント（任意）</span>
-            <textarea
-              className="mt-1 w-full rounded-xl border p-2 text-sm"
-              rows={2}
-              placeholder="この日はテストの可能性が…"
-              value={(answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""}
-              onChange={(e) => setComment(e.target.value)}
-            />
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
+          <label className="text-xs font-semibold text-zinc-500">
+            参加者フィルター
+            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
+              <option>全参加者（{DASHBOARD_META.participantCount} 名）</option>
+              <option>未回答のみ</option>
+              <option>コメントあり</option>
+            </select>
           </label>
-        </article>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button className="h-12 rounded-xl border bg-white disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
-          <button className="h-12 rounded-xl border bg-white disabled:opacity-40" onClick={() => go(1)} disabled={index === ICAL_CANDIDATES.length - 1}>次の日 →</button>
+          <label className="text-xs font-semibold text-zinc-500">
+            回答ステータス
+            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
+              <option>○ / △ / ×</option>
+              <option>○ のみ表示</option>
+              <option>△ をハイライト</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-zinc-500">
+            キーワード検索
+            <input type="search" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" placeholder="参加者名・コメントを検索" />
+          </label>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+          <span>回答締切: {DASHBOARD_META.deadline}</span>
+          <span>参加者: {DASHBOARD_META.participantCount} 名</span>
+          <span>最新更新: {DASHBOARD_META.lastUpdated}</span>
+        </div>
+      </section>
 
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold">📊 出欠サマリー</h2>
-          <ul className="space-y-1">
-            {ICAL_CANDIDATES.map((candidate) => {
-              const isCurrent = candidate.id === currentCandidate.id;
-              const my = (answers[candidate.id] && answers[candidate.id].mark) || null;
-              const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
-              const myClass =
-                my === "o" ? "border-emerald-300 text-emerald-700 bg-emerald-50"
-                : my === "d" ? "border-amber-300 text-amber-700 bg-amber-50"
-                : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
-                : "border-gray-200 text-gray-500 bg-gray-50";
+      <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
-              return (
-                <li
-                  key={candidate.id}
-                  className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/70" : "hover:bg-gray-50"}`}
-                  aria-current={isCurrent ? "true" : undefined}
-                  ref={(el) => (itemRefs.current[candidate.id] = el)}
-                  tabIndex={-1}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-6 w-1.5 rounded-full transition ${isCurrent ? "bg-emerald-500" : "bg-transparent"}`}
-                      aria-hidden="true"
-                    />
-                    <button
-                      className="py-3 text-left"
-                      onClick={() => {
-                        setShouldScrollToCurrent(true);
-                        setIndex(ICAL_CANDIDATES.findIndex((entry) => entry.id === candidate.id));
-                      }}
-                      onPointerDown={(e) => onPressStart(candidate.id, e)}
-                      onPointerMove={onPressMove}
-                      onPointerUp={onPressEnd}
-                      onPointerLeave={onPressEnd}
-                      onPointerCancel={onPressEnd}
-                      onContextMenu={(e) => e.preventDefault()}
-                    >
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        {formatCandidateDateLabel(candidate)}
-                        {isCurrent && <span className="ml-2 text-xs font-semibold text-emerald-600">（選択）</span>}
-                      </div>
-                      <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 ${icalStatusBadgeClass(candidate.status)}`}>
-                          {formatIcalStatusLabel(candidate.status)}
-                        </span>
-                        <span className="max-w-[12rem] truncate">{candidate.location}</span>
-                      </div>
-                      <div className="mt-1 text-[10px] text-gray-400">（長押しで参加者を見る）</div>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
-                    <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
-                    <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
-                    <span
-                      className={`ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${myClass}`}
-                      aria-label="あなたの選択"
-                      title="あなたの選択"
-                    >
-                      <span className="font-medium">あなた:</span> {myLabel}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+      {activeTab === "schedule" && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-zinc-600">日程ごとの回答サマリー</h2>
+          {SCHEDULES.map((schedule) => (
+            <ScheduleSummary key={schedule.id} schedule={schedule} />
+          ))}
         </section>
-      </main>
-
-      <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">✓ 自動保存済み {savedAt && `・${savedAt}`}</span>
-          <button className="h-10 rounded-xl bg-black px-4 font-semibold text-white" onClick={submit}>登録を送信</button>
-        </div>
-      </footer>
-
-      <Modal
-        open={!!detailCandidate}
-        title={detailCandidate ? `${formatCandidateDateLabel(detailCandidate)} の詳細` : ""}
-        onClose={closeDetail}
-      >
-        {detailCandidate && (
-          <>
-            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate.id, "o")} />
-            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate.id, "d")} />
-            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate.id, "x")} />
-            <hr className="my-3 border-gray-200" />
-            <section className="space-y-2 text-xs text-gray-600">
-              <p className="text-sm font-semibold text-gray-800">{detailCandidate.summary}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}>
-                  {formatIcalStatusLabel(detailCandidate.status)}
-                </span>
-                <span className="text-[11px] text-gray-400">{detailCandidate.tzid}</span>
-              </div>
-              <p>{formatCandidateDateLabel(detailCandidate)}・{formatCandidateTimeRange(detailCandidate)}</p>
-              <p>📍 {detailCandidate.location}</p>
-              <dl className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-[11px] text-gray-600">
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">UID</dt>
-                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailCandidate.uid}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">SEQUENCE</dt>
-                  <dd className="flex-1 text-gray-700">{detailCandidate.sequence}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">DTSTAMP</dt>
-                  <dd className="flex-1">
-                    <div className="break-all font-mono text-gray-700">{detailCandidate.dtstamp}</div>
-                    <div className="text-[10px] text-gray-400">
-                      {formatIcalDateTimeWithZone(detailCandidate.dtstamp, detailCandidate.tzid)} （{detailCandidate.tzid}）
-                    </div>
-                  </dd>
-                </div>
-              </dl>
-            </section>
-          </>
-        )}
-      </Modal>
-
-      {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-16 flex justify-center px-4">
-          <div className="pointer-events-auto rounded-xl border bg-white px-4 py-2 text-sm shadow-lg">{toast}</div>
-        </div>
       )}
+
+      {activeTab === "participant" && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
+          <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
+            <div className="border-b border-zinc-200 px-4 py-3">
+              <div className="text-sm font-semibold text-zinc-800">参加者状況のスナップショット</div>
+              <p className="mt-1 text-xs text-zinc-500">
+                直近の回答や未回答者のフォロー状況を把握できます。フィルターと連動し、必要な参加者だけを抽出します。
+              </p>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              {PARTICIPANTS.map((participant, index) => (
+                <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
+            <p className="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>未回答者を抽出して個別フォローのメモを残すなど、管理タスク整理に活用します。</li>
+              <li>将来的には参加者カードから回答修正や再送リマインダーを起動できるようにします。</li>
+              <li>参加者 × 候補のマトリクス表示と連動し、詳細ドリルダウンへ誘導します。</li>
+            </ul>
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
+          <div className="flex flex-wrap gap-2">
+            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
+              全回答を CSV でダウンロード
+            </button>
+            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
+              サマリーをコピー（仮）
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-dashed border-zinc-300 bg-white/80 p-4 text-sm text-zinc-500">
+        <h2 className="font-semibold text-zinc-600">実装メモ</h2>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>本画面はレイアウト確認用のモックです。データは固定のダミーです。</li>
+          <li>サーバー連携時は Project / Slot / Participant / Response の API と接続する想定です。</li>
+          <li>モバイルでは日別カード + ドリルダウンを基本にし、PC ではマトリクス表示へ切り替える予定です。</li>
+          <li>CSV 出力は日別ではなく、上記の全体アクションから提供する想定です。</li>
+        </ul>
+      </section>
     </div>
   );
 }
@@ -552,4 +450,4 @@ function SchedulyMock() {
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
-root.render(<SchedulyMock />);
+root.render(<AdminResponsesApp />);

@@ -11,14 +11,14 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者回答一覧（`user.html`）や回答入力画面（`user-edit.html`）へのリンクを設置済みです。
-- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者向けモバイル UI を React 化した画面。長押しモーダル、○△× 回答、コメント入力などを備え、`public/user-edit.html` からアクセスできます。
-- `admin-responses.jsx`（ビルド後は `responses.bundle.js`）: 参加者回答一覧の React モック。日程別／参加者別のタブ切り替え、ハイライトカード、アクション類を試作しており、`public/user.html` で読み込みます。
+- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者回答一覧（`user.html`）へのリンクを設置済みです。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者回答の共有ビュー。日程別／参加者別のタブ切り替えやサマリー表示を備え、参加者自身も閲覧できる一覧画面として `public/user.html` で読み込みます。
+- `user-edit.jsx`（ビルド後は `userEdit.bundle.js`）: 参加者が自分の回答を登録・編集するモバイル UI。長押しモーダル、○△× 回答、コメント入力などを備え、`public/user-edit.html` からアクセスできます。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
-    - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者入力画面）を必要に応じて開く
+    - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く
      - Console の警告・エラーを節目ごとに確認
   3. 本番ビルド: `npm run build`
   4. 静的資産のコピー: `npm run postbuild`（`dist/` に `public/` 内容がコピーされます）
@@ -34,7 +34,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
 - `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
-- 参加者回答一覧の React 版（`admin-responses.jsx`）をもとに、実データ連携やマトリクス表示を整備する。
+- 参加者回答一覧（`user.jsx`）をもとに、実データ連携やマトリクス表示を整備する。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
 
 ## レガシーモック（`public/legacy/`）

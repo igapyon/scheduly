@@ -7,19 +7,19 @@ Scheduly のフロントエンド構成と今後想定している拡張ポイ�
 ```
 public/
 ├── index.html         # 管理者 UI (React / webpack -> index.bundle.js)
-├── user.html          # 参加者回答一覧 UI (React / webpack -> responses.bundle.js)
-├── user-edit.html     # 参加者入力 UI (React / webpack -> user.bundle.js)
+├── user.html          # 参加者回答一覧 UI (React / webpack -> user.bundle.js)
+├── user-edit.html     # 参加者回答編集 UI (React / webpack -> userEdit.bundle.js)
 └── legacy/            # 旧 HTML モック一式（参照用・比較用）
 src/frontend/
 ├── admin.jsx          # プロジェクト（候補）管理画面
-├── user.jsx           # 参加者向け回答入力画面
-└── admin-responses.jsx # 参加者回答一覧（管理・共有ビュー）
+├── user.jsx           # 参加者回答一覧（共有ビュー）
+└── user-edit.jsx      # 参加者回答編集画面
 ```
 
 - **Webpack エントリ**
 - `admin.jsx` → `index.bundle.js`（`public/index.html`で読み込み）
-- `user.jsx` → `user.bundle.js`（`public/user-edit.html`で読み込み）
-- `admin-responses.jsx` → `responses.bundle.js`（`public/user.html`で読み込み）
+- `user.jsx` → `user.bundle.js`（`public/user.html`で読み込み）
+- `user-edit.jsx` → `userEdit.bundle.js`（`public/user-edit.html`で読み込み）
 - **Tailwind**
   - 現状は CDN で読み込み、最低限の UI を構築。将来 PostCSS 化する予定。
 - **ical.js**
@@ -42,7 +42,7 @@ src/frontend/
 
 ## 今後の拡張想定
 
-- **回答管理画面（`admin-responses` 系）**  
+- **回答管理画面（`user` 系）**  
   参加者ごとの回答を集計・編集できる UI を追加。回答ステータスを反映して確定日時を決めるループを作る。
 
 - **サーバー/API 層**  
