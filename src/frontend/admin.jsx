@@ -850,12 +850,6 @@ function OrganizerApp() {
             >
               参加者画面を開く
             </a>
-            <a
-              href="./user-edit.html"
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-            >
-              回答編集モックを見る
-            </a>
           </div>
         </div>
       </header>
@@ -866,15 +860,6 @@ function OrganizerApp() {
           <SectionCard
             title="プロジェクト情報"
             description="参加者に共有される基本情報と回答設定を編集します。"
-            action={
-              <button
-                type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                onClick={generateUrls}
-              >
-                共有URLを生成
-              </button>
-            }
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -964,7 +949,19 @@ function OrganizerApp() {
         </main>
 
         <aside className="space-y-5">
-          <SectionCard title="共有URL" description="参加者へ共有するリンクと編集リンクを確認できます。">
+          <SectionCard
+            title="共有URL"
+            description="参加者へ共有するリンクと編集リンクを確認できます。"
+            action={
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
+                onClick={generateUrls}
+              >
+                共有URLを生成
+              </button>
+            }
+          >
             <KeyValueList
               items={[
                 { key: "編集用URL（管理者）", value: urls.admin },
