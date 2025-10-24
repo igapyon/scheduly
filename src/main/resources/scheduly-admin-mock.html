@@ -22,7 +22,15 @@
     <script type="text/babel">
       const { useMemo, useState, useId, useRef } = React;
 
-      const defaultTzid = "Asia/Tokyo";
+      const DEFAULT_TZID = "Asia/Tokyo";
+      const ICAL_LINE_BREAK = "\r\n";
+      const ICAL_HEADER_LINES = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Scheduly//Mock//JA",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH"
+      ];
 
       const pad = (n) => String(n).padStart(2, "0");
       const toInputValue = (date) => {
@@ -56,9 +64,32 @@
         return toInputValue(icalTime.toJSDate());
       };
 
-      const ensureDtstamp = () => new Date().toISOString();
+      const createDtstampIso = () => new Date().toISOString();
 
-      const buildVeventJCal = (candidate) => {
+      const ensureString = (value) => (value === undefined || value === null ? "" : String(value));
+
+      const escapeICalText = (value) => {
+        return ensureString(value)
+          .replace(/\\/g, "\\\\")
+          .replace(/\r?\n/g, "\\n")
+          .replace(/,/g, "\\,")
+          .replace(/;/g, "\\;");
+      };
+
+      const formatUtcForICal = (value) => {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        const year = date.getUTCFullYear();
+        const month = pad(date.getUTCMonth() + 1);
+        const day = pad(date.getUTCDate());
+        const hour = pad(date.getUTCHours());
+        const minute = pad(date.getUTCMinutes());
+        const second = pad(date.getUTCSeconds());
+        return `${year}${month}${day}T${hour}${minute}${second}Z`;
+      };
+
+      const buildICalVeventJCal = (candidate) => {
         const component = new ICAL.Component(["VEVENT", [], []]);
         const event = new ICAL.Event(component);
         event.uid = candidate.uid;
@@ -72,20 +103,27 @@
         if (dtstartTime) event.startDate = dtstartTime;
         const dtendTime = timeFromLocalInput(candidate.dtend);
         if (dtendTime) event.endDate = dtendTime;
+        if (candidate.tzid) {
+          const assignedTz = ICAL.TimezoneService.get(candidate.tzid);
+          if (assignedTz) {
+            if (event.startDate) event.startDate.zone = assignedTz;
+            if (event.endDate) event.endDate.zone = assignedTz;
+          }
+        }
         const dtstampTime = candidate.dtstamp ? ICAL.Time.fromJSDate(new Date(candidate.dtstamp)) : ICAL.Time.fromJSDate(new Date());
         event.component.updatePropertyWithValue("dtstamp", dtstampTime);
         return component.toJSON();
       };
 
-      const candidateFromVevent = (vevent) => {
+      const createCandidateFromVevent = (vevent) => {
         const event = new ICAL.Event(vevent);
         const uid = event.uid;
         if (!uid) return null;
         const startDate = event.startDate;
         const zone = startDate && startDate.zone ? startDate.zone.tzid : null;
-        const tzid = zone || defaultTzid;
+        const tzid = zone || DEFAULT_TZID;
         const dtstampTime = event.component.getFirstPropertyValue("dtstamp");
-        const dtstampIso = dtstampTime ? dtstampTime.toJSDate().toISOString() : ensureDtstamp();
+        const dtstampIso = dtstampTime ? dtstampTime.toJSDate().toISOString() : createDtstampIso();
         return {
           id: crypto.randomUUID(),
           uid,
@@ -98,11 +136,11 @@
           dtstamp: dtstampIso,
           location: event.location || "",
           description: event.description || "",
-          rawVevent: vevent.toJSON()
+          rawICalVevent: vevent.toJSON()
         };
       };
 
-      const blankCandidate = () => {
+      const createBlankICalCandidate = () => {
         const now = new Date();
         now.setSeconds(0, 0);
         const start = new Date(now.getTime() + 60 * 60 * 1000);
@@ -113,68 +151,115 @@
           summary: "",
           dtstart: toInputValue(start),
           dtend: toInputValue(end),
-          tzid: defaultTzid,
+          tzid: DEFAULT_TZID,
           status: "CONFIRMED",
           sequence: 0,
-          dtstamp: ensureDtstamp(),
+          dtstamp: createDtstampIso(),
           location: "",
           description: "",
-          rawVevent: null
+          rawICalVevent: null
         };
-        candidate.rawVevent = buildVeventJCal(candidate);
+        candidate.rawICalVevent = buildICalVeventJCal(candidate);
         return candidate;
       };
 
-      const seedCandidate = (data) => {
+      const seedICalCandidate = (data) => {
         const candidate = {
           id: crypto.randomUUID(),
           uid: data.uid || `scheduly-${crypto.randomUUID()}`,
           summary: data.summary || "",
           dtstart: data.dtstart || "",
           dtend: data.dtend || "",
-          tzid: data.tzid || defaultTzid,
+          tzid: data.tzid || DEFAULT_TZID,
           status: data.status || "CONFIRMED",
           sequence: data.sequence || 0,
-          dtstamp: data.dtstamp || ensureDtstamp(),
+          dtstamp: data.dtstamp || createDtstampIso(),
           location: data.location || "",
           description: data.description || "",
-          rawVevent: null
+          rawICalVevent: null
         };
-        candidate.rawVevent = data.rawVevent || buildVeventJCal(candidate);
+        candidate.rawICalVevent = data.rawICalVevent || buildICalVeventJCal(candidate);
         return candidate;
       };
 
-      const exportCandidateToIcs = (candidate) => {
-        const veventComponent = new ICAL.Component(candidate.rawVevent || buildVeventJCal(candidate));
-        const event = new ICAL.Event(veventComponent);
-        event.uid = candidate.uid;
-        event.summary = candidate.summary || "";
-        event.location = candidate.location || "";
-        event.description = candidate.description || "";
-        event.status = candidate.status || "CONFIRMED";
-        const dtstartTime = timeFromLocalInput(candidate.dtstart, candidate.tzid);
-        if (dtstartTime) event.startDate = dtstartTime;
-        const dtendTime = timeFromLocalInput(candidate.dtend, candidate.tzid);
-        if (dtendTime) event.endDate = dtendTime;
+      const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
+
+      const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
+        const dtstartLine = formatUtcForICal(candidate.dtstart);
+        const dtendLine = formatUtcForICal(candidate.dtend);
+        const statusValue = (candidate.status ? String(candidate.status) : "CONFIRMED").toUpperCase();
+        const tzidValue = (candidate.tzid && candidate.tzid.trim()) ? candidate.tzid.trim() : DEFAULT_TZID;
+
+        const veventLines = [
+          "BEGIN:VEVENT",
+          "UID:" + (candidate.uid || `scheduly-${crypto.randomUUID()}`),
+          "SEQUENCE:" + sequence
+        ];
+
+        if (dtstampLine) veventLines.push("DTSTAMP:" + dtstampLine);
+        if (dtstartLine) veventLines.push("DTSTART:" + dtstartLine);
+        if (dtendLine) veventLines.push("DTEND:" + dtendLine);
+        veventLines.push("STATUS:" + (statusValue || "CONFIRMED"));
+        veventLines.push("SUMMARY:" + escapeICalText(candidate.summary || ""));
+        veventLines.push("LOCATION:" + escapeICalText(candidate.location || ""));
+        veventLines.push("DESCRIPTION:" + escapeICalText(candidate.description || ""));
+        if (tzidValue) veventLines.push("X-SCHEDULY-TZID:" + escapeICalText(tzidValue));
+        veventLines.push("END:VEVENT");
+        return veventLines;
+      };
+
+      const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
+
+      const exportAllCandidatesToICal = (candidates) => {
         const now = new Date();
-        const dtstampTime = ICAL.Time.fromJSDate(now, true);
-        event.component.updatePropertyWithValue("dtstamp", dtstampTime);
-        const currentSequence = typeof candidate.sequence === "number" ? candidate.sequence : (typeof event.sequence === "number" ? event.sequence : 0);
-        event.sequence = currentSequence + 1;
+        const dtstampIso = now.toISOString();
+        const dtstampLine = formatUtcForICal(dtstampIso);
 
-        const calendar = new ICAL.Component(["VCALENDAR", [["VERSION", "2.0"], ["PRODID", "-//Scheduly//Mock//JA"]], []]);
-        calendar.addSubcomponent(veventComponent);
+        const lines = ICAL_HEADER_LINES.slice();
 
-        const safeName = (candidate.summary || candidate.uid || "event").replace(/[\\/:*?"<>|]+/g, "_");
+        candidates.forEach(function (candidate) {
+          const sequence = resolveNextSequence(candidate);
+          const veventLines = buildICalEventLines(candidate, { dtstampLine, sequence });
+          lines.push(...veventLines);
+        });
+
+        lines.push("END:VCALENDAR");
+        return joinICalLines(lines);
+      };
+
+      const exportCandidateToICal = (candidate) => {
+        const now = new Date();
+        const sequence = resolveNextSequence(candidate);
+        const dtstampIso = now.toISOString();
+        const dtstampLine = formatUtcForICal(dtstampIso);
+        const documentLines = ICAL_HEADER_LINES.slice();
+        documentLines.push(...buildICalEventLines(candidate, { dtstampLine, sequence }));
+        documentLines.push("END:VCALENDAR");
+
+        const icsText = joinICalLines(documentLines);
+
+        let updatedRaw = candidate.rawICalVevent;
+        try {
+          const parsed = ICAL.parse(icsText);
+          const comp = new ICAL.Component(parsed);
+          const vevent = comp.getFirstSubcomponent("vevent");
+          if (vevent) {
+            updatedRaw = vevent.toJSON();
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse generated ICS back to component", parseError);
+        }
+
+        const safeName = (candidate.summary || candidate.uid || "event").replace(/[\/:*?"<>|]+/g, "_");
 
         return {
-          icsText: calendar.toString(),
+          icsText,
           filename: `${safeName || "event"}.ics`,
           updatedCandidate: {
             ...candidate,
-            sequence: event.sequence,
-            dtstamp: now.toISOString(),
-            rawVevent: veventComponent.toJSON()
+            sequence,
+            dtstamp: dtstampIso,
+            rawICalVevent: updatedRaw
           }
         };
       };
@@ -414,24 +499,24 @@
         const [password, setPassword] = useState("mitaka2025");
         const responseOptions = ["○", "△", "×"];
         const [candidates, setCandidates] = useState(() => [
-          seedCandidate({
+          seedICalCandidate({
             uid: `scheduly-${crypto.randomUUID()}`,
             summary: "秋の合宿 調整会議 Day1",
             dtstart: toInputValue(new Date("2024-10-26T13:00:00+09:00")),
             dtend: toInputValue(new Date("2024-10-26T17:00:00+09:00")),
-            tzid: defaultTzid,
+            tzid: DEFAULT_TZID,
             status: "CONFIRMED",
             sequence: 1,
             dtstamp: "2024-04-01T01:00:00Z",
             location: "サントリーホール 大ホール（2046席）",
             description: "初日: キックオフと全体ミーティング"
           }),
-          seedCandidate({
+          seedICalCandidate({
             uid: `scheduly-${crypto.randomUUID()}`,
             summary: "秋の合宿 調整会議 Day2",
             dtstart: toInputValue(new Date("2024-10-27T18:00:00+09:00")),
             dtend: toInputValue(new Date("2024-10-27T21:00:00+09:00")),
-            tzid: defaultTzid,
+            tzid: DEFAULT_TZID,
             status: "TENTATIVE",
             sequence: 0,
             dtstamp: "2024-04-01T01:05:00Z",
@@ -477,34 +562,50 @@
 
         const addCandidate = () => {
           setCandidates(function (prev) {
-            const next = blankCandidate();
+            const next = createBlankICalCandidate();
             next.sequence = prev.length;
             return prev.concat(next);
           });
           popToast("日程を追加しました");
         };
 
-        const handleExportCandidate = (candidateId) => {
-          let exportResult = null;
+        const handleExportAllCandidates = () => {
+          if (!candidates.length) {
+            popToast("ダウンロード対象の日程がありません");
+            return;
+          }
           try {
-            setCandidates(function (prev) {
-              return prev.map(function (item) {
-                if (item.id !== candidateId) {
-                  return item;
-                }
-                exportResult = exportCandidateToIcs(item);
-                return exportResult.updatedCandidate;
-              });
-            });
+            const icsText = exportAllCandidatesToICal(candidates);
+            const filename = `scheduly-all-${new Date().toISOString().split('T')[0]}.ics`;
+            downloadTextFile(filename, icsText);
+            popToast("全候補を iCal (ICS) でダウンロードしました（モック）");
+          } catch (error) {
+            console.error("ICS bulk export error", error);
+            popToast("全候補のICS生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
+          }
+        };
+
+        const handleExportCandidate = (candidateId) => {
+          const target = candidates.find(function (item) { return item.id === candidateId; });
+          if (!target) {
+            popToast("候補が見つかりませんでした");
+            return;
+          }
+          let exportResult;
+          try {
+            exportResult = exportCandidateToICal(target);
           } catch (error) {
             console.error("ICS export error", error);
             popToast("ICSの生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
             return;
           }
-          if (exportResult) {
-            downloadTextFile(exportResult.filename, exportResult.icsText);
-            popToast(`${exportResult.filename} をダウンロードしました（モック）`);
-          }
+          downloadTextFile(exportResult.filename, exportResult.icsText);
+          popToast(`${exportResult.filename} をダウンロードしました（モック）`);
+          setCandidates(function (prev) {
+            return prev.map(function (item) {
+              return item.id === candidateId ? exportResult.updatedCandidate : item;
+            });
+          });
         };
 
         const handleIcsImport = async (file) => {
@@ -544,7 +645,7 @@
               skippedNoDtstamp += 1;
               continue;
             }
-            const candidate = candidateFromVevent(vevent);
+            const candidate = createCandidateFromVevent(vevent);
             if (!candidate) {
               continue;
             }
@@ -573,7 +674,7 @@
               candidate: candidate,
               status: status,
               message: message,
-              selected: selected,
+              selected: false,
               existingIndex: existingIndex,
               existingDtstamp: existingDtstamp,
               importedDtstamp: candidate.dtstamp
@@ -803,6 +904,14 @@
                         }}
                       >
                         ICSから追加
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
+                        onClick={handleExportAllCandidates}
+                        disabled={!candidates.length}
+                      >
+                        ICSを一括ダウンロード
                       </button>
                       <input
                         ref={importInputRef}
