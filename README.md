@@ -23,13 +23,13 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `index.jsx`: 参加者向けモバイル UI を React 化したもの。候補の長押しによる詳細表示、○△× 回答、コメント入力、自動保存表示などレガシーモックと同等に動作します。
-- `admin.jsx`: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しています。
-- スタイルは当面 HTML テンプレートで読み込む Tailwind CDN（`public/index.html` / `public/admin.html`）と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
+- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。ics インポート／エクスポート、候補一覧編集、プレビューなどを再現しており、`public/index.html` で読み込みます。ヘッダーから参加者画面（`user.html`）へのリンクを設置済みです。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者向けモバイル UI を React 化した画面。長押しモーダル、○△× 回答、コメント入力などレガシーモックと同等に動作し、`public/user.html` からアクセスできます。
+- スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
-     - `http://localhost:5173/index.html` / `admin.html` を開く
+     - `http://localhost:5173/index.html`（管理者）または `http://localhost:5173/user.html`（参加者）を開く
      - Console の警告・エラーを節目ごとに確認
   3. 本番ビルド: `npm run build`
   4. 静的資産のコピー: `npm run postbuild`（`dist/` に `public/` 内容がコピーされます）

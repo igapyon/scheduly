@@ -13,7 +13,7 @@ const ICAL_HEADER_LINES = [
 
 const ensureICAL = () => {
   if (typeof window === "undefined" || !window.ICAL) {
-    throw new Error("ical.js が読み込まれていません。public/admin.html に CDN スクリプトを追加してください。");
+    throw new Error("ical.js が読み込まれていません。public/index.html に CDN スクリプトを追加してください。");
   }
   return window.ICAL;
 };
@@ -395,7 +395,7 @@ function CandidateRow({ index, value, onChange, onRemove, onExport, disableRemov
             onChange={(e) => onChange({ ...value, description: e.target.value })}
             rows={3}
             className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            placeholder="イベントの概要や連携メモ"
+              placeholder="プロジェクトの概要や連携メモ"
           />
         </label>
 
@@ -792,16 +792,26 @@ function OrganizerApp() {
     <div className="min-h-screen bg-zinc-100 px-4 py-6 text-gray-900 sm:px-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header>
-          <h1 className="text-3xl font-bold text-zinc-900">Scheduly 管理モック</h1>
-          <p className="mt-2 text-sm text-zinc-600">
-            ICS を活用した日程管理を想定したモック画面です。React 版への移植を進めながら挙動を検証できます。
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
+              <p className="mt-2 text-sm text-zinc-600">
+                iCal (ICS) を活用した日程管理アプリです。
+              </p>
+            </div>
+            <a
+              href="./user.html"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+            >
+              参加者画面（モック）を開く
+            </a>
+          </div>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[2fr,1.2fr]">
           <main className="space-y-6">
             <Section
-              title="イベント情報"
+              title="プロジェクト情報"
               action={
                 <button
                   type="button"
@@ -813,13 +823,13 @@ function OrganizerApp() {
               }
             >
               <label className="block">
-                <span className="text-xs font-semibold text-zinc-500">イベント名</span>
+                <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
                 <input
                   type="text"
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="イベント名を入力"
+                  placeholder="プロジェクト名を入力"
                 />
               </label>
               <label className="block">
@@ -829,11 +839,11 @@ function OrganizerApp() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="イベントの概要を入力"
+                  placeholder="プロジェクトの概要を入力"
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-zinc-500">イベントパスワード</span>
+                <span className="text-xs font-semibold text-zinc-500">プロジェクトパスワード</span>
                 <div className="mt-1 flex gap-2">
                   <input
                     type="text"
@@ -857,7 +867,7 @@ function OrganizerApp() {
                 ]}
               />
               <p className="text-xs text-zinc-500">
-                管理者URLを知っている人だけがイベント内容を更新できます。閲覧URLは参加者に共有します。
+                管理者URLを知っている人だけがプロジェクト内容を更新できます。閲覧URLは参加者に共有します。
               </p>
             </Section>
 
@@ -916,9 +926,9 @@ function OrganizerApp() {
                 <button
                   type="button"
                   className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-rose-500 hover:border-rose-400"
-                  onClick={() => popToast("イベントを削除しました（モック）")}
+                  onClick={() => popToast("プロジェクトを削除しました（モック）")}
                 >
-                  イベント削除（モック）
+                  プロジェクト削除（モック）
                 </button>
               }
             >
