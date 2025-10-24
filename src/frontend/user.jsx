@@ -17,10 +17,6 @@ const SCHEDULES = [
     status: "CONFIRMED",
     counts: { o: 8, d: 3, x: 1 },
     summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
-    actions: [
-      { label: "コメント要対応", variant: "outline" },
-      { label: "この候補を確定候補へ", variant: "solid" }
-    ],
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "オフィス参加可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
@@ -36,10 +32,6 @@ const SCHEDULES = [
     status: "TENTATIVE",
     counts: { o: 4, d: 5, x: 3 },
     summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
-    actions: [
-      { label: "コメント要対応", variant: "outline" },
-      { label: "この候補を確定候補へ", variant: "solid" }
-    ],
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "d", comment: "オンラインなら可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "開始時間を 19:00 にできれば ○" },
@@ -55,10 +47,6 @@ const SCHEDULES = [
     status: "TENTATIVE",
     counts: { o: 6, d: 2, x: 4 },
     summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
-    actions: [
-      { label: "候補をアーカイブ", variant: "outline" },
-      { label: "別日案を作成", variant: "dark" }
-    ],
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
@@ -220,22 +208,6 @@ function ScheduleSummary({ schedule }) {
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2 border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">
-        {schedule.actions.map((action) => (
-          <button
-            key={action.label}
-            className={
-              action.variant === "solid"
-                ? "rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-700"
-                : action.variant === "dark"
-                  ? "rounded-lg bg-zinc-900 px-3 py-2 font-semibold text-white hover:bg-zinc-800"
-                  : "rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300"
-            }
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
     </details>
   );
 }
