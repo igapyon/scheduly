@@ -1,77 +1,65 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
-const DEFAULT_TZID = "Asia/Tokyo";
+import sharedIcalUtils from "./shared/ical-utils";
 
-const ICAL_CANDIDATES = [
-  {
-    id: "2025-10-26",
-    uid: "scheduly-day1-9ba2",
-    summary: "秋の合宿 調整会議 Day1",
-    dtstart: "2025-10-26T13:00:00+09:00",
-    dtend: "2025-10-26T17:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "CONFIRMED",
-    sequence: 1,
-    dtstamp: "2024-04-01T01:00:00Z",
-    location: "サントリーホール 大ホール",
-    tally: { o: 12, d: 3, x: 2 }
+const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
+
+const logDebug = createLogger("user-edit");
+
+const SAMPLE_CANDIDATE_METADATA = {
+  "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
+    legacyId: "2025-10-26",
+    tally: { o: 12, d: 3, x: 2 },
+    responses: [
+      { name: "佐藤", mark: "o" },
+      { name: "鈴木", mark: "o" },
+      { name: "田中", mark: "o" },
+      { name: "高橋", mark: "d" },
+      { name: "伊藤", mark: "x" }
+    ]
   },
-  {
-    id: "2025-10-27",
-    uid: "scheduly-day2-c1f4",
-    summary: "秋の合宿 調整会議 Day2",
-    dtstart: "2025-10-27T18:00:00+09:00",
-    dtend: "2025-10-27T21:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "TENTATIVE",
-    sequence: 0,
-    dtstamp: "2024-04-01T01:05:00Z",
-    location: "サントリーホール ブルーローズ",
-    tally: { o: 8, d: 4, x: 5 }
+  "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
+    legacyId: "2025-10-27",
+    tally: { o: 8, d: 4, x: 5 },
+    responses: [
+      { name: "佐藤", mark: "o" },
+      { name: "鈴木", mark: "d" },
+      { name: "田中", mark: "x" },
+      { name: "高橋", mark: "x" }
+    ]
   },
-  {
-    id: "2025-10-28",
-    uid: "scheduly-day3-d73e",
-    summary: "秋の合宿 調整会議 Day3",
-    dtstart: "2025-10-28T18:00:00+09:00",
-    dtend: "2025-10-28T21:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "TENTATIVE",
-    sequence: 0,
-    dtstamp: "2024-04-01T01:10:00Z",
-    location: "サントリーホール ブルーローズ",
-    tally: { o: 10, d: 2, x: 3 }
+  "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
+    legacyId: "2025-10-28",
+    tally: { o: 10, d: 2, x: 3 },
+    responses: [
+      { name: "佐藤", mark: "d" },
+      { name: "鈴木", mark: "o" },
+      { name: "田中", mark: "o" }
+    ]
   },
-  {
-    id: "2025-11-03",
-    uid: "scheduly-day4-3a0d",
-    summary: "秋の合宿 調整会議 予備日",
-    dtstart: "2025-11-03T10:00:00+09:00",
-    dtend: "2025-11-03T12:00:00+09:00",
-    tzid: DEFAULT_TZID,
-    status: "CONFIRMED",
-    sequence: 2,
-    dtstamp: "2024-04-01T01:20:00Z",
-    location: "サントリーホール",
-    tally: { o: 14, d: 1, x: 0 }
+  "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
+    legacyId: "2025-11-03",
+    tally: { o: 14, d: 1, x: 0 },
+    responses: [
+      { name: "佐藤", mark: "o" },
+      { name: "鈴木", mark: "o" },
+      { name: "田中", mark: "o" },
+      { name: "高橋", mark: "o" }
+    ]
   }
-];
+};
 
-const PARTICIPANT_RESPONSES = {
-  "2025-10-26": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" },
-    { name: "高橋", mark: "d" }, { name: "伊藤", mark: "x" }
-  ],
-  "2025-10-27": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "d" }, { name: "田中", mark: "x" }, { name: "高橋", mark: "x" }
-  ],
-  "2025-10-28": [
-    { name: "佐藤", mark: "d" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }
-  ],
-  "2025-11-03": [
-    { name: "佐藤", mark: "o" }, { name: "鈴木", mark: "o" }, { name: "田中", mark: "o" }, { name: "高橋", mark: "o" }
-  ]
+const deriveTally = (responses) => {
+  return responses.reduce(
+    (acc, item) => {
+      if (item.mark === "o") acc.o += 1;
+      else if (item.mark === "d") acc.d += 1;
+      else if (item.mark === "x") acc.x += 1;
+      return acc;
+    },
+    { o: 0, d: 0, x: 0 }
+  );
 };
 
 const ICAL_STATUS_LABELS = {
@@ -94,12 +82,13 @@ const formatIcalStatusLabel = (status) => {
 const icalStatusBadgeClass = (status) => ICAL_STATUS_BADGE_CLASSES[status] || "border-gray-200 bg-gray-50 text-gray-500";
 
 const formatCandidateDateLabel = (candidate) => {
+  const zone = sanitizeTzid(candidate.tzid);
   const date = new Date(candidate.dtstart);
   const parts = new Intl.DateTimeFormat("ja-JP", {
     month: "numeric",
     day: "numeric",
     weekday: "short",
-    timeZone: candidate.tzid
+    timeZone: zone
   }).formatToParts(date);
   const month = parts.find((p) => p.type === "month")?.value || "";
   const dayNum = parts.find((p) => p.type === "day")?.value || "";
@@ -108,22 +97,24 @@ const formatCandidateDateLabel = (candidate) => {
 };
 
 const formatCandidateTimeRange = (candidate) => {
+  const zone = sanitizeTzid(candidate.tzid);
   const start = new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: candidate.tzid
+    timeZone: zone
   }).format(new Date(candidate.dtstart));
   const end = new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: candidate.tzid
+    timeZone: zone
   }).format(new Date(candidate.dtend));
   return `${start}〜${end}`;
 };
 
 const formatIcalDateTimeWithZone = (iso, tz) => {
+  const zone = sanitizeTzid(tz);
   return new Intl.DateTimeFormat("ja-JP", {
     year: "numeric",
     month: "2-digit",
@@ -131,13 +122,12 @@ const formatIcalDateTimeWithZone = (iso, tz) => {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    timeZone: tz,
+    timeZone: zone,
     hour12: false
   }).format(new Date(iso));
 };
 
-const StatRow = ({ candidate }) => {
-  const maxO = Math.max(...ICAL_CANDIDATES.map((entry) => entry.tally.o));
+const StatRow = ({ candidate, maxO }) => {
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
     <div className="mt-3 flex items-center justify-between text-sm">
@@ -198,6 +188,9 @@ const ParticipantList = ({ list, label, color }) => (
 );
 
 function SchedulyMock() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [savedAt, setSavedAt] = useState("");
@@ -210,26 +203,124 @@ function SchedulyMock() {
   const pressTimer = useRef(null);
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
-  const currentCandidate = ICAL_CANDIDATES[index];
-  const mark = (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null;
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCandidates = async () => {
+      setLoading(true);
+      setLoadError("");
+      try {
+        await waitForIcal();
+        const icsUrl = getSampleIcsUrl();
+        logDebug("fetching ICS", icsUrl);
+        const response = await fetch(icsUrl, { cache: "no-cache" });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
+        }
+        const text = await response.text();
+        const ICAL = ensureICAL();
+        const parsed = ICAL.parse(text);
+        const component = new ICAL.Component(parsed);
+        const vevents = component.getAllSubcomponents("vevent") || [];
+        logDebug("parsed VEVENT count", vevents.length);
+        const converted = [];
+        for (let i = 0; i < vevents.length; i += 1) {
+          const vevent = vevents[i];
+          const event = new ICAL.Event(vevent);
+          if (!event.uid) continue;
+          const metadata = SAMPLE_CANDIDATE_METADATA[event.uid] || null;
+          const startDate = event.startDate ? event.startDate.toJSDate() : null;
+          const endDate = event.endDate ? event.endDate.toJSDate() : null;
+          const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
+          const dtstampProp = vevent.getFirstPropertyValue("dtstamp");
+          const dtstampIso = dtstampProp ? dtstampProp.toJSDate().toISOString() : new Date().toISOString();
+          const sequenceValue = typeof event.sequence === "number" ? event.sequence : Number(event.sequence || 0);
+          const responses = metadata?.responses ? metadata.responses.map((item, idx) => ({ ...item, id: idx })) : [];
+          const tally = metadata?.tally || deriveTally(responses);
+          const legacyId = metadata?.legacyId || event.uid;
+          converted.push({
+            uid: event.uid,
+            id: legacyId,
+            summary: event.summary || "(タイトル未設定)",
+            dtstart: startDate ? startDate.toISOString() : "",
+            dtend: endDate ? endDate.toISOString() : "",
+            tzid,
+            status: event.status || "TENTATIVE",
+            sequence: Number.isFinite(sequenceValue) ? sequenceValue : 0,
+            dtstamp: dtstampIso,
+            location: event.location || "",
+            tally,
+            responses,
+            rawIcs: vevent.toJSON()
+          });
+        }
+        converted.sort((a, b) => {
+          const aTime = a.dtstart ? Date.parse(a.dtstart) : Number.POSITIVE_INFINITY;
+          const bTime = b.dtstart ? Date.parse(b.dtstart) : Number.POSITIVE_INFINITY;
+          return aTime - bTime;
+        });
+        logDebug("candidates after conversion", converted);
+        if (!converted.length) {
+          throw new Error("No VEVENT entries in sample ICS");
+        }
+        if (!cancelled) {
+          setCandidates(converted);
+          setIndex(0);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn("[Scheduly][user-edit] failed to hydrate candidates from ICS", error);
+        if (!cancelled) {
+          setCandidates([]);
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadCandidates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
+  const currentCandidate = candidates.length ? candidates[safeIndex] : null;
+  const mark = currentCandidate ? (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null : null;
+  const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
+
+  const completeCount = useMemo(() => {
+    return candidates.reduce((acc, candidate) => (answers[candidate.id] && answers[candidate.id].mark ? acc + 1 : acc), 0);
+  }, [answers, candidates]);
+
+  const maxTallyO = useMemo(() => {
+    return candidates.reduce((max, candidate) => Math.max(max, candidate.tally ? candidate.tally.o : 0), 0);
+  }, [candidates]);
 
   useEffect(() => {
+    if (!currentCandidate) return undefined;
     const id = setTimeout(() => {
       const t = new Date();
       setSavedAt(`${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`);
     }, 250);
     return () => clearTimeout(id);
-  }, [answers, index]);
+  }, [answers, currentCandidate, safeIndex]);
 
   useEffect(() => {
-    if (detailCandidateId) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = prev; };
-    }
-  }, [detailCandidateId]);
+    if (!detailCandidate) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [detailCandidate]);
 
   useEffect(() => {
+    if (!currentCandidate) return;
     const el = itemRefs.current[currentCandidate.id];
     if (el) {
       el.focus({ preventScroll: true });
@@ -238,9 +329,10 @@ function SchedulyMock() {
         setShouldScrollToCurrent(false);
       }
     }
-  }, [index, currentCandidate.id, shouldScrollToCurrent]);
+  }, [safeIndex, currentCandidate, shouldScrollToCurrent]);
 
   const setMark = (m) => {
+    if (!currentCandidate) return;
     setAnswers((prev) => ({
       ...prev,
       [currentCandidate.id]: {
@@ -251,6 +343,7 @@ function SchedulyMock() {
   };
 
   const setComment = (value) => {
+    if (!currentCandidate) return;
     setAnswers((prev) => ({
       ...prev,
       [currentCandidate.id]: {
@@ -261,22 +354,25 @@ function SchedulyMock() {
   };
 
   const go = (dir) => {
+    if (!candidates.length) return;
     setShouldScrollToCurrent(false);
-    setIndex((prev) => Math.max(0, Math.min(ICAL_CANDIDATES.length - 1, prev + dir)));
+    setIndex((prev) => {
+      const next = Math.max(0, Math.min(candidates.length - 1, prev + dir));
+      return next;
+    });
   };
 
   const onTouchStart = (e) => {
+    if (!candidates.length) return;
     startX.current = e.touches[0].clientX;
   };
 
   const onTouchEnd = (e) => {
-    if (startX.current == null) return;
+    if (startX.current == null || !candidates.length) return;
     const dx = e.changedTouches[0].clientX - startX.current;
     if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
     startX.current = null;
   };
-
-  const completeCount = Object.values(answers).filter((a) => a && a.mark).length;
 
   const showToast = (message) => {
     setToast(message);
@@ -314,8 +410,20 @@ function SchedulyMock() {
     }
   };
 
-  const participantsFor = (candidateId, markType) => (PARTICIPANT_RESPONSES[candidateId] || []).filter((participant) => participant.mark === markType);
-  const detailCandidate = detailCandidateId ? (ICAL_CANDIDATES.find((candidate) => candidate.id === detailCandidateId) || null) : null;
+  const participantsFor = (candidate, markType) => (candidate?.responses || []).filter((participant) => participant.mark === markType);
+
+  if (!currentCandidate) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
+        <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h1 className="text-2xl font-bold">Scheduly 回答編集</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            {loading ? "候補を読み込んでいます…" : loadError ? `候補を読み込めませんでした: ${loadError}` : "候補が存在しません。"}
+          </p>
+        </header>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
@@ -332,7 +440,7 @@ function SchedulyMock() {
                 {currentCandidate.location}
               </span>
               <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                <span aria-hidden="true">✓</span> {completeCount}/{ICAL_CANDIDATES.length} 日完了
+                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
               </span>
             </div>
           </div>
@@ -407,7 +515,7 @@ function SchedulyMock() {
             })}
           </div>
 
-          <StatRow candidate={currentCandidate} />
+          <StatRow candidate={currentCandidate} maxO={maxTallyO} />
 
           <label className="block">
             <span className="text-xs text-gray-500">コメント（任意）</span>
@@ -421,8 +529,8 @@ function SchedulyMock() {
           </label>
 
           <div className="grid grid-cols-2 gap-2">
-            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(-1)} disabled={index === 0}>← 前の日</button>
-            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(1)} disabled={index === ICAL_CANDIDATES.length - 1}>次の日 →</button>
+            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(-1)} disabled={safeIndex === 0}>← 前の日</button>
+            <button className="h-12 rounded-xl border bg-white text-sm font-semibold disabled:opacity-40" onClick={() => go(1)} disabled={safeIndex === candidates.length - 1}>次の日 →</button>
           </div>
         </section>
 
@@ -430,7 +538,7 @@ function SchedulyMock() {
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <h2 className="mb-3 text-sm font-semibold text-zinc-600">📊 出欠サマリー</h2>
             <ul className="space-y-2">
-              {ICAL_CANDIDATES.map((candidate) => {
+              {candidates.map((candidate) => {
                 const isCurrent = candidate.id === currentCandidate.id;
                 const my = (answers[candidate.id] && answers[candidate.id].mark) || null;
                 const myLabel = my === "o" ? "○" : my === "d" ? "△" : my === "x" ? "×" : "—";
@@ -457,7 +565,10 @@ function SchedulyMock() {
                         className="py-3 text-left"
                         onClick={() => {
                           setShouldScrollToCurrent(true);
-                          setIndex(ICAL_CANDIDATES.findIndex((entry) => entry.id === candidate.id));
+                          const targetIndex = candidates.findIndex((entry) => entry.id === candidate.id);
+                          if (targetIndex !== -1) {
+                            setIndex(targetIndex);
+                          }
                         }}
                         onPointerDown={(e) => onPressStart(candidate.id, e)}
                         onPointerMove={onPressMove}
@@ -503,7 +614,6 @@ function SchedulyMock() {
 
       <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-gray-500">✓ 自動保存済み {savedAt && `・${savedAt}`}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -516,10 +626,10 @@ function SchedulyMock() {
             </button>
             <button
               type="button"
-              className="h-10 rounded-xl bg-black px-4 font-semibold text-white"
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               onClick={submit}
             >
-              回答
+              保存
             </button>
           </div>
         </div>
@@ -532,9 +642,9 @@ function SchedulyMock() {
       >
         {detailCandidate && (
           <>
-            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate.id, "o")} />
-            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate.id, "d")} />
-            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate.id, "x")} />
+            <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
+            <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
+            <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />
             <hr className="my-3 border-gray-200" />
             <section className="space-y-2 text-xs text-gray-600">
               <p className="text-sm font-semibold text-gray-800">{detailCandidate.summary}</p>
