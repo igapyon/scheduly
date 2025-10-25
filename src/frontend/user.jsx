@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
+import sharedIcalUtils from "./shared/ical-utils";
+
+const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
+
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   deadline: "2025/05/01 23:59",
@@ -8,58 +12,11 @@ const DASHBOARD_META = {
   lastUpdated: "2025/04/12 17:45"
 };
 
-const DEFAULT_TZID = "Asia/Tokyo";
-
-const ensureICAL = () => {
-  if (typeof window === "undefined" || !window.ICAL) {
-    throw new Error("ical.js が読み込まれていません。public/index.html に CDN スクリプトを追加してください。");
-  }
-  return window.ICAL;
-};
-
-const logDebug = (...messages) => {
-  // eslint-disable-next-line no-console
-  console.debug("[Scheduly][user]", ...messages);
-};
-
-const waitForIcal = () => {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("window is undefined"));
-  }
-  if (window.ICAL) return Promise.resolve(window.ICAL);
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const timer = setInterval(() => {
-      if (window.ICAL) {
-        clearInterval(timer);
-        resolve(window.ICAL);
-      } else if (Date.now() - start > 5000) {
-        clearInterval(timer);
-        reject(new Error("ical.js did not load within timeout"));
-      }
-    }, 50);
-  });
-};
-
-const SAMPLE_ICS_RELATIVE_PATH = "ics/sample-candidates.ics";
-
-const resolveSampleIcsUrl = () => {
-  if (typeof window === "undefined") {
-    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
-  }
-  try {
-    return new URL(SAMPLE_ICS_RELATIVE_PATH, window.location.href).toString();
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn("[Scheduly] failed to resolve sample ICS URL", error);
-    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
-  }
-};
+const logDebug = createLogger("user");
 
 const formatScheduleRange = (startDate, endDate, tzid) => {
   if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
-  const normalizedTz = typeof tzid === "string" ? tzid.trim() : "";
-  const zone = normalizedTz && normalizedTz.toLowerCase() !== "floating" ? normalizedTz : DEFAULT_TZID;
+  const zone = sanitizeTzid(tzid);
   const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone });
   const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone });
   const datePart = dateFormatter.format(startDate);
@@ -99,6 +56,17 @@ const SAMPLE_SCHEDULE_DETAILS = {
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
       { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "他会議とバッティング" }
+    ]
+  },
+  "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
+    id: "day4",
+    counts: { o: 14, d: 1, x: 0 },
+    summaryText: "午前帯の予備日です。参加しやすい日程として追加しました。",
+    responses: [
+      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "終日参加可能" },
+      { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "午前は在宅参加になります" },
+      { participantId: "tanaka", name: "田中 一郎", mark: "o", comment: "午前に別予定があったが調整済み" },
+      { participantId: "others", name: "・・・", mark: "pending", comment: "詳細は未回答" }
     ]
   }
 };
@@ -391,7 +359,7 @@ function AdminResponsesApp() {
       setSchedulesError("");
       try {
         await waitForIcal();
-        const icsUrl = resolveSampleIcsUrl();
+        const icsUrl = getSampleIcsUrl();
         logDebug("fetching ICS", icsUrl);
         const response = await fetch(icsUrl, { cache: "no-cache" });
         if (!response.ok) {
@@ -414,7 +382,7 @@ function AdminResponsesApp() {
           const details = SAMPLE_SCHEDULE_DETAILS[event.uid];
           const startDate = event.startDate ? event.startDate.toJSDate() : null;
           const endDate = event.endDate ? event.endDate.toJSDate() : null;
-          const tzid = ((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID || "").trim();
+          const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
           const datetime = startDate && endDate ? formatScheduleRange(startDate, endDate, tzid) : "";
 
           converted.push({
