@@ -29,7 +29,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     id: "day1",
     counts: { o: 8, d: 3, x: 1 },
-    summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "オフィス参加可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
@@ -40,7 +39,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
     id: "day2",
     counts: { o: 4, d: 5, x: 3 },
-    summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "d", comment: "オンラインなら可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "開始時間を 19:00 にできれば ○" },
@@ -51,7 +49,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
     id: "day3",
     counts: { o: 6, d: 2, x: 4 },
-    summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
@@ -61,7 +58,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
     id: "day4",
     counts: { o: 14, d: 1, x: 0 },
-    summaryText: "午前帯の予備日です。参加しやすい日程として追加しました。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "終日参加可能" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "午前は在宅参加になります" },
@@ -77,7 +73,6 @@ const PARTICIPANTS = [
     name: "佐藤 太郎",
     lastUpdated: "2025/04/12 17:42",
     commentHighlights: ["コメント記入: Day2"],
-    summary: "各候補に対する回答とコメントを日程順にまとめています。コメントを含む候補は上部のハイライトと連動します。",
     actions: [
       { label: "フォロー済みにする", variant: "outline" },
       { label: "コメントに返信", variant: "outline" }
@@ -94,7 +89,6 @@ const PARTICIPANTS = [
     name: "鈴木 花子",
     lastUpdated: "2025/04/10 09:15",
     commentHighlights: ["コメント記入: Day1 / Day3"],
-    summary: "平日夜は調整が必要との回答が多めです。Day2 の要望を反映すると参加しやすくなる可能性があります。",
     actions: [
       { label: "Day2 の代替案を検討", variant: "outline" },
       { label: "フォローを記録", variant: "outline" }
@@ -111,7 +105,6 @@ const PARTICIPANTS = [
     name: "田中 一郎",
     lastUpdated: "2025/04/05 21:03",
     commentHighlights: ["コメント記入: Day2 / Day3"],
-    summary: "平日日程の参加が難しいとのコメントが複数あり。予備日の回答が未入力のため、フォローが必要です。",
     actions: [
       { label: "未回答フォローを送信", variant: "outline" },
       { label: "代替日程を提案", variant: "outline" }
@@ -210,7 +203,6 @@ function ScheduleSummary({ schedule }) {
           </span>
         </div>
       </summary>
-      <div className="border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">{schedule.summaryText}</div>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
         {schedule.responses.map((response) => (
           <li key={response.name} className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
@@ -279,7 +271,6 @@ function ParticipantSummary({ participant, defaultOpen }) {
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
-      <div className="border-t border-zinc-200 bg-white/90 px-4 py-3 text-xs text-zinc-600">{participant.summary}</div>
       <ul className="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
         {participant.responses.map((response) => (
           <li
@@ -396,7 +387,6 @@ function AdminResponsesApp() {
             startsAt: startDate ? startDate.toISOString() : null,
             endsAt: endDate ? endDate.toISOString() : null,
             counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
-            summaryText: details?.summaryText || "",
             responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
           });
         }
