@@ -223,7 +223,6 @@ function ParticipantList({ list, label, color }){
 function SchedulyMock() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { [id]: { mark: 'o'|'d'|'x'|null, comment: '' } }
-  const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
 
@@ -240,14 +239,6 @@ function SchedulyMock() {
 
   const currentCandidate = ICAL_CANDIDATES[index];
   const mark = (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null;
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      const t = new Date();
-      setSavedAt(String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0"));
-    }, 250);
-    return () => clearTimeout(id);
-  }, [answers, index]);
 
   useEffect(() => {
     if (detailCandidateId) {
@@ -346,24 +337,54 @@ function SchedulyMock() {
   const detailCandidate = detailCandidateId ? (ICAL_CANDIDATES.find((candidate) => candidate.id === detailCandidateId) || null) : null;
 
   return (
-    <div className="mx-auto max-w-sm h-dvh flex flex-col bg-white text-gray-900">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b p-3">
-        <div className="flex items-center justify-between">
+      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-semibold">Scheduly</h1>
-            <p className="text-xs font-semibold text-gray-700 mt-0.5">{currentCandidate.summary}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">📍 {currentCandidate.location}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+              <span aria-hidden="true">✏️</span>
+              <span>Scheduly 回答編集</span>
+            </h1>
+            <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
+            <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
-          <div className="flex flex-col items-end gap-1 text-right">
-            <Pill>{completeCount}/{ICAL_CANDIDATES.length}日 完了</Pill>
-            <div className="text-[10px] text-gray-500">👤 匿名参加者</div>
+          <div className="flex flex-col items-end gap-2 text-xs text-zinc-500">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                <span aria-hidden="true">✓</span> {completeCount}/{ICAL_CANDIDATES.length} 日完了
+              </span>
+              <span>👤 匿名参加者</span>
+              <a
+                href="../user.html"
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                参加者一覧へ
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+                onClick={() => showToast("参加者名を変更するモーダル（モック）")}
+              >
+                名前を変更
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:border-rose-400 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+                onClick={() => showToast("参加者を削除しました（モック）")}
+              >
+                参加者を削除
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto p-4 select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <main className="flex-1 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm select-none" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* Day Card */}
         <article className="rounded-2xl border p-4 shadow-sm">
           <div className="mb-3 space-y-1">
@@ -532,10 +553,24 @@ function SchedulyMock() {
       </main>
 
       {/* Footer */}
-      <footer className="sticky bottom-0 bg-white/95 backdrop-blur border-t p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">✓ 自動保存済み {savedAt && "・" + savedAt}</span>
-          <button className="h-10 px-4 rounded-xl bg-black text-white font-semibold" onClick={submit}>登録を送信</button>
+      <footer className="sticky bottom-0 border-t border-zinc-200 bg-white/95 p-3 backdrop-blur">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            className="h-10 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 hover:border-gray-300"
+            onClick={() => {
+              window.location.href = "../user.html";
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+            onClick={submit}
+          >
+            保存
+          </button>
         </div>
       </footer>
 
