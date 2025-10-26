@@ -561,12 +561,6 @@ function AdminResponsesApp() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            <div className="border-b border-zinc-200 px-4 py-3">
-              <div className="text-sm font-semibold text-zinc-800">参加者状況のスナップショット</div>
-              <p className="mt-1 text-xs text-zinc-500">
-                直近の回答や未回答者のフォロー状況を把握できます。フィルターと連動し、必要な参加者だけを抽出します。
-              </p>
-            </div>
             <div className="space-y-3 px-4 py-4">
               {PARTICIPANTS.map((participant, index) => (
                 <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
