@@ -39,15 +39,15 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## レガシーモック（`public/legacy/`）
 
-- React 18（UMD 版）・Tailwind CDN・Babel Standalone による HTML モック。ビルドやサーバーなしでブラウザから直接動かせます。
+- React 18（UMD 版）・Tailwind CDN・Babel Standalone による静的モック。ビルドやサーバーなしでブラウザから直接開けますが、**動作は「見栄え再現」が主目的**であり、React 版と同等の機能は搭載していません。
 - 主なファイル
-  - `scheduly-mock.html`: 参加者向けスマホ UI。候補の長押しによる詳細表示、○△× 回答、コメント入力などを体験できます。
-  - `scheduly-admin-mock.html`: 管理者向け UI。ical.js によるインポート／エクスポート、UID・SEQUENCE・DTSTAMP の確認、Blob ダウンロード動線をモックしています。
-  - `downloadtest.html`: Blob ダウンロードがブラウザで正常に動作するか単独で検証するページ。
+  - `scheduly-admin-mock.html`: 管理画面の見た目を再現したモック。インポート／エクスポートなどのボタンはトースト表示のみの仮実装です。
+  - `scheduly-admin-responses.html`: 参加者回答一覧ビュー（タブ切り替え含む）のワイヤーフレーム。表示のみで実データ連携は行いません。
+  - `scheduly-mock.html`: 参加者向けスマホ UI のビジュアルモック。○△× の選択やトースト表示なども画面確認用途です。
 - 使い方
   1. 対象の HTML をブラウザで直接開く
-  2. 画面を操作して挙動を確認する
-  3. 想定外の動きがあれば Console ログを確認し、必要に応じて `console.log` 等で原因を追跡する
+  2. レイアウトやスタイル差分を確認する（挙動は React 版を参照）
+  3. UI 差異があれば React 側の DOM をコピーしてモックを更新する
 
 ## ライセンス
 

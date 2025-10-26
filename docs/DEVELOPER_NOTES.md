@@ -9,10 +9,19 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## ICS まわりのメモ
 
-- 最小構成の挙動確認には `public/legacy/downloadtest.html` を利用します。Blob ダウンロードが怪しいときはまずここでブラウザ環境を切り分けてください。
 - 管理者モック（`scheduly-admin-mock.html`）は候補ごとに `rawVevent` を保持しつつ、エクスポート時は文字列を組み立てて `.ics` を生成します。実装の詳細は `exportCandidateToIcs` と `exportAllCandidatesToIcs` を参照。
 - ICS 生成に失敗した場合は、候補データを含めて `console.error` を出力するようにしています。Chrome 開発者ツールの Console で状況を確認してください。
 - ICS インポートのプレビューは既定で全候補 OFF、既存の UID と一致する候補のみ ON になります。振る舞いを変えるときは `handleIcsImport` とプレビュー UI をセットで確認すると迷いません。
+
+## モック更新ワークフロー
+
+1. React/webpack 版を `npm run dev` で起動し、目的の画面（例: `http://localhost:5173/index.html`）を表示する。
+2. Chrome DevTools の Elements タブで該当 DOM を選択し、右クリック → `Copy` → `Copy outerHTML` でレンダリング後の HTML を取得する。
+3. 取得した DOM を生成 AI などに渡し、`public/legacy/*.html` へ反映する際の差分作成を補助させる。
+4. モック側に貼り付けるときは動作ロジックを追加しない（トーストやボタンは見栄え再現のみ）。必要があれば Tailwind クラスをそのまま利用する。
+5. 反映後はブラウザでレガシーモックを開き、見た目と最低限の開閉などが崩れていないかを目視確認する。
+
+- スクリーンショット (`docs/screenshot/*.png`) は React 版の最新 UI が差異なく再現できているか判断する材料になる。UI 更新を行った場合は同じ手順で撮り直し、ファイルを更新する習慣を付ける。
 
 ## 開発フローの覚書
 
