@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useId, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger } = sharedIcalUtils;
 
@@ -23,6 +24,29 @@ const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
 
 const logDebug = createLogger("admin");
 const pad = (n) => String(n).padStart(2, "0");
+
+const ICAL_STATUS_LABELS = {
+  CONFIRMED: "確定",
+  TENTATIVE: "仮予定",
+  CANCELLED: "取消し"
+};
+
+const ICAL_STATUS_BADGE_CLASSES = {
+  CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
+  TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
+  CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+};
+
+function formatIcalStatusLabel(status) {
+  const key = status ? String(status).toUpperCase() : "CONFIRMED";
+  const label = ICAL_STATUS_LABELS[key] || key;
+  return `${label}（${key}）`;
+}
+
+function icalStatusBadgeClass(status) {
+  const key = status ? String(status).toUpperCase() : "CONFIRMED";
+  return ICAL_STATUS_BADGE_CLASSES[key] || "border-zinc-200 bg-zinc-50 text-zinc-600";
+}
 
 const toInputValue = (date) => {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
@@ -295,11 +319,28 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           handleSummaryClick();
         }}
       >
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">日程 {index + 1}</span>
-          <span className="text-sm font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
-          <span className="text-xs text-zinc-500">{displayMeta}</span>
-          <span className="text-xs text-zinc-500">TZID: {value.tzid || DEFAULT_TZID} ／ STATUS: {value.status}</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
+              {formatIcalStatusLabel(value.status || "CONFIRMED")}
+            </span>
+          </div>
+          <EventMeta
+            summary={value.summary || "タイトル未設定"}
+            summaryClassName="text-sm font-semibold text-zinc-800"
+            dateTime={displayMeta}
+            dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-500"
+            timezone={value.tzid || DEFAULT_TZID}
+            timezoneClassName="text-xs text-zinc-400"
+            description={value.description}
+            descriptionClassName="text-xs text-zinc-500"
+            location={value.location}
+            locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+            showLocationIcon
+            statusText={null}
+            statusPrefix=""
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -499,9 +540,27 @@ function formatLocalDisplay(value) {
 }
 
 function candidateToDisplayMeta(candidate) {
-  const start = formatLocalDisplay(candidate.dtstart);
-  const end = formatLocalDisplay(candidate.dtend);
-  return `${start} 〜 ${end}`;
+  const { dtstart, dtend } = candidate;
+  if (!dtstart) return "未設定";
+  const startDate = new Date(dtstart);
+  if (Number.isNaN(startDate.getTime())) return formatLocalDisplay(dtstart);
+  const endDate = dtend ? new Date(dtend) : null;
+  const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const startDateLabel = dateFormatter.format(startDate);
+  const startTimeLabel = timeFormatter.format(startDate);
+  if (!endDate || Number.isNaN(endDate.getTime())) {
+    return `${startDateLabel} ${startTimeLabel}`;
+  }
+  const sameDay = startDate.getFullYear() === endDate.getFullYear()
+    && startDate.getMonth() === endDate.getMonth()
+    && startDate.getDate() === endDate.getDate();
+  const endTimeLabel = timeFormatter.format(endDate);
+  if (sameDay) {
+    return `${startDateLabel} ${startTimeLabel} – ${endTimeLabel}`;
+  }
+  const endDateLabel = dateFormatter.format(endDate);
+  return `${startDateLabel} ${startTimeLabel} – ${endDateLabel} ${endTimeLabel}`;
 }
 
 function OrganizerApp() {
