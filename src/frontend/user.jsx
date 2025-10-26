@@ -240,7 +240,7 @@ function ScheduleSummary({ schedule }) {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
             ○ {schedule.counts.o}
           </span>

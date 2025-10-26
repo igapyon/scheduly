@@ -127,14 +127,21 @@ const formatIcalDateTimeWithZone = (iso, tz) => {
   }).format(new Date(iso));
 };
 
-const StatRow = ({ candidate, maxO }) => {
+const StatRow = ({ candidate, maxO, onOpenDetail }) => {
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
     <div className="mt-3 flex items-center justify-between text-sm">
-      <div className="flex gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{candidate.tally.o}</span>
         <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{candidate.tally.d}</span>
         <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{candidate.tally.x}</span>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+          onClick={onOpenDetail}
+        >
+          <span aria-hidden="true">ℹ</span> 詳細を表示
+        </button>
       </div>
       <span className="text-xs font-semibold text-emerald-600">{star}</span>
     </div>
@@ -468,13 +475,6 @@ function SchedulyMock() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-                onClick={() => openDetail(currentCandidate.id)}
-              >
-                <span aria-hidden="true">ℹ</span> 詳細を表示
-              </button>
-              <button
-                type="button"
                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 opacity-70"
                 title="この候補の ICS ダウンロードはモックでは未実装です"
                 onClick={() => showToast("参加者向け ICS ダウンロードは未実装です（モック）")}
@@ -507,7 +507,11 @@ function SchedulyMock() {
             })}
           </div>
 
-          <StatRow candidate={currentCandidate} maxO={maxTallyO} />
+          <StatRow
+            candidate={currentCandidate}
+            maxO={maxTallyO}
+            onOpenDetail={() => openDetail(currentCandidate.id)}
+          />
 
           <label className="block">
             <span className="text-xs text-gray-500">コメント（任意）</span>
