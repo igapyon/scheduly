@@ -874,7 +874,7 @@ function OrganizerApp() {
               />
             </label>
             <label className="block">
-              <span className="text-xs font-semibold text-zinc-500">説明文</span>
+              <span className="text-xs font-semibold text-zinc-500">説明</span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -902,7 +902,7 @@ function OrganizerApp() {
                   className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
                   onClick={() => importInputRef.current?.click()}
                 >
-                  ICSから追加
+                  日程をICSからインポート
                 </button>
                 <button
                   type="button"
@@ -910,7 +910,7 @@ function OrganizerApp() {
                   onClick={handleExportAllCandidates}
                   disabled={!candidates.length}
                 >
-                  ICSを一括ダウンロード
+                  日程をICSに一括エクスポート
                 </button>
                 <input
                   ref={importInputRef}

@@ -5,6 +5,15 @@ import sharedIcalUtils from "./shared/ical-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
+const ICS_LINE_BREAK = "\r\n";
+const PARTICIPANT_ICS_HEADER_LINES = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Scheduly//Participant//JA",
+  "CALSCALE:GREGORIAN",
+  "METHOD:PUBLISH"
+];
+
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   deadline: "2025/05/01 23:59",
@@ -13,6 +22,58 @@ const DASHBOARD_META = {
 };
 
 const logDebug = createLogger("user");
+
+const padNumber = (value) => String(value).padStart(2, "0");
+
+const formatDateTimeAsUtc = (value) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const year = date.getUTCFullYear();
+  const month = padNumber(date.getUTCMonth() + 1);
+  const day = padNumber(date.getUTCDate());
+  const hour = padNumber(date.getUTCHours());
+  const minute = padNumber(date.getUTCMinutes());
+  const second = padNumber(date.getUTCSeconds());
+  return `${year}${month}${day}T${hour}${minute}${second}Z`;
+};
+
+const escapeIcsText = (value) => {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+};
+
+const buildIcsFromSchedules = (schedules) => {
+  if (!Array.isArray(schedules) || !schedules.length) return "";
+  const lines = PARTICIPANT_ICS_HEADER_LINES.slice();
+  const sharedDtstamp = formatDateTimeAsUtc(new Date());
+
+  schedules.forEach((schedule, index) => {
+    if (!schedule || !schedule.uid) return;
+    const dtstartLine = formatDateTimeAsUtc(schedule.startsAt);
+    const dtendLine = formatDateTimeAsUtc(schedule.endsAt);
+    const statusText = schedule.status ? String(schedule.status).toUpperCase() : "";
+
+    lines.push("BEGIN:VEVENT");
+    lines.push("UID:" + escapeIcsText(schedule.uid));
+    if (sharedDtstamp) lines.push("DTSTAMP:" + sharedDtstamp);
+    if (dtstartLine) lines.push("DTSTART:" + dtstartLine);
+    if (dtendLine) lines.push("DTEND:" + dtendLine);
+    if (statusText) lines.push("STATUS:" + escapeIcsText(statusText));
+    lines.push("SUMMARY:" + escapeIcsText(schedule.label || schedule.uid));
+    lines.push("LOCATION:" + escapeIcsText(schedule.location || ""));
+    if (schedule.tzid) lines.push("X-SCHEDULY-TZID:" + escapeIcsText(schedule.tzid));
+    lines.push("SEQUENCE:" + String(index));
+    lines.push("END:VEVENT");
+  });
+
+  lines.push("END:VCALENDAR");
+  return lines.join(ICS_LINE_BREAK) + ICS_LINE_BREAK;
+};
 
 const formatScheduleRange = (startDate, endDate, tzid) => {
   if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
@@ -315,6 +376,7 @@ function AdminResponsesApp() {
   const [schedules, setSchedules] = useState([]);
   const [schedulesLoading, setSchedulesLoading] = useState(true);
   const [schedulesError, setSchedulesError] = useState("");
+  const [icsSource, setIcsSource] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -373,6 +435,7 @@ function AdminResponsesApp() {
         logDebug("schedules after conversion", converted);
         if (!cancelled) {
           setSchedules(converted);
+          setIcsSource(text);
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -381,6 +444,7 @@ function AdminResponsesApp() {
           setSchedules([]);
           setSchedulesError(error instanceof Error ? error.message : String(error));
           logDebug("load schedules error", error);
+          setIcsSource("");
         }
       } finally {
         if (!cancelled) {
@@ -395,6 +459,34 @@ function AdminResponsesApp() {
       cancelled = true;
     };
   }, []);
+
+  const downloadIcsFile = (filename, contents) => {
+    if (!contents) return;
+    const blob = new Blob([contents], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    window.setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  };
+
+  const handleDownloadAllIcs = () => {
+    const source = icsSource || buildIcsFromSchedules(schedules);
+    if (!source) {
+      logDebug("skip ICS download: no data");
+      return;
+    }
+    const filename = `scheduly-schedules-${new Date().toISOString().split("T")[0]}.ics`;
+    downloadIcsFile(filename, source);
+  };
+
+  const hasIcsData = Boolean((icsSource && icsSource.trim()) || schedules.length);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -489,6 +581,14 @@ function AdminResponsesApp() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-emerald-600 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleDownloadAllIcs}
+              disabled={!hasIcsData}
+            >
+              日程をICSに一括エクスポート
+            </button>
             <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
               全回答を CSV でダウンロード
             </button>
