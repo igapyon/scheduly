@@ -355,7 +355,10 @@ function TabNavigation({ activeTab, onChange }) {
           }`}
           onClick={() => onChange("schedule")}
         >
-          日程ごと
+          <span className="inline-flex items-center justify-center gap-2">
+            <span aria-hidden="true">📅</span>
+            <span>日程ごと</span>
+          </span>
         </button>
         <button
           type="button"
@@ -364,7 +367,10 @@ function TabNavigation({ activeTab, onChange }) {
           }`}
           onClick={() => onChange("participant")}
         >
-          参加者ごと
+          <span className="inline-flex items-center justify-center gap-2">
+            <span aria-hidden="true">👤</span>
+            <span>参加者ごと</span>
+          </span>
         </button>
       </div>
     </nav>
