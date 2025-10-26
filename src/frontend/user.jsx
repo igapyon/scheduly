@@ -498,7 +498,10 @@ function AdminResponsesApp() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
-        <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者</h1>
+        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+          <span aria-hidden="true">📋</span>
+          <span>Scheduly 参加者</span>
+        </h1>
         <p className="mt-2 text-sm text-zinc-600">
           プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
         </p>

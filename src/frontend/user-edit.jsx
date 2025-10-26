@@ -440,7 +440,10 @@ function SchedulyMock() {
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
         <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h1 className="text-2xl font-bold">Scheduly 回答編集</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <span aria-hidden="true">✏️</span>
+            <span>Scheduly 回答編集</span>
+          </h1>
           <p className="mt-2 text-sm text-zinc-600">
             {loading ? "候補を読み込んでいます…" : loadError ? `候補を読み込めませんでした: ${loadError}` : "候補が存在しません。"}
           </p>
@@ -455,7 +458,10 @@ function SchedulyMock() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
-            <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+              <span aria-hidden="true">✏️</span>
+              <span>Scheduly 回答編集</span>
+            </h1>
             <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">

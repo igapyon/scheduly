@@ -840,7 +840,10 @@ function OrganizerApp() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 text-2xl font-bold text-zinc-900">Scheduly 管理</h1>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-zinc-900">
+              <span aria-hidden="true">🗂️</span>
+              <span>Scheduly 管理</span>
+            </h1>
             <p className="mt-2 text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
