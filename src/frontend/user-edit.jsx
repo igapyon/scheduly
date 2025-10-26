@@ -583,62 +583,64 @@ function SchedulyMock() {
                   : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
                   : "border-gray-200 text-gray-500 bg-gray-50";
 
+                const status = formatIcalStatusLabel(candidate.status);
+
                 return (
                   <li
                     key={candidate.id}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/50" : "hover:bg-zinc-50"}`}
+                    className={`rounded-xl border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/40" : "hover:bg-zinc-50"}`}
                     aria-current={isCurrent ? "true" : undefined}
                     ref={(el) => (itemRefs.current[candidate.id] = el)}
                     tabIndex={-1}
                   >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-6 w-1.5 rounded-full transition ${isCurrent ? "bg-emerald-500" : "bg-transparent"}`}
-                        aria-hidden="true"
+                    <button
+                      className="w-full space-y-2 text-left"
+                      onClick={() => {
+                        setShouldScrollToCurrent(true);
+                        const targetIndex = candidates.findIndex((entry) => entry.id === candidate.id);
+                        if (targetIndex !== -1) {
+                          setIndex(targetIndex);
+                        }
+                      }}
+                      onPointerDown={(e) => onPressStart(candidate.id, e)}
+                      onPointerMove={onPressMove}
+                      onPointerUp={onPressEnd}
+                      onPointerLeave={onPressEnd}
+                      onPointerCancel={onPressEnd}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(candidate.status)}`}>
+                          {status}
+                        </span>
+                        {isCurrent && <span className="text-emerald-600">（選択中）</span>}
+                      </div>
+                      <EventMeta
+                        summary={`${formatCandidateDateLabel(candidate)} ${formatCandidateTimeRange(candidate)}`}
+                        summaryClassName="text-sm font-semibold text-gray-800"
+                        dateTime={null}
+                        description={candidate.description}
+                        descriptionClassName="text-xs text-gray-500"
+                        location={candidate.location}
+                        locationClassName="flex items-center gap-1 text-xs text-gray-500"
+                        showLocationIcon
+                        timezone={candidate.tzid}
+                        timezoneClassName="text-[11px] text-gray-400"
                       />
-                      <button
-                        className="py-3 text-left"
-                        onClick={() => {
-                          setShouldScrollToCurrent(true);
-                          const targetIndex = candidates.findIndex((entry) => entry.id === candidate.id);
-                          if (targetIndex !== -1) {
-                            setIndex(targetIndex);
-                          }
-                        }}
-                        onPointerDown={(e) => onPressStart(candidate.id, e)}
-                        onPointerMove={onPressMove}
-                        onPointerUp={onPressEnd}
-                        onPointerLeave={onPressEnd}
-                        onPointerCancel={onPressEnd}
-                        onContextMenu={(e) => e.preventDefault()}
-                      >
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          {formatCandidateDateLabel(candidate)}
-                          {isCurrent && <span className="ml-2 text-xs font-semibold text-emerald-600">（選択中）</span>}
-                        </div>
-                        <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 ${icalStatusBadgeClass(candidate.status)}`}>
-                            {formatIcalStatusLabel(candidate.status)}
-                          </span>
-                          <span className="max-w-[12rem] truncate">{candidate.location}</span>
-                        </div>
-                        <div className="mt-1 text-[10px] text-gray-400">（長押しで参加者を見る）</div>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
-                      <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
-                      <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
-                      <span
-                        className={`ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${myClass}`}
-                        aria-label="あなたの選択"
-                        title="あなたの選択"
-                      >
-                        <span className="font-medium">あなた:</span> {myLabel}
-                      </span>
-                    </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
+                        <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
+                        <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
+                        <span
+                          className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${myClass}`}
+                          aria-label="あなたの選択"
+                          title="あなたの選択"
+                        >
+                          <span className="font-medium">あなた:</span> {myLabel}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400">（長押しで参加者を見る）</div>
+                    </button>
                   </li>
                 );
               })}
