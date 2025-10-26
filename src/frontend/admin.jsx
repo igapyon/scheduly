@@ -793,8 +793,12 @@ function OrganizerApp() {
     popToast("編集URL／閲覧URLを発行しました（モック）");
   };
 
-  const mockDownloadJson = () => {
-    popToast("出欠表を JSON でダウンロードしました（モック）");
+  const mockExportProjectInfo = () => {
+    popToast("プロジェクト情報をエクスポートしました（モック）");
+  };
+
+  const mockImportProjectInfo = () => {
+    popToast("プロジェクト情報をインポートしました（モック）");
   };
 
   const handleSave = () => {
@@ -980,13 +984,22 @@ function OrganizerApp() {
               </button>
             }
           >
-            <button
-              type="button"
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
-              onClick={mockDownloadJson}
-            >
-              出欠表を JSON でダウンロード（モック）
-            </button>
+            <div className="grid gap-2">
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                onClick={mockExportProjectInfo}
+              >
+                プロジェクト情報をエクスポート（モック）
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                onClick={mockImportProjectInfo}
+              >
+                プロジェクト情報をインポート（モック）
+              </button>
+            </div>
           </SectionCard>
         </aside>
       </div>
