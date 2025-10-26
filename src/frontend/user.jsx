@@ -230,18 +230,22 @@ function ScheduleSummary({ schedule }) {
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <EventMeta
-          summary={schedule.label}
-          summaryClassName="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500"
-          dateTime={schedule.datetime}
-          dateTimeClassName="text-base font-semibold text-zinc-800"
-          location={schedule.location}
-          locationClassName="flex flex-wrap items-center gap-2 text-xs text-zinc-500"
-          statusText={status.text}
-          statusClassName={status.className}
-          statusPrefix="状態:"
-          separator="/"
-        />
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className={status.className}>{status.text}</span>
+          </div>
+          <EventMeta
+            summary={schedule.label}
+            summaryClassName="text-base font-semibold text-zinc-800"
+            dateTime={schedule.datetime}
+            dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-zinc-600"
+            timezone={schedule.tzid}
+            timezoneClassName="text-xs text-zinc-400"
+            location={schedule.location}
+            locationClassName="flex items-center gap-2 text-xs text-zinc-500"
+            showLocationIcon
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
             ○ {schedule.counts.o}
