@@ -456,6 +456,7 @@ function SchedulyMock() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
             <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
+            <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
             <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
