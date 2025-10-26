@@ -842,7 +842,7 @@ function OrganizerApp() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
             <h1 className="mt-1 text-2xl font-bold text-zinc-900">Scheduly 管理</h1>
             <p className="mt-2 text-sm text-zinc-600">
-              日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS の取り込み・書き出しを行ってください。
+              日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -861,7 +861,7 @@ function OrganizerApp() {
         <main className="space-y-5">
           <SectionCard
             title="プロジェクト情報"
-            description="参加者に共有される基本情報を編集します。"
+            description="プロジェクトの基本情報を編集します。"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -887,7 +887,7 @@ function OrganizerApp() {
 
           <SectionCard
             title="日程"
-            description="候補日や確定日をまとめて管理できます。カードを開いて詳細を編集してください。"
+            description="候補日や確定日を管理できます。カードを開いて詳細を編集してください。"
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -964,7 +964,7 @@ function OrganizerApp() {
               items={[
                 { key: "編集用URL（管理者）", value: urls.admin },
                 { key: "閲覧用URL（参加者）", value: urls.guest },
-                { key: "最終更新", value: "2024/05/01 10:00 更新済み（モック）" }
+                { key: "最終更新", value: "2024/05/01 10:00 更新済み" }
               ]}
             />
             <p className="text-xs text-zinc-500">
@@ -972,32 +972,28 @@ function OrganizerApp() {
             </p>
           </SectionCard>
 
-          <SectionCard
-            title="管理アクション"
-            action={
-              <button
-                type="button"
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-rose-500 hover:border-rose-400"
-                onClick={() => popToast("プロジェクトを削除しました（モック）")}
-              >
-                プロジェクト削除（モック）
-              </button>
-            }
-          >
+          <SectionCard title="管理アクション">
             <div className="grid gap-2">
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
                 onClick={mockExportProjectInfo}
               >
-                プロジェクト情報をエクスポート（モック）
+                プロジェクトをエクスポート
               </button>
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
                 onClick={mockImportProjectInfo}
               >
-                プロジェクト情報をインポート（モック）
+                プロジェクトをインポート
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-rose-500 hover:border-rose-400"
+                onClick={() => popToast("プロジェクトを削除しました（モック）")}
+              >
+                プロジェクトを削除
               </button>
             </div>
           </SectionCard>
@@ -1006,7 +1002,7 @@ function OrganizerApp() {
 
       <footer className="sticky bottom-0 z-30 border-t border-zinc-200 bg-white/90 shadow-[0_-4px_16px_rgba(24,24,27,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-          <div>保存すると参加者画面で最新の内容が反映されます（モック）</div>
+          <div>保存すると参加者画面にも最新の内容を反映します</div>
           <div className="flex items-center gap-2">
             <button
               type="button"
