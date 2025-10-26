@@ -438,7 +438,7 @@ function AdminResponsesApp() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
         <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          プロジェクト「{DASHBOARD_META.projectName}」の回答状況を参加者と管理者が共有するモックです。実データはまだ連携していません。
+          プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
         </p>
       </header>
 
@@ -466,7 +466,6 @@ function AdminResponsesApp() {
           </label>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-          <span>回答締切: {DASHBOARD_META.deadline}</span>
           <span>参加者: {DASHBOARD_META.participantCount} 名</span>
           <span>最新更新: {DASHBOARD_META.lastUpdated}</span>
         </div>
@@ -516,9 +515,7 @@ function AdminResponsesApp() {
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
             <p className="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>未回答者を抽出して個別フォローのメモを残すなど、管理タスク整理に活用します。</li>
-              <li>将来的には参加者カードから回答修正や再送リマインダーを起動できるようにします。</li>
-              <li>参加者 × 候補のマトリクス表示と連動し、詳細ドリルダウンへ誘導します。</li>
+              <li>未回答者を抽出して個別フォローしましょう。</li>
             </ul>
           </div>
         </section>
@@ -536,16 +533,6 @@ function AdminResponsesApp() {
             </button>
           </div>
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-dashed border-zinc-300 bg-white/80 p-4 text-sm text-zinc-500">
-        <h2 className="font-semibold text-zinc-600">実装メモ</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>本画面はレイアウト確認用のモックです。データは固定のダミーです。</li>
-          <li>サーバー連携時は Project / Slot / Participant / Response の API と接続する想定です。</li>
-          <li>モバイルでは日別カード + ドリルダウンを基本にし、PC ではマトリクス表示へ切り替える予定です。</li>
-          <li>CSV 出力は日別ではなく、上記の全体アクションから提供する想定です。</li>
-        </ul>
       </section>
     </div>
   );
