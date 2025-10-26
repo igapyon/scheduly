@@ -557,7 +557,7 @@ function SchedulyMock() {
               ref={commentTextareaRef}
               className="mt-1 w-full resize-none rounded-xl border px-2 py-2 text-sm leading-relaxed"
               rows={1}
-              placeholder="この日はテストの可能性が…"
+              placeholder="この日程に何かコメントがありましたらこちらに入力してください…"
               value={currentComment}
               onChange={(e) => setComment(e.target.value)}
               style={{ overflow: "hidden" }}
@@ -627,8 +627,10 @@ function SchedulyMock() {
                         location={candidate.location}
                         locationClassName="flex items-center gap-1 text-xs text-gray-500"
                         showLocationIcon
+                        timezone={candidate.tzid}
+                        timezoneClassName="text-[11px] text-gray-400"
                       />
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
                         <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
                         <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
                         <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
@@ -675,26 +677,26 @@ function SchedulyMock() {
 
       <Modal
         open={!!detailCandidate}
-        title={detailCandidate ? `${formatCandidateDateLabel(detailCandidate)} の詳細` : ""}
+        title={detailCandidate ? `${detailCandidate.summary || "回答詳細"} の詳細` : "回答詳細"}
         onClose={closeDetail}
       >
         {detailCandidate && (
           <>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}>
+                {formatIcalStatusLabel(detailCandidate.status)}
+              </span>
+            </div>
             <EventMeta
               summary={detailCandidate.summary}
               summaryClassName="text-sm font-semibold text-gray-800"
-              dateTime={`${formatCandidateDateLabel(detailCandidate)}・${formatCandidateTimeRange(detailCandidate)}`}
-              dateTimeClassName="text-xs text-gray-600"
-              timezone={detailCandidate.tzid}
-              timezoneClassName="text-[11px] text-gray-400"
+              dateTime={formatDateTimeRangeLabel(detailCandidate.dtstart, detailCandidate.dtend, detailCandidate.tzid)}
+              dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-gray-600"
               description={detailCandidate.description}
               descriptionClassName="text-xs text-gray-500"
               location={detailCandidate.location}
               locationClassName="flex items-center gap-1 text-xs text-gray-500"
               showLocationIcon
-              statusText={formatIcalStatusLabel(detailCandidate.status)}
-              statusClassName={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}
-              statusPrefix=""
             />
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />

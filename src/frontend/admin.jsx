@@ -321,7 +321,6 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
         }}
       >
         <div className="flex flex-col gap-2">
-          <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">日程 {index + 1}</span>
           <div className="flex items-center gap-2 text-xs">
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
               {formatIcalStatusLabel(value.status || "CONFIRMED")}
