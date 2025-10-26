@@ -258,7 +258,10 @@ function SectionCard({ title, description, action, children }) {
     <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-700">{title}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+            <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
+            <span>{title}</span>
+          </h2>
           {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
         </div>
         {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
