@@ -560,12 +560,10 @@ function AdminResponsesApp() {
       {activeTab === "participant" && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
-          <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            <div className="space-y-3 px-4 py-4">
-              {PARTICIPANTS.map((participant, index) => (
-                <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
-              ))}
-            </div>
+          <div className="space-y-3">
+            {PARTICIPANTS.map((participant, index) => (
+              <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
+            ))}
           </div>
 
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
