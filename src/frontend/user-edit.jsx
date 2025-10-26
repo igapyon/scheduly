@@ -474,17 +474,35 @@ function SchedulyMock() {
             <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
             <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
-            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-              <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
-            </span>
-            <span>👤 匿名参加者</span>
-            <a
-              href="./user.html"
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-            >
-              参加者一覧へ
-            </a>
+          <div className="flex flex-col items-end gap-2 text-xs text-zinc-500">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
+              </span>
+              <span>👤 匿名参加者</span>
+              <a
+                href="./user.html"
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                参加者一覧へ
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
+                onClick={() => showToast("参加者名の変更モーダル（モック）")}
+              >
+                名前を変更
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:border-rose-400 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+                onClick={() => showToast("参加者を削除しました（モック）")}
+              >
+                参加者を削除
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -653,25 +671,23 @@ function SchedulyMock() {
       </main>
 
       <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="h-10 rounded-xl border border-gray-200 bg-white px-4 font-semibold text-gray-600 hover:border-gray-300"
-              onClick={() => {
-                window.location.href = "./user.html";
-              }}
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-              onClick={submit}
-            >
-              保存
-            </button>
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            className="h-10 rounded-xl border border-gray-200 bg-white px-4 font-semibold text-gray-600 hover:border-gray-300"
+            onClick={() => {
+              window.location.href = "./user.html";
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+            onClick={submit}
+          >
+            保存
+          </button>
         </div>
       </footer>
 
