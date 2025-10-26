@@ -127,10 +127,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/12 17:42",
     commentHighlights: ["コメント記入: Day2"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
     ]
   },
   {
@@ -139,10 +139,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/10 09:15",
     commentHighlights: ["コメント記入: Day1 / Day3"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
     ]
   },
   {
@@ -151,10 +151,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/05 21:03",
     commentHighlights: ["コメント記入: Day2 / Day3"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
     ]
   }
 ];
@@ -276,7 +276,7 @@ function ScheduleSummary({ schedule }) {
   );
 }
 
-function ParticipantSummary({ participant, defaultOpen }) {
+function ParticipantSummary({ participant, defaultOpen, scheduleLookup }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
@@ -317,25 +317,49 @@ function ParticipantSummary({ participant, defaultOpen }) {
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
-      <ul className="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
-        {participant.responses.map((response) => (
-          <li
-            key={`${participant.id}-${response.scheduleId}`}
-            className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
-              response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
-            }`}
-          >
-            <div>
-              <div className="text-sm font-semibold text-zinc-800">{response.datetime}</div>
-              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
-            </div>
-            <span
-              className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+      <ul className="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+        {participant.responses.map((response) => {
+          const schedule = scheduleLookup ? scheduleLookup.get(response.scheduleId) : null;
+          const rangeLabel = schedule
+            ? formatDateTimeRangeLabel(schedule.startsAt, schedule.endsAt, schedule.tzid)
+            : response.datetime;
+          const summaryLabel = schedule ? schedule.label : response.datetime;
+          const location = schedule?.location;
+          const description = schedule?.description;
+          const timezone = schedule?.tzid;
+
+          return (
+            <li
+              key={`${participant.id}-${response.scheduleId}`}
+              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+                response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
+              }`}
             >
-              {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
-            </span>
-          </li>
-        ))}
+              <div className="flex-1 space-y-1">
+                <EventMeta
+                  summary={summaryLabel}
+                  summaryClassName="text-sm font-semibold text-zinc-800"
+                  dateTime={rangeLabel}
+                  dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-600"
+                  timezone={schedule ? timezone : null}
+                  description={description}
+                  descriptionClassName="text-xs text-zinc-500"
+                  location={location}
+                  locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+                  showLocationIcon
+                  statusText={null}
+                  statusPrefix=""
+                />
+                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+              </div>
+              <span
+                className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+              >
+                {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </details>
   );
@@ -380,6 +404,14 @@ function AdminResponsesApp() {
   const [schedulesLoading, setSchedulesLoading] = useState(true);
   const [schedulesError, setSchedulesError] = useState("");
   const [icsSource, setIcsSource] = useState("");
+
+  const scheduleLookup = useMemo(() => {
+    const map = new Map();
+    schedules.forEach((schedule) => {
+      map.set(schedule.id, schedule);
+    });
+    return map;
+  }, [schedules]);
 
   useEffect(() => {
     let cancelled = false;
@@ -537,9 +569,14 @@ function AdminResponsesApp() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
           <div className="space-y-3">
-            {PARTICIPANTS.map((participant, index) => (
-              <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
-            ))}
+              {PARTICIPANTS.map((participant, index) => (
+                <ParticipantSummary
+                  key={participant.id}
+                  participant={participant}
+                  defaultOpen={index === 0}
+                  scheduleLookup={scheduleLookup}
+                />
+              ))}
           </div>
 
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
