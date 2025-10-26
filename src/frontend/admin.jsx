@@ -242,10 +242,10 @@ const exportCandidateToICal = (candidate) => {
 
 function SectionCard({ title, description, action, children }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-800">{title}</h2>
+          <h2 className="text-sm font-semibold text-zinc-700">{title}</h2>
           {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
         </div>
         {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
@@ -281,7 +281,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
       >
         <div className="flex flex-col gap-1">
           <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">日程 {index + 1}</span>
-          <span className="text-base font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
+          <span className="text-sm font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
           <span className="text-xs text-zinc-500">{displayMeta}</span>
           <span className="text-xs text-zinc-500">TZID: {value.tzid || DEFAULT_TZID} ／ STATUS: {value.status}</span>
         </div>
@@ -412,7 +412,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 id={dialogTitleId} className="text-base font-semibold text-zinc-800">ICS詳細</h3>
+        <h3 id={dialogTitleId} className="text-sm font-semibold text-zinc-800">ICS詳細</h3>
               <button className="text-xs text-zinc-500" onClick={() => setMetaOpen(false)}>閉じる</button>
             </div>
             <CandidateMetaTable candidate={value} />
@@ -818,12 +818,12 @@ function OrganizerApp() {
   }, [summary, description, responseOptions, candidates]);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
+            <h1 className="mt-1 text-2xl font-bold text-zinc-900">Scheduly 管理</h1>
             <p className="mt-2 text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS の取り込み・書き出しを行ってください。
             </p>
@@ -839,7 +839,7 @@ function OrganizerApp() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-5 lg:grid-cols-[2fr,1fr]">
+      <div className="grid flex-1 gap-5 xl:grid-cols-[2fr,1fr]">
 
         <main className="space-y-5">
           <SectionCard
@@ -997,7 +997,7 @@ function OrganizerApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
           <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-zinc-800">
+                <h3 className="text-sm font-semibold text-zinc-800">
                   ICS 取り込みプレビュー（{importPreview.fileName}）
                 </h3>
                 <button
