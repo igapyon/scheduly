@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
@@ -229,17 +230,18 @@ function ScheduleSummary({ schedule }) {
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{schedule.label}</div>
-          <div className="text-base font-semibold text-zinc-800">{schedule.datetime}</div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-            <span>{schedule.location}</span>
-            <span className="text-zinc-400">/</span>
-            <span className="text-zinc-500">
-              状態: <span className={status.className}>{status.text}</span>
-            </span>
-          </div>
-        </div>
+        <EventMeta
+          summary={schedule.label}
+          summaryClassName="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500"
+          dateTime={schedule.datetime}
+          dateTimeClassName="text-base font-semibold text-zinc-800"
+          location={schedule.location}
+          locationClassName="flex flex-wrap items-center gap-2 text-xs text-zinc-500"
+          statusText={status.text}
+          statusClassName={status.className}
+          statusPrefix="状態:"
+          separator="/"
+        />
         <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
             ○ {schedule.counts.o}

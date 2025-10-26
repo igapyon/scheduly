@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
@@ -302,6 +303,7 @@ function SchedulyMock() {
   const currentComment = currentCandidate
     ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
     : "";
+  const currentDateRange = currentCandidate ? `${formatCandidateDateLabel(currentCandidate)}・${formatCandidateTimeRange(currentCandidate)}` : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
   const completeCount = useMemo(() => {
@@ -487,15 +489,19 @@ function SchedulyMock() {
                 {formatIcalStatusLabel(currentCandidate.status)}
               </span>
             </div>
-            <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
-              <span className="text-xs text-gray-400">{currentCandidate.tzid}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span role="img" aria-hidden="true">📍</span>
-              <span>{currentCandidate.location}</span>
-            </div>
+            <EventMeta
+              summary={currentCandidate.summary}
+              summaryClassName="text-2xl font-bold tracking-wide text-gray-900"
+              dateTime={currentDateRange}
+              dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-gray-600"
+              timezone={currentCandidate.tzid}
+              timezoneClassName="text-xs text-gray-400"
+              location={currentCandidate.location}
+              locationClassName="flex items-center gap-2 text-xs text-gray-500"
+              showLocationIcon
+              statusText={null}
+              statusPrefix=""
+            />
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
