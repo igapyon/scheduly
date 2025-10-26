@@ -205,6 +205,7 @@ function SchedulyMock() {
   const [detailCandidateId, setDetailCandidateId] = useState(null);
 
   const itemRefs = useRef({});
+  const commentTextareaRef = useRef(null);
   const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
   const startX = useRef(null);
   const pressTimer = useRef(null);
@@ -298,6 +299,9 @@ function SchedulyMock() {
   const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
   const currentCandidate = candidates.length ? candidates[safeIndex] : null;
   const mark = currentCandidate ? (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null : null;
+  const currentComment = currentCandidate
+    ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
+    : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
   const completeCount = useMemo(() => {
@@ -380,6 +384,19 @@ function SchedulyMock() {
     if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
     startX.current = null;
   };
+
+  useEffect(() => {
+    if (!commentTextareaRef.current) return;
+    const el = commentTextareaRef.current;
+    const computed = el.scrollHeight || parseInt(window.getComputedStyle(el).lineHeight || "0", 10) || 0;
+    const baseHeight = el.dataset.baseHeight ? Number(el.dataset.baseHeight) : computed;
+    if (!el.dataset.baseHeight) {
+      el.dataset.baseHeight = String(baseHeight);
+    }
+    el.style.height = "auto";
+    const minHeight = el.dataset.baseHeight ? Number(el.dataset.baseHeight) : 0;
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
+  }, [currentCandidate ? currentCandidate.id : null, currentComment]);
 
   const showToast = (message) => {
     setToast(message);
@@ -516,11 +533,13 @@ function SchedulyMock() {
           <label className="block">
             <span className="text-xs text-gray-500">コメント（任意）</span>
             <textarea
-              className="mt-1 w-full rounded-xl border p-2 text-sm"
-              rows={3}
+              ref={commentTextareaRef}
+              className="mt-1 w-full resize-none rounded-xl border px-2 py-2 text-sm leading-relaxed"
+              rows={1}
               placeholder="この日はテストの可能性が…"
-              value={(answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""}
+              value={currentComment}
               onChange={(e) => setComment(e.target.value)}
+              style={{ overflow: "hidden" }}
             />
           </label>
 
