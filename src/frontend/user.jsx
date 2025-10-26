@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
@@ -16,6 +18,7 @@ const PARTICIPANT_ICS_HEADER_LINES = [
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
+  description: "秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。",
   deadline: "2025/05/01 23:59",
   participantCount: 12,
   lastUpdated: "2025/04/12 17:45"
@@ -75,17 +78,6 @@ const buildIcsFromSchedules = (schedules) => {
   return lines.join(ICS_LINE_BREAK) + ICS_LINE_BREAK;
 };
 
-const formatScheduleRange = (startDate, endDate, tzid) => {
-  if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
-  const zone = sanitizeTzid(tzid);
-  const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone });
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone });
-  const datePart = dateFormatter.format(startDate);
-  const startTime = timeFormatter.format(startDate);
-  const endTime = endDate instanceof Date && !Number.isNaN(endDate.getTime()) ? timeFormatter.format(endDate) : "";
-  return endTime ? `${datePart} ${startTime} – ${endTime}` : `${datePart} ${startTime}`;
-};
-
 const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     id: "day1",
@@ -135,10 +127,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/12 17:42",
     commentHighlights: ["コメント記入: Day2"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
     ]
   },
   {
@@ -147,10 +139,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/10 09:15",
     commentHighlights: ["コメント記入: Day1 / Day3"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
     ]
   },
   {
@@ -159,10 +151,10 @@ const PARTICIPANTS = [
     lastUpdated: "2025/04/05 21:03",
     commentHighlights: ["コメント記入: Day2 / Day3"],
     responses: [
-      { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
-      { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
-      { scheduleId: "day3", datetime: "Day3 2025/10/28 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
-      { scheduleId: "day4", datetime: "Day4 2025/11/03 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
+      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
+      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
+      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
+      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
     ]
   }
 ];
@@ -229,16 +221,21 @@ function ScheduleSummary({ schedule }) {
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{schedule.label}</div>
-          <div className="text-base font-semibold text-zinc-800">{schedule.datetime}</div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-            <span>{schedule.location}</span>
-            <span className="text-zinc-400">/</span>
-            <span className="text-zinc-500">
-              状態: <span className={status.className}>{status.text}</span>
-            </span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className={status.className}>{status.text}</span>
           </div>
+          <EventMeta
+            summary={schedule.label}
+            summaryClassName="text-base font-semibold text-zinc-800"
+            dateTime={schedule.rangeLabel || schedule.datetime}
+            dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-zinc-600"
+            description={schedule.description}
+            descriptionClassName="text-xs text-zinc-500"
+            location={schedule.location}
+            locationClassName="flex items-center gap-2 text-xs text-zinc-500"
+            showLocationIcon
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
@@ -279,7 +276,7 @@ function ScheduleSummary({ schedule }) {
   );
 }
 
-function ParticipantSummary({ participant, defaultOpen }) {
+function ParticipantSummary({ participant, defaultOpen, scheduleLookup }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
@@ -320,25 +317,49 @@ function ParticipantSummary({ participant, defaultOpen }) {
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
-      <ul className="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
-        {participant.responses.map((response) => (
-          <li
-            key={`${participant.id}-${response.scheduleId}`}
-            className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
-              response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
-            }`}
-          >
-            <div>
-              <div className="text-sm font-semibold text-zinc-800">{response.datetime}</div>
-              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
-            </div>
-            <span
-              className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+      <ul className="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+        {participant.responses.map((response) => {
+          const schedule = scheduleLookup ? scheduleLookup.get(response.scheduleId) : null;
+          const rangeLabel = schedule
+            ? formatDateTimeRangeLabel(schedule.startsAt, schedule.endsAt, schedule.tzid)
+            : response.datetime;
+          const summaryLabel = schedule ? schedule.label : response.datetime;
+          const location = schedule?.location;
+          const description = schedule?.description;
+          const timezone = schedule?.tzid;
+
+          return (
+            <li
+              key={`${participant.id}-${response.scheduleId}`}
+              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+                response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
+              }`}
             >
-              {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
-            </span>
-          </li>
-        ))}
+              <div className="flex-1 space-y-1">
+                <EventMeta
+                  summary={summaryLabel}
+                  summaryClassName="text-sm font-semibold text-zinc-800"
+                  dateTime={rangeLabel}
+                  dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-600"
+                  timezone={schedule ? timezone : null}
+                  description={description}
+                  descriptionClassName="text-xs text-zinc-500"
+                  location={location}
+                  locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+                  showLocationIcon
+                  statusText={null}
+                  statusPrefix=""
+                />
+                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+              </div>
+              <span
+                className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+              >
+                {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </details>
   );
@@ -384,6 +405,14 @@ function AdminResponsesApp() {
   const [schedulesError, setSchedulesError] = useState("");
   const [icsSource, setIcsSource] = useState("");
 
+  const scheduleLookup = useMemo(() => {
+    const map = new Map();
+    schedules.forEach((schedule) => {
+      map.set(schedule.id, schedule);
+    });
+    return map;
+  }, [schedules]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -416,19 +445,21 @@ function AdminResponsesApp() {
           const startDate = event.startDate ? event.startDate.toJSDate() : null;
           const endDate = event.endDate ? event.endDate.toJSDate() : null;
           const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
-          const datetime = startDate && endDate ? formatScheduleRange(startDate, endDate, tzid) : "";
+          const rangeLabel = formatDateTimeRangeLabel(startDate, endDate, tzid);
 
           converted.push({
             uid: event.uid,
             id: details?.id || event.uid,
             label: event.summary || event.uid,
-            datetime,
+            datetime: rangeLabel,
+            rangeLabel,
             location: event.location || "",
             status: event.status || "TENTATIVE",
             tzid,
             startsAt: startDate ? startDate.toISOString() : null,
             endsAt: endDate ? endDate.toISOString() : null,
             counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
+            description: event.description || "",
             responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
           });
         }
@@ -498,10 +529,16 @@ function AdminResponsesApp() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
-        <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者</h1>
+        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+          <span aria-hidden="true">📋</span>
+          <span>Scheduly 参加者</span>
+        </h1>
         <p className="mt-2 text-sm text-zinc-600">
           プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
         </p>
+        {DASHBOARD_META.description ? (
+          <p className="mt-1 text-xs text-zinc-500">{DASHBOARD_META.description}</p>
+        ) : null}
       </header>
 
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
@@ -532,9 +569,14 @@ function AdminResponsesApp() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
           <div className="space-y-3">
-            {PARTICIPANTS.map((participant, index) => (
-              <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
-            ))}
+              {PARTICIPANTS.map((participant, index) => (
+                <ParticipantSummary
+                  key={participant.id}
+                  participant={participant}
+                  defaultOpen={index === 0}
+                  scheduleLookup={scheduleLookup}
+                />
+              ))}
           </div>
 
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">

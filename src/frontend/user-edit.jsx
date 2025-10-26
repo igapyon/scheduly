@@ -2,10 +2,14 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
 const logDebug = createLogger("user-edit");
+
+const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
 
 const SAMPLE_CANDIDATE_METADATA = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
@@ -257,6 +261,7 @@ function SchedulyMock() {
             sequence: Number.isFinite(sequenceValue) ? sequenceValue : 0,
             dtstamp: dtstampIso,
             location: event.location || "",
+            description: event.description || "",
             tally,
             responses,
             rawIcs: vevent.toJSON()
@@ -301,6 +306,9 @@ function SchedulyMock() {
   const mark = currentCandidate ? (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null : null;
   const currentComment = currentCandidate
     ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
+    : "";
+  const currentDateRange = currentCandidate
+    ? formatDateTimeRangeLabel(currentCandidate.dtstart, currentCandidate.dtend, currentCandidate.tzid)
     : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
@@ -440,10 +448,14 @@ function SchedulyMock() {
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-gray-900 sm:px-6">
         <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h1 className="text-2xl font-bold">Scheduly 回答編集</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <span aria-hidden="true">✏️</span>
+            <span>Scheduly 回答編集</span>
+          </h1>
           <p className="mt-2 text-sm text-zinc-600">
             {loading ? "候補を読み込んでいます…" : loadError ? `候補を読み込めませんでした: ${loadError}` : "候補が存在しません。"}
           </p>
+          <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
         </header>
       </div>
     );
@@ -455,8 +467,12 @@ function SchedulyMock() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
-            <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+              <span aria-hidden="true">✏️</span>
+              <span>Scheduly 回答編集</span>
+            </h1>
             <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
+            <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
             <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
@@ -481,15 +497,19 @@ function SchedulyMock() {
                 {formatIcalStatusLabel(currentCandidate.status)}
               </span>
             </div>
-            <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
-              <span className="text-xs text-gray-400">{currentCandidate.tzid}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span role="img" aria-hidden="true">📍</span>
-              <span>{currentCandidate.location}</span>
-            </div>
+            <EventMeta
+              summary={currentCandidate.summary}
+              summaryClassName="text-2xl font-bold tracking-wide text-gray-900"
+              dateTime={currentDateRange}
+              dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-gray-600"
+              description={currentCandidate.description}
+              descriptionClassName="text-xs text-gray-500"
+              location={currentCandidate.location}
+              locationClassName="flex items-center gap-2 text-xs text-gray-500"
+              showLocationIcon
+              statusText={null}
+              statusPrefix=""
+            />
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -537,7 +557,7 @@ function SchedulyMock() {
               ref={commentTextareaRef}
               className="mt-1 w-full resize-none rounded-xl border px-2 py-2 text-sm leading-relaxed"
               rows={1}
-              placeholder="この日はテストの可能性が…"
+              placeholder="この日程に何かコメントがありましたらこちらに入力してください…"
               value={currentComment}
               onChange={(e) => setComment(e.target.value)}
               style={{ overflow: "hidden" }}
@@ -564,62 +584,66 @@ function SchedulyMock() {
                   : my === "x" ? "border-rose-300 text-rose-700 bg-rose-50"
                   : "border-gray-200 text-gray-500 bg-gray-50";
 
+                const status = formatIcalStatusLabel(candidate.status);
+                const rangeLabel = formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid);
+
                 return (
                   <li
                     key={candidate.id}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/50" : "hover:bg-zinc-50"}`}
+                    className={`rounded-xl border px-3 py-2 transition ${isCurrent ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/40" : "hover:bg-zinc-50"}`}
                     aria-current={isCurrent ? "true" : undefined}
                     ref={(el) => (itemRefs.current[candidate.id] = el)}
                     tabIndex={-1}
                   >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-6 w-1.5 rounded-full transition ${isCurrent ? "bg-emerald-500" : "bg-transparent"}`}
-                        aria-hidden="true"
+                    <button
+                      className="w-full space-y-2 text-left"
+                      onClick={() => {
+                        setShouldScrollToCurrent(true);
+                        const targetIndex = candidates.findIndex((entry) => entry.id === candidate.id);
+                        if (targetIndex !== -1) {
+                          setIndex(targetIndex);
+                        }
+                      }}
+                      onPointerDown={(e) => onPressStart(candidate.id, e)}
+                      onPointerMove={onPressMove}
+                      onPointerUp={onPressEnd}
+                      onPointerLeave={onPressEnd}
+                      onPointerCancel={onPressEnd}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(candidate.status)}`}>
+                          {status}
+                        </span>
+                        {isCurrent && <span className="text-emerald-600">（選択中）</span>}
+                      </div>
+                      <EventMeta
+                        summary={candidate.summary || formatCandidateDateLabel(candidate)}
+                        summaryClassName="text-sm font-semibold text-gray-800"
+                        dateTime={rangeLabel}
+                        dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-gray-600"
+                        description={candidate.description}
+                        descriptionClassName="text-xs text-gray-500"
+                        location={candidate.location}
+                        locationClassName="flex items-center gap-1 text-xs text-gray-500"
+                        showLocationIcon
+                        timezone={candidate.tzid}
+                        timezoneClassName="text-[11px] text-gray-400"
                       />
-                      <button
-                        className="py-3 text-left"
-                        onClick={() => {
-                          setShouldScrollToCurrent(true);
-                          const targetIndex = candidates.findIndex((entry) => entry.id === candidate.id);
-                          if (targetIndex !== -1) {
-                            setIndex(targetIndex);
-                          }
-                        }}
-                        onPointerDown={(e) => onPressStart(candidate.id, e)}
-                        onPointerMove={onPressMove}
-                        onPointerUp={onPressEnd}
-                        onPointerLeave={onPressEnd}
-                        onPointerCancel={onPressEnd}
-                        onContextMenu={(e) => e.preventDefault()}
-                      >
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          {formatCandidateDateLabel(candidate)}
-                          {isCurrent && <span className="ml-2 text-xs font-semibold text-emerald-600">（選択中）</span>}
-                        </div>
-                        <div className="text-xs text-gray-500">{formatCandidateTimeRange(candidate)}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 ${icalStatusBadgeClass(candidate.status)}`}>
-                            {formatIcalStatusLabel(candidate.status)}
-                          </span>
-                          <span className="max-w-[12rem] truncate">{candidate.location}</span>
-                        </div>
-                        <div className="mt-1 text-[10px] text-gray-400">（長押しで参加者を見る）</div>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
-                      <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
-                      <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
-                      <span
-                        className={`ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${myClass}`}
-                        aria-label="あなたの選択"
-                        title="あなたの選択"
-                      >
-                        <span className="font-medium">あなた:</span> {myLabel}
-                      </span>
-                    </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
+                        <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>
+                        <span className="inline-flex items-center gap-1 text-amber-500"><span>△</span>{candidate.tally.d}</span>
+                        <span className="inline-flex items-center gap-1 text-rose-500"><span>×</span>{candidate.tally.x}</span>
+                        <span
+                          className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${myClass}`}
+                          aria-label="あなたの選択"
+                          title="あなたの選択"
+                        >
+                          <span className="font-medium">あなた:</span> {myLabel}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400">（長押しで参加者を見る）</div>
+                    </button>
                   </li>
                 );
               })}
@@ -653,11 +677,27 @@ function SchedulyMock() {
 
       <Modal
         open={!!detailCandidate}
-        title={detailCandidate ? `${formatCandidateDateLabel(detailCandidate)} の詳細` : ""}
+        title={detailCandidate ? `${detailCandidate.summary || "回答詳細"} の詳細` : "回答詳細"}
         onClose={closeDetail}
       >
         {detailCandidate && (
           <>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}>
+                {formatIcalStatusLabel(detailCandidate.status)}
+              </span>
+            </div>
+            <EventMeta
+              summary={detailCandidate.summary}
+              summaryClassName="text-sm font-semibold text-gray-800"
+              dateTime={formatDateTimeRangeLabel(detailCandidate.dtstart, detailCandidate.dtend, detailCandidate.tzid)}
+              dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-gray-600"
+              description={detailCandidate.description}
+              descriptionClassName="text-xs text-gray-500"
+              location={detailCandidate.location}
+              locationClassName="flex items-center gap-1 text-xs text-gray-500"
+              showLocationIcon
+            />
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />

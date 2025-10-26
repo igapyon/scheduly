@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState, useId, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger } = sharedIcalUtils;
 
@@ -23,6 +25,29 @@ const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
 
 const logDebug = createLogger("admin");
 const pad = (n) => String(n).padStart(2, "0");
+
+const ICAL_STATUS_LABELS = {
+  CONFIRMED: "確定",
+  TENTATIVE: "仮予定",
+  CANCELLED: "取消し"
+};
+
+const ICAL_STATUS_BADGE_CLASSES = {
+  CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
+  TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
+  CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+};
+
+function formatIcalStatusLabel(status) {
+  const key = status ? String(status).toUpperCase() : "CONFIRMED";
+  const label = ICAL_STATUS_LABELS[key] || key;
+  return `${label}（${key}）`;
+}
+
+function icalStatusBadgeClass(status) {
+  const key = status ? String(status).toUpperCase() : "CONFIRMED";
+  return ICAL_STATUS_BADGE_CLASSES[key] || "border-zinc-200 bg-zinc-50 text-zinc-600";
+}
 
 const toInputValue = (date) => {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
@@ -258,7 +283,10 @@ function SectionCard({ title, description, action, children }) {
     <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-700">{title}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+            <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
+            <span>{title}</span>
+          </h2>
           {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
         </div>
         {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
@@ -292,11 +320,27 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           handleSummaryClick();
         }}
       >
-        <div className="flex flex-col gap-1">
-          <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">日程 {index + 1}</span>
-          <span className="text-sm font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
-          <span className="text-xs text-zinc-500">{displayMeta}</span>
-          <span className="text-xs text-zinc-500">TZID: {value.tzid || DEFAULT_TZID} ／ STATUS: {value.status}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
+              {formatIcalStatusLabel(value.status || "CONFIRMED")}
+            </span>
+          </div>
+          <EventMeta
+            summary={value.summary || "タイトル未設定"}
+            summaryClassName="text-sm font-semibold text-zinc-800"
+            dateTime={displayMeta}
+            dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-500"
+            timezone={value.tzid || DEFAULT_TZID}
+            timezoneClassName="text-xs text-zinc-400"
+            description={value.description}
+            descriptionClassName="text-xs text-zinc-500"
+            location={value.location}
+            locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+            showLocationIcon
+            statusText={null}
+            statusPrefix=""
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -496,9 +540,7 @@ function formatLocalDisplay(value) {
 }
 
 function candidateToDisplayMeta(candidate) {
-  const start = formatLocalDisplay(candidate.dtstart);
-  const end = formatLocalDisplay(candidate.dtend);
-  return `${start} 〜 ${end}`;
+  return formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
 }
 
 function OrganizerApp() {
@@ -840,7 +882,10 @@ function OrganizerApp() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 text-2xl font-bold text-zinc-900">Scheduly 管理</h1>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-zinc-900">
+              <span aria-hidden="true">🗂️</span>
+              <span>Scheduly 管理</span>
+            </h1>
             <p className="mt-2 text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
