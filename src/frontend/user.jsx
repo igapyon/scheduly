@@ -504,35 +504,6 @@ function AdminResponsesApp() {
         </p>
       </header>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
-          <label className="text-xs font-semibold text-zinc-500">
-            参加者フィルター
-            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
-              <option>全参加者（{DASHBOARD_META.participantCount} 名）</option>
-              <option>未回答のみ</option>
-              <option>コメントあり</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-zinc-500">
-            回答ステータス
-            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
-              <option>○ / △ / ×</option>
-              <option>○ のみ表示</option>
-              <option>△ をハイライト</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-zinc-500">
-            キーワード検索
-            <input type="search" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" placeholder="参加者名・コメントを検索" />
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-          <span>参加者: {DASHBOARD_META.participantCount} 名</span>
-          <span>最新更新: {DASHBOARD_META.lastUpdated}</span>
-        </div>
-      </section>
-
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === "schedule" && (
