@@ -33,7 +33,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 ## TODO の種
 
 - `exportAllCandidatesToIcs` を活用し、候補を一括ダウンロードできる UI を追加する。
-- `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
+- (優先度低) `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
 - 参加者回答一覧（`user.jsx`）をもとに、実データ連携やマトリクス表示を整備する。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
 

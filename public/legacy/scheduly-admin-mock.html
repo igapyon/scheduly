@@ -263,13 +263,41 @@
           }
         };
       };
+      const ICAL_STATUS_LABELS = {
+        CONFIRMED: "確定",
+        TENTATIVE: "仮予定",
+        CANCELLED: "取消し"
+      };
 
-      function Section({ title, children, action }) {
+      const ICAL_STATUS_BADGE_CLASSES = {
+        CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
+        TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
+        CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+      };
+
+      const formatIcalStatusLabel = (status) => {
+        const normalized = (status ? String(status) : "CONFIRMED").toUpperCase();
+        const label = ICAL_STATUS_LABELS[normalized] || normalized;
+        return `${label}（${normalized}）`;
+      };
+
+      const icalStatusBadgeClass = (status) => {
+        const normalized = (status ? String(status) : "CONFIRMED").toUpperCase();
+        return ICAL_STATUS_BADGE_CLASSES[normalized] || "border-zinc-200 bg-zinc-50 text-zinc-600";
+      };
+
+      function Section({ title, description, children, action, icon }) {
         return (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold">{title}</h2>
-              {action}
+          <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                  {icon ? <span aria-hidden="true">{icon}</span> : null}
+                  <span>{title}</span>
+                </h2>
+                {description ? <p className="mt-1 text-xs text-zinc-500">{description}</p> : null}
+              </div>
+              {action ? <div className="flex flex-wrap items-center gap-2">{action}</div> : null}
             </div>
             <div className="space-y-4">{children}</div>
           </section>
@@ -277,48 +305,81 @@
       }
 
       function CandidateRow({ index, value, onChange, onRemove, onExport, disableRemove }) {
+        const [open, setOpen] = useState(index === 0);
         const [metaOpen, setMetaOpen] = useState(false);
         const dialogTitleId = useId();
-        const startLabel = formatLocalDisplay(value.dtstart);
-        const endLabel = formatLocalDisplay(value.dtend);
+
+        const handleToggle = (event) => {
+          setOpen(event.currentTarget.open);
+        };
+
+        const handleSummaryToggle = (event) => {
+          event.preventDefault();
+          setOpen((prev) => !prev);
+        };
+
+        const handleMetaOpen = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setMetaOpen(true);
+        };
+
+        const handleExport = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onExport();
+        };
+
+        const rangeLabel = formatCandidateRangeLabel(value);
 
         return (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex w-fit items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    日程 {index + 1}
+          <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" open={open} onToggle={handleToggle}>
+            <summary
+              className="flex cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition hover:bg-emerald-50/50 sm:flex-row sm:items-center sm:justify-between"
+              onClick={handleSummaryToggle}
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
+                    {formatIcalStatusLabel(value.status)}
                   </span>
-                  <button
-                    type="button"
-                    className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-emerald-300 hover:text-emerald-600"
-                    onClick={() => setMetaOpen(true)}
-                  >
-                    ICS詳細
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-                    onClick={onExport}
-                  >
-                    <span aria-hidden="true">📅</span> ICS
-                  </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
-                  <span>開始: {startLabel}</span>
-                  <span className="hidden sm:inline">／</span>
-                  <span>終了: {endLabel}</span>
-                  {value.location && (
-                    <>
-                      <span className="hidden sm:inline">／</span>
-                      <span className="max-w-xs truncate">場所: {value.location}</span>
-                    </>
-                  )}
+                <div className="space-y-1">
+                  <div className="text-sm font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</div>
+                  <div className="flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+                    <span>{rangeLabel}</span>
+                  </div>
+                  {value.description ? (
+                    <div className="text-xs text-zinc-500">{value.description}</div>
+                  ) : null}
+                  {value.location ? (
+                    <div className="flex items-center gap-1 text-xs text-zinc-500">
+                      <span aria-hidden="true">📍</span>
+                      <span className="truncate">{value.location}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                  onClick={handleMetaOpen}
+                >
+                  ICS 詳細
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+                  onClick={handleExport}
+                >
+                  <span aria-hidden="true">📅</span> ICS
+                </button>
+              </div>
+            </summary>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-4 border-t border-zinc-200 px-5 py-5">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
                   <input
@@ -343,7 +404,7 @@
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-zinc-500">開始日時（DTSTART）</span>
                   <input
@@ -364,7 +425,7 @@
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-zinc-500">タイムゾーン（TZID）</span>
                   <select
@@ -379,18 +440,17 @@
                     ))}
                   </select>
                 </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-zinc-500">場所（LOCATION）</span>
+                  <input
+                    type="text"
+                    value={value.location}
+                    onChange={(e) => onChange({ ...value, location: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    placeholder="例: サントリーホール 大ホール"
+                  />
+                </label>
               </div>
-
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-500">場所（LOCATION）</span>
-                <input
-                  type="text"
-                  value={value.location}
-                  onChange={(e) => onChange({ ...value, location: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="例: サントリーホール 大ホール（2000席）"
-                />
-              </label>
 
               <label className="block">
                 <span className="text-xs font-semibold text-zinc-500">説明（DESCRIPTION）</span>
@@ -399,18 +459,18 @@
                   onChange={(e) => onChange({ ...value, description: e.target.value })}
                   rows={3}
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  placeholder="プロジェクトの概要や連携メモ"
+                  placeholder="補足情報を入力"
                 />
               </label>
 
               <div className="flex justify-end">
                 <button
                   type="button"
-                  className="h-10 w-full shrink-0 rounded-lg border border-zinc-300 px-3 text-xs text-zinc-500 hover:border-rose-400 hover:text-rose-600 disabled:opacity-40 sm:w-32"
+                  className="h-10 rounded-lg border border-zinc-200 px-4 text-xs font-semibold text-rose-500 hover:border-rose-400 disabled:opacity-40"
                   onClick={onRemove}
                   disabled={disableRemove}
                 >
-                  削除
+                  日程を削除
                 </button>
               </div>
             </div>
@@ -456,21 +516,7 @@
                 </div>
               </div>
             )}
-          </div>
-        );
-      }
-
-      function ResponseSelector({ responses }) {
-        return (
-          <div>
-            <div className="text-xs font-semibold text-zinc-500">回答形式</div>
-            <div className="mt-2 flex flex-wrap gap-2 text-sm text-zinc-500">
-              <span className="inline-flex items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1 font-semibold text-zinc-600">
-                {responses.join(" / ")}
-              </span>
-              <span className="text-xs">※ 現在は固定設定です（編集不可）。</span>
-            </div>
-          </div>
+          </details>
         );
       }
 
@@ -493,10 +539,42 @@
         return value.replace("T", " ");
       }
 
+      function formatCandidateRangeLabel(candidate) {
+        if (!candidate) return "日時未設定";
+        const tz = candidate.tzid || DEFAULT_TZID;
+        const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          weekday: "short",
+          timeZone: tz
+        });
+        const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: tz
+        });
+
+        const startDate = candidate.dtstart ? new Date(candidate.dtstart) : null;
+        const endDate = candidate.dtend ? new Date(candidate.dtend) : null;
+
+        const startValid = startDate && !Number.isNaN(startDate.getTime());
+        const endValid = endDate && !Number.isNaN(endDate.getTime());
+
+        if (!startValid && !endValid) return "日時未設定";
+
+        const startLabel = startValid
+          ? `${dateFormatter.format(startDate)} ${timeFormatter.format(startDate)}`
+          : "未設定";
+        const endLabel = endValid ? timeFormatter.format(endDate) : "未設定";
+
+        return `${startLabel} – ${endLabel} (${tz})`;
+      }
+
       function OrganizerMock() {
         const [summary, setSummary] = useState("秋の合宿 調整会議");
         const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
-        const [password, setPassword] = useState("mitaka2025");
         const responseOptions = ["○", "△", "×"];
         const [candidates, setCandidates] = useState(() => [
           seedICalCandidate({
@@ -769,8 +847,16 @@
           popToast("編集URL／閲覧URLを発行しました（モック）");
         };
 
-        const mockDownloadJson = () => {
-          popToast("出欠表を JSON でダウンロードしました（モック）");
+        const mockExportProjectInfo = () => {
+          popToast("プロジェクト情報をエクスポートしました（モック）");
+        };
+
+        const mockImportProjectInfo = () => {
+          popToast("プロジェクト情報をインポートしました（モック）");
+        };
+
+        const handleSave = () => {
+          popToast("保存しました（モック）");
         };
 
         const eventPayload = useMemo(() => {
@@ -778,7 +864,6 @@
             summary,
             description,
             responseOptions: responseOptions,
-            accessControl: password ? { passwordEnabled: true, hint: "保存時にハッシュ化されます" } : { passwordEnabled: false },
             candidates: candidates.map((c, index) => ({
               id: c.id,
               order: index + 1,
@@ -798,44 +883,45 @@
             metadata: {
               createdAt: "2024-05-01T10:00:00+09:00",
               organizer: "匿名",
-              sharing: {
-                adminUrl: urls.admin || "(未発行)",
-                guestUrl: urls.guest || "(未発行)"
-              }
+              hint: "ダッシュボードから参照できます"
             }
           };
-        }, [summary, description, password, candidates, urls]);
+        }, [summary, description, responseOptions, candidates]);
 
         return (
-          <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-4 sm:p-8">
-            <header className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Admin Mock</p>
-                <h1 className="mt-1 text-2xl font-bold">Scheduly 管理者コンソール</h1>
-                <p className="mt-2 text-sm text-zinc-500">プロジェクトを作成し、URLベースのアクセス制御や回答形式を設定するためのモックUIです。</p>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
-                <span className="font-semibold">URL = 認証キー</span>
-                <span className="block text-xs text-emerald-600">アカウントレス設計を再現しています。</span>
+          <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
+            <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
+                  <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-zinc-900">
+                    <span aria-hidden="true">🗂️</span>
+                    <span>Scheduly 管理</span>
+                  </h1>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href="../user.html"
+                    className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+                  >
+                    参加者画面を開く
+                  </a>
+                </div>
               </div>
             </header>
 
-            <main className="grid grid-cols-1 gap-6">
-              <div className="space-y-6">
+            <div className="grid flex-1 gap-5 xl:grid-cols-[2fr,1fr]">
+              <main className="space-y-5">
                 <Section
-                  title="プロジェクト基本情報"
-                  action={
-                    <button
-                      type="button"
-                      className="rounded-lg border border-emerald-400 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
-                      onClick={generateUrls}
-                    >
-                      URLを発行（モック）
-                    </button>
-                  }
+                  title="プロジェクト情報"
+                  description="プロジェクトの基本情報を編集します。"
+                  icon="📝"
                 >
                   <label className="block">
-                    <span className="text-xs font-semibold text-zinc-500">プロジェクトタイトル（SUMMARY）</span>
+                    <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
                     <input
                       type="text"
                       value={summary}
@@ -845,7 +931,7 @@
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold text-zinc-500">説明文</span>
+                    <span className="text-xs font-semibold text-zinc-500">説明</span>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -854,39 +940,14 @@
                       placeholder="プロジェクトの概要を入力"
                     />
                   </label>
-                  <label className="block">
-                    <span className="text-xs font-semibold text-zinc-500">プロジェクトパスワード</span>
-                    <div className="mt-1 flex gap-2">
-                      <input
-                        type="text"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                        placeholder="空欄でパスワードなし"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-zinc-500">閲覧制限のための任意設定です。保存時にサーバー側でハッシュ化される想定です。</p>
-                  </label>
-                  <ResponseSelector responses={responseOptions} />
-                </Section>
-
-                <Section title="共有URL" action={null}>
-                  <KeyValueList
-                    items={[
-                      { key: "編集用URL（管理者）", value: urls.admin },
-                      { key: "閲覧用URL（参加者）", value: urls.guest },
-                      { key: "最終更新", value: "2024/05/01 10:00 更新済み（モック）" }
-                    ]}
-                  />
-                  <p className="text-xs text-zinc-500">
-                    管理者URLを知っている人だけがプロジェクト内容を更新できます。閲覧URLは参加者に共有します。
-                  </p>
                 </Section>
 
                 <Section
-                  title="日程一覧"
+                  title="日程"
+                  description="候補日や確定日を管理できます。カードを開いて詳細を編集してください。"
+                  icon="🗓️"
                   action={
-                    <div className="flex flex-wrap items-center gap-2">
+                    <>
                       <button
                         type="button"
                         className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
@@ -897,13 +958,9 @@
                       <button
                         type="button"
                         className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                        onClick={function () {
-                          if (importInputRef.current) {
-                            importInputRef.current.click();
-                          }
-                        }}
+                        onClick={() => importInputRef.current && importInputRef.current.click()}
                       >
-                        ICSから追加
+                        日程をICSからインポート
                       </button>
                       <button
                         type="button"
@@ -911,7 +968,7 @@
                         onClick={handleExportAllCandidates}
                         disabled={!candidates.length}
                       >
-                        ICSを一括ダウンロード
+                        日程をICSに一括エクスポート
                       </button>
                       <input
                         ref={importInputRef}
@@ -920,7 +977,7 @@
                         className="hidden"
                         onChange={onIcsInputChange}
                       />
-                    </div>
+                    </>
                   }
                 >
                   {candidates.map((candidate, index) => (
@@ -938,39 +995,78 @@
 
                 <Section
                   title="管理アクション"
+                  description="プロジェクト全体に関わる操作です。保存すると参加者画面にも最新の内容が反映されます。"
+                  icon="📝"
+                >
+                  <div className="grid gap-2">
+                    <button
+                      type="button"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                      onClick={mockExportProjectInfo}
+                    >
+                      プロジェクトをエクスポート
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                      onClick={mockImportProjectInfo}
+                    >
+                      プロジェクトをインポート
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-rose-500 hover:border-rose-400"
+                      onClick={() => popToast("プロジェクトを削除しました（モック）")}
+                    >
+                      プロジェクトを削除
+                    </button>
+                  </div>
+                </Section>
+              </main>
+
+              <aside className="space-y-5">
+                <Section
+                  title="共有URL"
+                  description="参加者へ共有するリンクと編集リンクを確認できます。"
+                  icon="📝"
                   action={
                     <button
                       type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-rose-500 hover:border-rose-400"
-                    onClick={() => popToast("プロジェクトを削除しました（モック）")}
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
+                      onClick={generateUrls}
                     >
-                      プロジェクト削除（モック）
+                      共有URLを生成
                     </button>
                   }
                 >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={mockDownloadJson}
-                    >
-                      参加者情報をエクスポート（JSON）
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold hover:border-emerald-300"
-                      onClick={() => popToast("JSONをアップロードして更新しました（モック）")}
-                    >
-                      参加者情報をインポート（JSON）
-                    </button>
-                  </div>
+                  <KeyValueList
+                    items={[
+                      { key: "編集用URL（管理者）", value: urls.admin },
+                      { key: "閲覧用URL（参加者）", value: urls.guest },
+                      { key: "最終更新", value: "2024/05/01 10:00 更新済み" }
+                    ]}
+                  />
                   <p className="text-xs text-zinc-500">
-                    ICS のエクスポート／インポートは各候補の「ICS」ボタン（モック）で個別に扱う設計を想定しています。
+                    管理者URLを知っている人だけがプロジェクト内容を更新できます。閲覧URLは参加者に共有します。
                   </p>
                 </Section>
-              </div>
+              </aside>
+            </div>
 
-            </main>
+            <footer className="sticky bottom-0 z-30 border-t border-zinc-200 bg-white/90 shadow-[0_-4px_16px_rgba(24,24,27,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/70">
+              <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+                <div>保存すると参加者画面にも最新の内容を反映します</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                    onClick={handleSave}
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            </footer>
 
             {importPreview && (
               <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
