@@ -17,14 +17,18 @@ function EventMeta({
   statusClassName = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold text-zinc-600",
   separator = null
 }) {
+  const dateTimeText = dateTime ? String(dateTime) : "";
+  const normalizedTimezone = timezone ? String(timezone) : "";
+  const shouldShowTimezone = Boolean(normalizedTimezone && !dateTimeText.includes(`(${normalizedTimezone})`));
+
   return (
     <div className="space-y-1">
       {summary ? <div className={summaryClassName}>{summary}</div> : null}
-      {(dateTime || timezone) ? (
+      {(dateTime || shouldShowTimezone) ? (
         <div className={dateTimeClassName}>
           {dateTime ? <span>{dateTime}</span> : null}
-          {dateTime && timezone ? <span className="text-zinc-400">/</span> : null}
-          {timezone ? <span className={timezoneClassName}>{timezone}</span> : null}
+          {dateTime && shouldShowTimezone ? <span className="text-zinc-400">/</span> : null}
+          {shouldShowTimezone ? <span className={timezoneClassName}>{normalizedTimezone}</span> : null}
         </div>
       ) : null}
       {description ? <div className={descriptionClassName}>{description}</div> : null}

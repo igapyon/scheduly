@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
 import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
@@ -75,17 +76,6 @@ const buildIcsFromSchedules = (schedules) => {
 
   lines.push("END:VCALENDAR");
   return lines.join(ICS_LINE_BREAK) + ICS_LINE_BREAK;
-};
-
-const formatScheduleRange = (startDate, endDate, tzid) => {
-  if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
-  const zone = sanitizeTzid(tzid);
-  const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone });
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: zone });
-  const datePart = dateFormatter.format(startDate);
-  const startTime = timeFormatter.format(startDate);
-  const endTime = endDate instanceof Date && !Number.isNaN(endDate.getTime()) ? timeFormatter.format(endDate) : "";
-  return endTime ? `${datePart} ${startTime} – ${endTime}` : `${datePart} ${startTime}`;
 };
 
 const SAMPLE_SCHEDULE_DETAILS = {
@@ -238,10 +228,8 @@ function ScheduleSummary({ schedule }) {
           <EventMeta
             summary={schedule.label}
             summaryClassName="text-base font-semibold text-zinc-800"
-            dateTime={schedule.datetime}
-            dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-zinc-600"
-            timezone={schedule.tzid}
-            timezoneClassName="text-xs text-zinc-400"
+            dateTime={schedule.rangeLabel || schedule.datetime}
+            dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-zinc-600"
             description={schedule.description}
             descriptionClassName="text-xs text-zinc-500"
             location={schedule.location}
@@ -425,13 +413,14 @@ function AdminResponsesApp() {
           const startDate = event.startDate ? event.startDate.toJSDate() : null;
           const endDate = event.endDate ? event.endDate.toJSDate() : null;
           const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
-          const datetime = startDate && endDate ? formatScheduleRange(startDate, endDate, tzid) : "";
+          const rangeLabel = formatDateTimeRangeLabel(startDate, endDate, tzid);
 
           converted.push({
             uid: event.uid,
             id: details?.id || event.uid,
             label: event.summary || event.uid,
-            datetime,
+            datetime: rangeLabel,
+            rangeLabel,
             location: event.location || "",
             status: event.status || "TENTATIVE",
             tzid,

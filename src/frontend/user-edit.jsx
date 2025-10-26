@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
 import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
@@ -306,7 +307,9 @@ function SchedulyMock() {
   const currentComment = currentCandidate
     ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
     : "";
-  const currentDateRange = currentCandidate ? `${formatCandidateDateLabel(currentCandidate)}・${formatCandidateTimeRange(currentCandidate)}` : "";
+  const currentDateRange = currentCandidate
+    ? formatDateTimeRangeLabel(currentCandidate.dtstart, currentCandidate.dtend, currentCandidate.tzid)
+    : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
   const completeCount = useMemo(() => {
@@ -498,9 +501,7 @@ function SchedulyMock() {
               summary={currentCandidate.summary}
               summaryClassName="text-2xl font-bold tracking-wide text-gray-900"
               dateTime={currentDateRange}
-              dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-gray-600"
-              timezone={currentCandidate.tzid}
-              timezoneClassName="text-xs text-gray-400"
+              dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-gray-600"
               description={currentCandidate.description}
               descriptionClassName="text-xs text-gray-500"
               location={currentCandidate.location}
@@ -584,6 +585,7 @@ function SchedulyMock() {
                   : "border-gray-200 text-gray-500 bg-gray-50";
 
                 const status = formatIcalStatusLabel(candidate.status);
+                const rangeLabel = formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid);
 
                 return (
                   <li
@@ -616,16 +618,15 @@ function SchedulyMock() {
                         {isCurrent && <span className="text-emerald-600">（選択中）</span>}
                       </div>
                       <EventMeta
-                        summary={`${formatCandidateDateLabel(candidate)} ${formatCandidateTimeRange(candidate)}`}
+                        summary={candidate.summary || formatCandidateDateLabel(candidate)}
                         summaryClassName="text-sm font-semibold text-gray-800"
-                        dateTime={null}
+                        dateTime={rangeLabel}
+                        dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-gray-600"
                         description={candidate.description}
                         descriptionClassName="text-xs text-gray-500"
                         location={candidate.location}
                         locationClassName="flex items-center gap-1 text-xs text-gray-500"
                         showLocationIcon
-                        timezone={candidate.tzid}
-                        timezoneClassName="text-[11px] text-gray-400"
                       />
                       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                         <span className="inline-flex items-center gap-1 text-emerald-500"><span>○</span>{candidate.tally.o}</span>

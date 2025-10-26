@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
 import EventMeta from "./shared/EventMeta.jsx";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger } = sharedIcalUtils;
 
@@ -540,27 +541,7 @@ function formatLocalDisplay(value) {
 }
 
 function candidateToDisplayMeta(candidate) {
-  const { dtstart, dtend } = candidate;
-  if (!dtstart) return "未設定";
-  const startDate = new Date(dtstart);
-  if (Number.isNaN(startDate.getTime())) return formatLocalDisplay(dtstart);
-  const endDate = dtend ? new Date(dtend) : null;
-  const dateFormatter = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
-  const timeFormatter = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const startDateLabel = dateFormatter.format(startDate);
-  const startTimeLabel = timeFormatter.format(startDate);
-  if (!endDate || Number.isNaN(endDate.getTime())) {
-    return `${startDateLabel} ${startTimeLabel}`;
-  }
-  const sameDay = startDate.getFullYear() === endDate.getFullYear()
-    && startDate.getMonth() === endDate.getMonth()
-    && startDate.getDate() === endDate.getDate();
-  const endTimeLabel = timeFormatter.format(endDate);
-  if (sameDay) {
-    return `${startDateLabel} ${startTimeLabel} – ${endTimeLabel}`;
-  }
-  const endDateLabel = dateFormatter.format(endDate);
-  return `${startDateLabel} ${startTimeLabel} – ${endDateLabel} ${endTimeLabel}`;
+  return formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
 }
 
 function OrganizerApp() {
