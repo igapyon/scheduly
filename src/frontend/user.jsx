@@ -73,10 +73,6 @@ const PARTICIPANTS = [
     name: "佐藤 太郎",
     lastUpdated: "2025/04/12 17:42",
     commentHighlights: ["コメント記入: Day2"],
-    actions: [
-      { label: "フォロー済みにする", variant: "outline" },
-      { label: "コメントに返信", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
@@ -89,10 +85,6 @@ const PARTICIPANTS = [
     name: "鈴木 花子",
     lastUpdated: "2025/04/10 09:15",
     commentHighlights: ["コメント記入: Day1 / Day3"],
-    actions: [
-      { label: "Day2 の代替案を検討", variant: "outline" },
-      { label: "フォローを記録", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
@@ -105,10 +97,6 @@ const PARTICIPANTS = [
     name: "田中 一郎",
     lastUpdated: "2025/04/05 21:03",
     commentHighlights: ["コメント記入: Day2 / Day3"],
-    actions: [
-      { label: "未回答フォローを送信", variant: "outline" },
-      { label: "代替日程を提案", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
@@ -291,20 +279,6 @@ function ParticipantSummary({ participant, defaultOpen }) {
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2 border-t border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-600">
-        {participant.actions.map((action) => (
-          <button
-            key={action.label}
-            className={
-              action.variant === "outline"
-                ? "rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300"
-                : "rounded-lg bg-zinc-900 px-3 py-2 font-semibold text-white hover:bg-zinc-800"
-            }
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
     </details>
   );
 }
