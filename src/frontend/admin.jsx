@@ -115,7 +115,20 @@ const createCandidateFromVevent = (vevent) => {
   if (!uid) return null;
   const startDate = event.startDate;
   const zone = startDate && startDate.zone ? startDate.zone.tzid : null;
-  const tzid = zone || DEFAULT_TZID;
+  const schedulyTzid = event.component.getFirstPropertyValue("x-scheduly-tzid");
+  let tzid = zone || schedulyTzid || DEFAULT_TZID;
+  if (tzid && typeof tzid === "string") {
+    const normalized = tzid.trim();
+    if (normalized && normalized.toLowerCase() !== "floating") {
+      tzid = normalized;
+    } else if (schedulyTzid && typeof schedulyTzid === "string" && schedulyTzid.trim()) {
+      tzid = schedulyTzid.trim();
+    } else {
+      tzid = DEFAULT_TZID;
+    }
+  } else {
+    tzid = DEFAULT_TZID;
+  }
   const dtstampTime = event.component.getFirstPropertyValue("dtstamp");
   const dtstampIso = dtstampTime ? dtstampTime.toJSDate().toISOString() : createDtstampIso();
   return {
