@@ -432,20 +432,12 @@ function SchedulyMock() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
             <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
-            <p className="mt-2 text-sm text-zinc-600">現在編集中: {currentCandidate.summary}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
-              <span className="flex items-center gap-1">
-                <span role="img" aria-hidden="true">📍</span>
-                {currentCandidate.location}
-              </span>
-              <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
-              </span>
-            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-zinc-500">👤 匿名参加者</span>
+          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+              <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
+            </span>
+            <span>👤 匿名参加者</span>
             <a
               href="./user.html"
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
