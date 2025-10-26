@@ -304,7 +304,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               onExport();
             }}
           >
-            <span aria-hidden="true">📅</span> iCal (ICS)
+            <span aria-hidden="true">📅</span> ICS
           </button>
         </div>
       </summary>
@@ -592,7 +592,7 @@ function OrganizerApp() {
       const icsText = exportAllCandidatesToICal(candidates);
       const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
       downloadTextFile(filename, icsText);
-      popToast("全候補を iCal (ICS) でダウンロードしました（モック）");
+      popToast("全候補を ICS でダウンロードしました（モック）");
     } catch (error) {
       console.error("ICS bulk export error", error);
       popToast("全候補のICS生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));

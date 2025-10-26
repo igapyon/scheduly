@@ -19,7 +19,7 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - レガシーモックはブラウザで直接動かし、修正後はリロードで挙動を確認します。
 - Webpack 版は `npm run dev` でホットリロードしながら作業します。エントリポイントは管理者向け `src/frontend/admin.jsx`（`public/index.html`）、参加者回答一覧 `src/frontend/user.jsx`（`public/user.html`）、参加者回答編集 `src/frontend/user-edit.jsx`（`public/user-edit.html`）。
 - 画面の挙動が想定とズレたら、まず Console ログを確認し、必要なら `console.log` を一時的に追加して原因を突き止めます。解決後に整える方が近道です。
-- 参加者モックの `iCal (ICS)` ボタンは現状トーストを表示するだけのダミーです。本実装時に必要な導線として残しています。
+- 参加者モックの `ICS` ボタンは現状トーストを表示するだけのダミーです。本実装時に必要な導線として残しています。
 
 ## トラブルシューティングの習慣
 

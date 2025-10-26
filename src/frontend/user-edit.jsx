@@ -484,10 +484,10 @@ function SchedulyMock() {
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 opacity-70"
-                title="この候補の iCal ダウンロードはモックでは未実装です"
-                onClick={() => showToast("参加者向け iCal ダウンロードは未実装です（モック）")}
+                title="この候補の ICS ダウンロードはモックでは未実装です"
+                onClick={() => showToast("参加者向け ICS ダウンロードは未実装です（モック）")}
               >
-                <span aria-hidden="true">📅</span> iCal (ICS)
+                <span aria-hidden="true">📅</span> ICS
               </button>
             </div>
           </div>
