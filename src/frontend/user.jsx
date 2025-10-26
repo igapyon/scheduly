@@ -5,6 +5,15 @@ import sharedIcalUtils from "./shared/ical-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
 
+const ICS_LINE_BREAK = "\r\n";
+const PARTICIPANT_ICS_HEADER_LINES = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Scheduly//Participant//JA",
+  "CALSCALE:GREGORIAN",
+  "METHOD:PUBLISH"
+];
+
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   deadline: "2025/05/01 23:59",
@@ -13,6 +22,58 @@ const DASHBOARD_META = {
 };
 
 const logDebug = createLogger("user");
+
+const padNumber = (value) => String(value).padStart(2, "0");
+
+const formatDateTimeAsUtc = (value) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const year = date.getUTCFullYear();
+  const month = padNumber(date.getUTCMonth() + 1);
+  const day = padNumber(date.getUTCDate());
+  const hour = padNumber(date.getUTCHours());
+  const minute = padNumber(date.getUTCMinutes());
+  const second = padNumber(date.getUTCSeconds());
+  return `${year}${month}${day}T${hour}${minute}${second}Z`;
+};
+
+const escapeIcsText = (value) => {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+};
+
+const buildIcsFromSchedules = (schedules) => {
+  if (!Array.isArray(schedules) || !schedules.length) return "";
+  const lines = PARTICIPANT_ICS_HEADER_LINES.slice();
+  const sharedDtstamp = formatDateTimeAsUtc(new Date());
+
+  schedules.forEach((schedule, index) => {
+    if (!schedule || !schedule.uid) return;
+    const dtstartLine = formatDateTimeAsUtc(schedule.startsAt);
+    const dtendLine = formatDateTimeAsUtc(schedule.endsAt);
+    const statusText = schedule.status ? String(schedule.status).toUpperCase() : "";
+
+    lines.push("BEGIN:VEVENT");
+    lines.push("UID:" + escapeIcsText(schedule.uid));
+    if (sharedDtstamp) lines.push("DTSTAMP:" + sharedDtstamp);
+    if (dtstartLine) lines.push("DTSTART:" + dtstartLine);
+    if (dtendLine) lines.push("DTEND:" + dtendLine);
+    if (statusText) lines.push("STATUS:" + escapeIcsText(statusText));
+    lines.push("SUMMARY:" + escapeIcsText(schedule.label || schedule.uid));
+    lines.push("LOCATION:" + escapeIcsText(schedule.location || ""));
+    if (schedule.tzid) lines.push("X-SCHEDULY-TZID:" + escapeIcsText(schedule.tzid));
+    lines.push("SEQUENCE:" + String(index));
+    lines.push("END:VEVENT");
+  });
+
+  lines.push("END:VCALENDAR");
+  return lines.join(ICS_LINE_BREAK) + ICS_LINE_BREAK;
+};
 
 const formatScheduleRange = (startDate, endDate, tzid) => {
   if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) return "";
@@ -29,7 +90,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     id: "day1",
     counts: { o: 8, d: 3, x: 1 },
-    summaryText: "参加者の回答詳細（○ / △ / ×・コメント）を確認できます。上部フィルターに応じて表示が変わります。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "オフィス参加可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
@@ -40,7 +100,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
     id: "day2",
     counts: { o: 4, d: 5, x: 3 },
-    summaryText: "△ が多いため調整が必要そうです。参加者のコメントを確認し、代替案を検討します。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "d", comment: "オンラインなら可" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "開始時間を 19:00 にできれば ○" },
@@ -51,7 +110,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
     id: "day3",
     counts: { o: 6, d: 2, x: 4 },
-    summaryText: "参加者が二分している日程です。オンライン併用や別日の追加も検討できます。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
@@ -61,7 +119,6 @@ const SAMPLE_SCHEDULE_DETAILS = {
   "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
     id: "day4",
     counts: { o: 14, d: 1, x: 0 },
-    summaryText: "午前帯の予備日です。参加しやすい日程として追加しました。",
     responses: [
       { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "終日参加可能" },
       { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "午前は在宅参加になります" },
@@ -77,11 +134,6 @@ const PARTICIPANTS = [
     name: "佐藤 太郎",
     lastUpdated: "2025/04/12 17:42",
     commentHighlights: ["コメント記入: Day2"],
-    summary: "各候補に対する回答とコメントを日程順にまとめています。コメントを含む候補は上部のハイライトと連動します。",
-    actions: [
-      { label: "フォロー済みにする", variant: "outline" },
-      { label: "コメントに返信", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
@@ -94,11 +146,6 @@ const PARTICIPANTS = [
     name: "鈴木 花子",
     lastUpdated: "2025/04/10 09:15",
     commentHighlights: ["コメント記入: Day1 / Day3"],
-    summary: "平日夜は調整が必要との回答が多めです。Day2 の要望を反映すると参加しやすくなる可能性があります。",
-    actions: [
-      { label: "Day2 の代替案を検討", variant: "outline" },
-      { label: "フォローを記録", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
@@ -111,11 +158,6 @@ const PARTICIPANTS = [
     name: "田中 一郎",
     lastUpdated: "2025/04/05 21:03",
     commentHighlights: ["コメント記入: Day2 / Day3"],
-    summary: "平日日程の参加が難しいとのコメントが複数あり。予備日の回答が未入力のため、フォローが必要です。",
-    actions: [
-      { label: "未回答フォローを送信", variant: "outline" },
-      { label: "代替日程を提案", variant: "outline" }
-    ],
     responses: [
       { scheduleId: "day1", datetime: "Day1 2025/10/26 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
       { scheduleId: "day2", datetime: "Day2 2025/10/27 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
@@ -198,7 +240,7 @@ function ScheduleSummary({ schedule }) {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-emerald-100 px-3 font-semibold text-emerald-700">
             ○ {schedule.counts.o}
           </span>
@@ -210,7 +252,6 @@ function ScheduleSummary({ schedule }) {
           </span>
         </div>
       </summary>
-      <div className="border-t border-zinc-200 px-4 py-3 text-xs text-zinc-500">{schedule.summaryText}</div>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
         {schedule.responses.map((response) => (
           <li key={response.name} className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
@@ -279,7 +320,6 @@ function ParticipantSummary({ participant, defaultOpen }) {
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
-      <div className="border-t border-zinc-200 bg-white/90 px-4 py-3 text-xs text-zinc-600">{participant.summary}</div>
       <ul className="space-y-1 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
         {participant.responses.map((response) => (
           <li
@@ -300,20 +340,6 @@ function ParticipantSummary({ participant, defaultOpen }) {
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2 border-t border-zinc-200 bg-white px-4 py-3 text-xs text-zinc-600">
-        {participant.actions.map((action) => (
-          <button
-            key={action.label}
-            className={
-              action.variant === "outline"
-                ? "rounded-lg border border-zinc-200 px-3 py-2 font-semibold hover:border-zinc-300"
-                : "rounded-lg bg-zinc-900 px-3 py-2 font-semibold text-white hover:bg-zinc-800"
-            }
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
     </details>
   );
 }
@@ -329,7 +355,10 @@ function TabNavigation({ activeTab, onChange }) {
           }`}
           onClick={() => onChange("schedule")}
         >
-          日程ごと
+          <span className="inline-flex items-center justify-center gap-2">
+            <span aria-hidden="true">📅</span>
+            <span>日程ごと</span>
+          </span>
         </button>
         <button
           type="button"
@@ -338,7 +367,10 @@ function TabNavigation({ activeTab, onChange }) {
           }`}
           onClick={() => onChange("participant")}
         >
-          参加者ごと
+          <span className="inline-flex items-center justify-center gap-2">
+            <span aria-hidden="true">👤</span>
+            <span>参加者ごと</span>
+          </span>
         </button>
       </div>
     </nav>
@@ -350,6 +382,7 @@ function AdminResponsesApp() {
   const [schedules, setSchedules] = useState([]);
   const [schedulesLoading, setSchedulesLoading] = useState(true);
   const [schedulesError, setSchedulesError] = useState("");
+  const [icsSource, setIcsSource] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -396,7 +429,6 @@ function AdminResponsesApp() {
             startsAt: startDate ? startDate.toISOString() : null,
             endsAt: endDate ? endDate.toISOString() : null,
             counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
-            summaryText: details?.summaryText || "",
             responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
           });
         }
@@ -409,6 +441,7 @@ function AdminResponsesApp() {
         logDebug("schedules after conversion", converted);
         if (!cancelled) {
           setSchedules(converted);
+          setIcsSource(text);
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -417,6 +450,7 @@ function AdminResponsesApp() {
           setSchedules([]);
           setSchedulesError(error instanceof Error ? error.message : String(error));
           logDebug("load schedules error", error);
+          setIcsSource("");
         }
       } finally {
         if (!cancelled) {
@@ -432,45 +466,43 @@ function AdminResponsesApp() {
     };
   }, []);
 
+  const downloadIcsFile = (filename, contents) => {
+    if (!contents) return;
+    const blob = new Blob([contents], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    window.setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  };
+
+  const handleDownloadAllIcs = () => {
+    const source = icsSource || buildIcsFromSchedules(schedules);
+    if (!source) {
+      logDebug("skip ICS download: no data");
+      return;
+    }
+    const filename = `scheduly-schedules-${new Date().toISOString().split("T")[0]}.ics`;
+    downloadIcsFile(filename, source);
+  };
+
+  const hasIcsData = Boolean((icsSource && icsSource.trim()) || schedules.length);
+
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
         <h1 className="mt-1 text-2xl font-bold">Scheduly 参加者</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          プロジェクト「{DASHBOARD_META.projectName}」の回答状況を参加者と管理者が共有するモックです。実データはまだ連携していません。
+          プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
         </p>
       </header>
-
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
-          <label className="text-xs font-semibold text-zinc-500">
-            参加者フィルター
-            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
-              <option>全参加者（{DASHBOARD_META.participantCount} 名）</option>
-              <option>未回答のみ</option>
-              <option>コメントあり</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-zinc-500">
-            回答ステータス
-            <select className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm">
-              <option>○ / △ / ×</option>
-              <option>○ のみ表示</option>
-              <option>△ をハイライト</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-zinc-500">
-            キーワード検索
-            <input type="search" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" placeholder="参加者名・コメントを検索" />
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-          <span>回答締切: {DASHBOARD_META.deadline}</span>
-          <span>参加者: {DASHBOARD_META.participantCount} 名</span>
-          <span>最新更新: {DASHBOARD_META.lastUpdated}</span>
-        </div>
-      </section>
 
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
@@ -499,26 +531,16 @@ function AdminResponsesApp() {
       {activeTab === "participant" && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
-          <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            <div className="border-b border-zinc-200 px-4 py-3">
-              <div className="text-sm font-semibold text-zinc-800">参加者状況のスナップショット</div>
-              <p className="mt-1 text-xs text-zinc-500">
-                直近の回答や未回答者のフォロー状況を把握できます。フィルターと連動し、必要な参加者だけを抽出します。
-              </p>
-            </div>
-            <div className="space-y-3 px-4 py-4">
-              {PARTICIPANTS.map((participant, index) => (
-                <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
-              ))}
-            </div>
+          <div className="space-y-3">
+            {PARTICIPANTS.map((participant, index) => (
+              <ParticipantSummary key={participant.id} participant={participant} defaultOpen={index === 0} />
+            ))}
           </div>
 
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
             <p className="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>未回答者を抽出して個別フォローのメモを残すなど、管理タスク整理に活用します。</li>
-              <li>将来的には参加者カードから回答修正や再送リマインダーを起動できるようにします。</li>
-              <li>参加者 × 候補のマトリクス表示と連動し、詳細ドリルダウンへ誘導します。</li>
+              <li>未回答者を抽出して個別フォローしましょう。</li>
             </ul>
           </div>
         </section>
@@ -528,6 +550,14 @@ function AdminResponsesApp() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-emerald-600 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleDownloadAllIcs}
+              disabled={!hasIcsData}
+            >
+              日程をICSに一括エクスポート
+            </button>
             <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
               全回答を CSV でダウンロード
             </button>
@@ -536,16 +566,6 @@ function AdminResponsesApp() {
             </button>
           </div>
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-dashed border-zinc-300 bg-white/80 p-4 text-sm text-zinc-500">
-        <h2 className="font-semibold text-zinc-600">実装メモ</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>本画面はレイアウト確認用のモックです。データは固定のダミーです。</li>
-          <li>サーバー連携時は Project / Slot / Participant / Response の API と接続する想定です。</li>
-          <li>モバイルでは日別カード + ドリルダウンを基本にし、PC ではマトリクス表示へ切り替える予定です。</li>
-          <li>CSV 出力は日別ではなく、上記の全体アクションから提供する想定です。</li>
-        </ul>
       </section>
     </div>
   );

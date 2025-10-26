@@ -115,7 +115,20 @@ const createCandidateFromVevent = (vevent) => {
   if (!uid) return null;
   const startDate = event.startDate;
   const zone = startDate && startDate.zone ? startDate.zone.tzid : null;
-  const tzid = zone || DEFAULT_TZID;
+  const schedulyTzid = event.component.getFirstPropertyValue("x-scheduly-tzid");
+  let tzid = zone || schedulyTzid || DEFAULT_TZID;
+  if (tzid && typeof tzid === "string") {
+    const normalized = tzid.trim();
+    if (normalized && normalized.toLowerCase() !== "floating") {
+      tzid = normalized;
+    } else if (schedulyTzid && typeof schedulyTzid === "string" && schedulyTzid.trim()) {
+      tzid = schedulyTzid.trim();
+    } else {
+      tzid = DEFAULT_TZID;
+    }
+  } else {
+    tzid = DEFAULT_TZID;
+  }
   const dtstampTime = event.component.getFirstPropertyValue("dtstamp");
   const dtstampIso = dtstampTime ? dtstampTime.toJSDate().toISOString() : createDtstampIso();
   return {
@@ -242,10 +255,10 @@ const exportCandidateToICal = (candidate) => {
 
 function SectionCard({ title, description, action, children }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-800">{title}</h2>
+          <h2 className="text-sm font-semibold text-zinc-700">{title}</h2>
           {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
         </div>
         {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
@@ -281,7 +294,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
       >
         <div className="flex flex-col gap-1">
           <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">日程 {index + 1}</span>
-          <span className="text-base font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
+          <span className="text-sm font-semibold text-zinc-800">{value.summary || "タイトル未設定"}</span>
           <span className="text-xs text-zinc-500">{displayMeta}</span>
           <span className="text-xs text-zinc-500">TZID: {value.tzid || DEFAULT_TZID} ／ STATUS: {value.status}</span>
         </div>
@@ -304,7 +317,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               onExport();
             }}
           >
-            <span aria-hidden="true">📅</span> iCal (ICS)
+            <span aria-hidden="true">📅</span> ICS
           </button>
         </div>
       </summary>
@@ -412,7 +425,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 id={dialogTitleId} className="text-base font-semibold text-zinc-800">ICS詳細</h3>
+        <h3 id={dialogTitleId} className="text-sm font-semibold text-zinc-800">ICS詳細</h3>
               <button className="text-xs text-zinc-500" onClick={() => setMetaOpen(false)}>閉じる</button>
             </div>
             <CandidateMetaTable candidate={value} />
@@ -592,7 +605,7 @@ function OrganizerApp() {
       const icsText = exportAllCandidatesToICal(candidates);
       const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
       downloadTextFile(filename, icsText);
-      popToast("全候補を iCal (ICS) でダウンロードしました（モック）");
+      popToast("全候補を ICS でダウンロードしました（モック）");
     } catch (error) {
       console.error("ICS bulk export error", error);
       popToast("全候補のICS生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
@@ -780,8 +793,12 @@ function OrganizerApp() {
     popToast("編集URL／閲覧URLを発行しました（モック）");
   };
 
-  const mockDownloadJson = () => {
-    popToast("出欠表を JSON でダウンロードしました（モック）");
+  const mockExportProjectInfo = () => {
+    popToast("プロジェクト情報をエクスポートしました（モック）");
+  };
+
+  const mockImportProjectInfo = () => {
+    popToast("プロジェクト情報をインポートしました（モック）");
   };
 
   const handleSave = () => {
@@ -818,14 +835,14 @@ function OrganizerApp() {
   }, [summary, description, responseOptions, candidates]);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-5 bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-6">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 text-3xl font-bold text-zinc-900">Scheduly 管理</h1>
+            <h1 className="mt-1 text-2xl font-bold text-zinc-900">Scheduly 管理</h1>
             <p className="mt-2 text-sm text-zinc-600">
-              日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS の取り込み・書き出しを行ってください。
+              日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -839,12 +856,12 @@ function OrganizerApp() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-5 lg:grid-cols-[2fr,1fr]">
+      <div className="grid flex-1 gap-5 xl:grid-cols-[2fr,1fr]">
 
         <main className="space-y-5">
           <SectionCard
             title="プロジェクト情報"
-            description="参加者に共有される基本情報を編集します。"
+            description="プロジェクトの基本情報を編集します。"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -857,7 +874,7 @@ function OrganizerApp() {
               />
             </label>
             <label className="block">
-              <span className="text-xs font-semibold text-zinc-500">説明文</span>
+              <span className="text-xs font-semibold text-zinc-500">説明</span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -870,7 +887,7 @@ function OrganizerApp() {
 
           <SectionCard
             title="日程"
-            description="候補日や確定日をまとめて管理できます。カードを開いて詳細を編集してください。"
+            description="候補日や確定日を管理できます。カードを開いて詳細を編集してください。"
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -885,7 +902,7 @@ function OrganizerApp() {
                   className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
                   onClick={() => importInputRef.current?.click()}
                 >
-                  ICSから追加
+                  日程をICSからインポート
                 </button>
                 <button
                   type="button"
@@ -893,7 +910,7 @@ function OrganizerApp() {
                   onClick={handleExportAllCandidates}
                   disabled={!candidates.length}
                 >
-                  ICSを一括ダウンロード
+                  日程をICSに一括エクスポート
                 </button>
                 <input
                   ref={importInputRef}
@@ -947,7 +964,7 @@ function OrganizerApp() {
               items={[
                 { key: "編集用URL（管理者）", value: urls.admin },
                 { key: "閲覧用URL（参加者）", value: urls.guest },
-                { key: "最終更新", value: "2024/05/01 10:00 更新済み（モック）" }
+                { key: "最終更新", value: "2024/05/01 10:00 更新済み" }
               ]}
             />
             <p className="text-xs text-zinc-500">
@@ -955,32 +972,37 @@ function OrganizerApp() {
             </p>
           </SectionCard>
 
-          <SectionCard
-            title="管理アクション"
-            action={
+          <SectionCard title="管理アクション">
+            <div className="grid gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-rose-500 hover:border-rose-400"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                onClick={mockExportProjectInfo}
+              >
+                プロジェクトをエクスポート
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
+                onClick={mockImportProjectInfo}
+              >
+                プロジェクトをインポート
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-rose-500 hover:border-rose-400"
                 onClick={() => popToast("プロジェクトを削除しました（モック）")}
               >
-                プロジェクト削除（モック）
+                プロジェクトを削除
               </button>
-            }
-          >
-            <button
-              type="button"
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
-              onClick={mockDownloadJson}
-            >
-              出欠表を JSON でダウンロード（モック）
-            </button>
+            </div>
           </SectionCard>
         </aside>
       </div>
 
       <footer className="sticky bottom-0 z-30 border-t border-zinc-200 bg-white/90 shadow-[0_-4px_16px_rgba(24,24,27,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-          <div>保存すると参加者画面で最新の内容が反映されます（モック）</div>
+          <div>保存すると参加者画面にも最新の内容を反映します</div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -997,7 +1019,7 @@ function OrganizerApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
           <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-zinc-800">
+                <h3 className="text-sm font-semibold text-zinc-800">
                   ICS 取り込みプレビュー（{importPreview.fileName}）
                 </h3>
                 <button

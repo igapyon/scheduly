@@ -127,14 +127,21 @@ const formatIcalDateTimeWithZone = (iso, tz) => {
   }).format(new Date(iso));
 };
 
-const StatRow = ({ candidate, maxO }) => {
+const StatRow = ({ candidate, maxO, onOpenDetail }) => {
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
     <div className="mt-3 flex items-center justify-between text-sm">
-      <div className="flex gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <span className="inline-flex items-center gap-1"><span className="text-lg text-emerald-500">○</span>{candidate.tally.o}</span>
         <span className="inline-flex items-center gap-1"><span className="text-lg text-amber-500">△</span>{candidate.tally.d}</span>
         <span className="inline-flex items-center gap-1"><span className="text-lg text-rose-500">×</span>{candidate.tally.x}</span>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+          onClick={onOpenDetail}
+        >
+          <span aria-hidden="true">ℹ</span> 詳細を表示
+        </button>
       </div>
       <span className="text-xs font-semibold text-emerald-600">{star}</span>
     </div>
@@ -198,6 +205,7 @@ function SchedulyMock() {
   const [detailCandidateId, setDetailCandidateId] = useState(null);
 
   const itemRefs = useRef({});
+  const commentTextareaRef = useRef(null);
   const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
   const startX = useRef(null);
   const pressTimer = useRef(null);
@@ -291,6 +299,9 @@ function SchedulyMock() {
   const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
   const currentCandidate = candidates.length ? candidates[safeIndex] : null;
   const mark = currentCandidate ? (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null : null;
+  const currentComment = currentCandidate
+    ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
+    : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
   const completeCount = useMemo(() => {
@@ -374,6 +385,19 @@ function SchedulyMock() {
     startX.current = null;
   };
 
+  useEffect(() => {
+    if (!commentTextareaRef.current) return;
+    const el = commentTextareaRef.current;
+    const computed = el.scrollHeight || parseInt(window.getComputedStyle(el).lineHeight || "0", 10) || 0;
+    const baseHeight = el.dataset.baseHeight ? Number(el.dataset.baseHeight) : computed;
+    if (!el.dataset.baseHeight) {
+      el.dataset.baseHeight = String(baseHeight);
+    }
+    el.style.height = "auto";
+    const minHeight = el.dataset.baseHeight ? Number(el.dataset.baseHeight) : 0;
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
+  }, [currentCandidate ? currentCandidate.id : null, currentComment]);
+
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(""), 1800);
@@ -432,20 +456,13 @@ function SchedulyMock() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
             <h1 className="mt-1 text-2xl font-bold">Scheduly 回答編集</h1>
-            <p className="mt-2 text-sm text-zinc-600">現在編集中: {currentCandidate.summary}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
-              <span className="flex items-center gap-1">
-                <span role="img" aria-hidden="true">📍</span>
-                {currentCandidate.location}
-              </span>
-              <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
-              </span>
-            </div>
+            <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-zinc-500">👤 匿名参加者</span>
+          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+              <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
+            </span>
+            <span>👤 匿名参加者</span>
             <a
               href="./user.html"
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
@@ -463,11 +480,11 @@ function SchedulyMock() {
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(currentCandidate.status)}`}>
                 {formatIcalStatusLabel(currentCandidate.status)}
               </span>
-              <span className="text-[11px] text-gray-400">{currentCandidate.tzid}</span>
             </div>
             <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
-            <div className="text-sm text-gray-600">
-              {formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
+              <span className="text-xs text-gray-400">{currentCandidate.tzid}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span role="img" aria-hidden="true">📍</span>
@@ -476,18 +493,11 @@ function SchedulyMock() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-                onClick={() => openDetail(currentCandidate.id)}
-              >
-                <span aria-hidden="true">ℹ</span> 詳細を表示
-              </button>
-              <button
-                type="button"
                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 opacity-70"
-                title="この候補の iCal ダウンロードはモックでは未実装です"
-                onClick={() => showToast("参加者向け iCal ダウンロードは未実装です（モック）")}
+                title="この候補の ICS ダウンロードはモックでは未実装です"
+                onClick={() => showToast("参加者向け ICS ダウンロードは未実装です（モック）")}
               >
-                <span aria-hidden="true">📅</span> iCal (ICS)
+                <span aria-hidden="true">📅</span> ICS
               </button>
             </div>
           </div>
@@ -515,16 +525,22 @@ function SchedulyMock() {
             })}
           </div>
 
-          <StatRow candidate={currentCandidate} maxO={maxTallyO} />
+          <StatRow
+            candidate={currentCandidate}
+            maxO={maxTallyO}
+            onOpenDetail={() => openDetail(currentCandidate.id)}
+          />
 
           <label className="block">
             <span className="text-xs text-gray-500">コメント（任意）</span>
             <textarea
-              className="mt-1 w-full rounded-xl border p-2 text-sm"
-              rows={3}
+              ref={commentTextareaRef}
+              className="mt-1 w-full resize-none rounded-xl border px-2 py-2 text-sm leading-relaxed"
+              rows={1}
               placeholder="この日はテストの可能性が…"
-              value={(answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""}
+              value={currentComment}
               onChange={(e) => setComment(e.target.value)}
+              style={{ overflow: "hidden" }}
             />
           </label>
 
@@ -645,37 +661,6 @@ function SchedulyMock() {
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />
-            <hr className="my-3 border-gray-200" />
-            <section className="space-y-2 text-xs text-gray-600">
-              <p className="text-sm font-semibold text-gray-800">{detailCandidate.summary}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}>
-                  {formatIcalStatusLabel(detailCandidate.status)}
-                </span>
-                <span className="text-[11px] text-gray-400">{detailCandidate.tzid}</span>
-              </div>
-              <p>{formatCandidateDateLabel(detailCandidate)}・{formatCandidateTimeRange(detailCandidate)}</p>
-              <p>📍 {detailCandidate.location}</p>
-              <dl className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-[11px] text-gray-600">
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">UID</dt>
-                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailCandidate.uid}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">SEQUENCE</dt>
-                  <dd className="flex-1 text-gray-700">{detailCandidate.sequence}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">DTSTAMP</dt>
-                  <dd className="flex-1">
-                    <div className="break-all font-mono text-gray-700">{detailCandidate.dtstamp}</div>
-                    <div className="text-[10px] text-gray-400">
-                      {formatIcalDateTimeWithZone(detailCandidate.dtstamp, detailCandidate.tzid)} （{detailCandidate.tzid}）
-                    </div>
-                  </dd>
-                </div>
-              </dl>
-            </section>
           </>
         )}
       </Modal>
