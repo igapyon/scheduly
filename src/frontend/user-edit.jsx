@@ -8,6 +8,8 @@ const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sa
 
 const logDebug = createLogger("user-edit");
 
+const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
+
 const SAMPLE_CANDIDATE_METADATA = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
     legacyId: "2025-10-26",
@@ -258,6 +260,7 @@ function SchedulyMock() {
             sequence: Number.isFinite(sequenceValue) ? sequenceValue : 0,
             dtstamp: dtstampIso,
             location: event.location || "",
+            description: event.description || "",
             tally,
             responses,
             rawIcs: vevent.toJSON()
@@ -449,6 +452,7 @@ function SchedulyMock() {
           <p className="mt-2 text-sm text-zinc-600">
             {loading ? "候補を読み込んでいます…" : loadError ? `候補を読み込めませんでした: ${loadError}` : "候補が存在しません。"}
           </p>
+          <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
         </header>
       </div>
     );
@@ -465,6 +469,7 @@ function SchedulyMock() {
               <span>Scheduly 回答編集</span>
             </h1>
             <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
+            <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-zinc-500">
             <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
@@ -496,6 +501,8 @@ function SchedulyMock() {
               dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-gray-600"
               timezone={currentCandidate.tzid}
               timezoneClassName="text-xs text-gray-400"
+              description={currentCandidate.description}
+              descriptionClassName="text-xs text-gray-500"
               location={currentCandidate.location}
               locationClassName="flex items-center gap-2 text-xs text-gray-500"
               showLocationIcon
@@ -670,6 +677,22 @@ function SchedulyMock() {
       >
         {detailCandidate && (
           <>
+            <EventMeta
+              summary={detailCandidate.summary}
+              summaryClassName="text-sm font-semibold text-gray-800"
+              dateTime={`${formatCandidateDateLabel(detailCandidate)}・${formatCandidateTimeRange(detailCandidate)}`}
+              dateTimeClassName="text-xs text-gray-600"
+              timezone={detailCandidate.tzid}
+              timezoneClassName="text-[11px] text-gray-400"
+              description={detailCandidate.description}
+              descriptionClassName="text-xs text-gray-500"
+              location={detailCandidate.location}
+              locationClassName="flex items-center gap-1 text-xs text-gray-500"
+              showLocationIcon
+              statusText={formatIcalStatusLabel(detailCandidate.status)}
+              statusClassName={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}
+              statusPrefix=""
+            />
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />

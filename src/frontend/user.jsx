@@ -17,6 +17,7 @@ const PARTICIPANT_ICS_HEADER_LINES = [
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
+  description: "秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。",
   deadline: "2025/05/01 23:59",
   participantCount: 12,
   lastUpdated: "2025/04/12 17:45"
@@ -241,6 +242,8 @@ function ScheduleSummary({ schedule }) {
             dateTimeClassName="flex flex-wrap items-center gap-2 text-sm text-zinc-600"
             timezone={schedule.tzid}
             timezoneClassName="text-xs text-zinc-400"
+            description={schedule.description}
+            descriptionClassName="text-xs text-zinc-500"
             location={schedule.location}
             locationClassName="flex items-center gap-2 text-xs text-zinc-500"
             showLocationIcon
@@ -435,6 +438,7 @@ function AdminResponsesApp() {
             startsAt: startDate ? startDate.toISOString() : null,
             endsAt: endDate ? endDate.toISOString() : null,
             counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
+            description: event.description || "",
             responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
           });
         }
@@ -511,6 +515,9 @@ function AdminResponsesApp() {
         <p className="mt-2 text-sm text-zinc-600">
           プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
         </p>
+        {DASHBOARD_META.description ? (
+          <p className="mt-1 text-xs text-zinc-500">{DASHBOARD_META.description}</p>
+        ) : null}
       </header>
 
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />

@@ -7,6 +7,8 @@ function EventMeta({
   dateTimeClassName = "flex flex-wrap items-center gap-2 text-sm text-zinc-600",
   timezone,
   timezoneClassName = "text-xs text-zinc-400",
+  description,
+  descriptionClassName = "text-xs text-zinc-500",
   location,
   locationClassName = "flex flex-wrap items-center gap-2 text-xs text-zinc-500",
   showLocationIcon = false,
@@ -24,6 +26,7 @@ function EventMeta({
           {timezone ? <span className={timezoneClassName}>{timezone}</span> : null}
         </div>
       ) : null}
+      {description ? <div className={descriptionClassName}>{description}</div> : null}
       {(location || statusText) ? (
         <div className={locationClassName}>
           {location ? (
