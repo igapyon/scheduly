@@ -645,37 +645,6 @@ function SchedulyMock() {
             <ParticipantList label="○ 出席" color="text-emerald-600" list={participantsFor(detailCandidate, "o")} />
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />
-            <hr className="my-3 border-gray-200" />
-            <section className="space-y-2 text-xs text-gray-600">
-              <p className="text-sm font-semibold text-gray-800">{detailCandidate.summary}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(detailCandidate.status)}`}>
-                  {formatIcalStatusLabel(detailCandidate.status)}
-                </span>
-                <span className="text-[11px] text-gray-400">{detailCandidate.tzid}</span>
-              </div>
-              <p>{formatCandidateDateLabel(detailCandidate)}・{formatCandidateTimeRange(detailCandidate)}</p>
-              <p>📍 {detailCandidate.location}</p>
-              <dl className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-[11px] text-gray-600">
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">UID</dt>
-                  <dd className="flex-1 break-all font-mono text-[11px] text-gray-700">{detailCandidate.uid}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">SEQUENCE</dt>
-                  <dd className="flex-1 text-gray-700">{detailCandidate.sequence}</dd>
-                </div>
-                <div className="flex items-start gap-3">
-                  <dt className="w-20 font-semibold text-gray-500">DTSTAMP</dt>
-                  <dd className="flex-1">
-                    <div className="break-all font-mono text-gray-700">{detailCandidate.dtstamp}</div>
-                    <div className="text-[10px] text-gray-400">
-                      {formatIcalDateTimeWithZone(detailCandidate.dtstamp, detailCandidate.tzid)} （{detailCandidate.tzid}）
-                    </div>
-                  </dd>
-                </div>
-              </dl>
-            </section>
           </>
         )}
       </Modal>
