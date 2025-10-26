@@ -479,11 +479,11 @@ function SchedulyMock() {
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(currentCandidate.status)}`}>
                 {formatIcalStatusLabel(currentCandidate.status)}
               </span>
-              <span className="text-[11px] text-gray-400">{currentCandidate.tzid}</span>
             </div>
             <div className="text-2xl font-bold tracking-wide">{currentCandidate.summary}</div>
-            <div className="text-sm text-gray-600">
-              {formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+              <span>{formatCandidateDateLabel(currentCandidate)}・{formatCandidateTimeRange(currentCandidate)}</span>
+              <span className="text-xs text-gray-400">{currentCandidate.tzid}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span role="img" aria-hidden="true">📍</span>
