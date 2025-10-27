@@ -64,3 +64,4 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - `responseService.upsert` の結果を使って `tallyService.recalculate` を反映するホットリロードループを `user-edit.jsx` から組み込み、○△× 更新とコメント保存がリアルタイムで一覧に反映されるよう整える。
 - 参加者側 (`user.jsx` / `user-edit.jsx`) でも `projectStore` と `scheduleService` を利用して候補データを取得し、管理画面との表示差分をなくす（サマリー表示と回答編集の両方）。
 - ICS インポートプレビューから選択した候補のみをストアへ適用できるようにし、未選択候補のスキップ理由を含めたログ／トースト表示を整える。
+- TODO: ICS インポート時にタイムゾーンが UTC 固定になる問題を解消し、デフォルト `Asia/Tokyo` を適用できるようにする。

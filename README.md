@@ -17,6 +17,9 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 - [docs/DEVELOPER_NOTES.md](docs/DEVELOPER_NOTES.md): 作業メモと TODO の整理
 - [docs/SERVER_INTEGRATION.md](docs/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
 - [docs/DISCLAIMER.md](docs/DISCLAIMER.md): 免責事項と利用時の注意点
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): コントリビューション手引き
+- [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md): コントリビューター一覧
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): 変更履歴のメモ
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
