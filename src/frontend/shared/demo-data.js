@@ -1,13 +1,13 @@
 const sharedIcalUtils = require("./ical-utils");
 const scheduleService = require("../services/schedule-service");
 const participantService = require("../services/participant-service");
+const responseService = require("../services/response-service");
 const projectStore = require("../store/project-store");
 
 const { waitForIcal, ensureICAL, getSampleIcsUrl, createLogger } = sharedIcalUtils;
 
 const logDebug = createLogger("demo-data");
 
-// Map VCALENDAR UID to a stable alias used in sample datasets.
 const SAMPLE_CANDIDATE_ALIAS_BY_UID = {
   "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": "day1",
   "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": "day2",
@@ -50,12 +50,10 @@ const SAMPLE_RESPONSES = [
   { participantId: "sato", candidateAlias: "day2", mark: "d", comment: "オンラインなら参加可能" },
   { participantId: "sato", candidateAlias: "day3", mark: "o", comment: "" },
   { participantId: "sato", candidateAlias: "day4", mark: "o", comment: "終日参加可能" },
-
   { participantId: "suzuki", candidateAlias: "day1", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
   { participantId: "suzuki", candidateAlias: "day2", mark: "x", comment: "開始時間を 19:00 にできれば参加可" },
   { participantId: "suzuki", candidateAlias: "day3", mark: "o", comment: "20:00 までなら参加可" },
   { participantId: "suzuki", candidateAlias: "day4", mark: "o", comment: "午前は在宅参加になります" },
-
   { participantId: "tanaka", candidateAlias: "day1", mark: "o", comment: "自家用車で参加予定" },
   { participantId: "tanaka", candidateAlias: "day2", mark: "x", comment: "平日は別件の会議があり難しい" },
   { participantId: "tanaka", candidateAlias: "day3", mark: "x", comment: "他プロジェクトとバッティング" },
@@ -64,57 +62,27 @@ const SAMPLE_RESPONSES = [
 
 const inflight = new Map();
 
-const buildAliasToCandidateMap = (projectId) => {
+const buildAliasMap = (projectId) => {
   const snapshot = projectStore.getProjectStateSnapshot(projectId);
   const aliasMap = new Map();
   (snapshot.candidates || []).forEach((candidate) => {
     if (!candidate || !candidate.uid) return;
     const alias = SAMPLE_CANDIDATE_ALIAS_BY_UID[candidate.uid];
-    if (!alias) return;
-    aliasMap.set(alias, candidate);
+    if (alias) aliasMap.set(alias, candidate);
   });
   return aliasMap;
 };
 
-const seedParticipantsIfNeeded = (projectId) => {
-  const existing = projectStore.getParticipants(projectId);
-  if (existing && existing.length) return;
-  SAMPLE_PARTICIPANTS.forEach((participant) => {
-    projectStore.upsertParticipant(projectId, { ...participant });
-  });
-  logDebug("participants seeded", SAMPLE_PARTICIPANTS.length);
-};
-
-const seedResponsesIfNeeded = (projectId, aliasMap) => {
-  const existing = projectStore.getResponses(projectId);
-  if (existing && existing.length) return;
-  const payload = [];
-  SAMPLE_RESPONSES.forEach((item) => {
-    const candidate = aliasMap.get(item.candidateAlias);
-    if (!candidate) return;
-    payload.push({
-      id: `${item.participantId}::${candidate.id}`,
-      participantId: item.participantId,
-      candidateId: candidate.id,
-      mark: item.mark,
-      comment: item.comment,
-      createdAt: candidate.dtstamp || new Date().toISOString(),
-      updatedAt: candidate.dtstamp || new Date().toISOString()
-    });
-  });
-  if (payload.length) {
-    projectStore.replaceResponses(projectId, payload);
-  }
-  logDebug("responses seeded", payload.length);
-};
-
 const seedCandidatesIfNeeded = async (projectId) => {
   const snapshot = projectStore.getProjectStateSnapshot(projectId);
-  if (snapshot.candidates && snapshot.candidates.length) return;
+  if (snapshot.candidates && snapshot.candidates.length) {
+    logDebug("candidates already seeded", projectId);
+    return;
+  }
 
   await waitForIcal();
   const icsUrl = getSampleIcsUrl();
-  logDebug("fetching ICS", icsUrl);
+  logDebug("fetching sample ICS", { projectId, icsUrl });
   const response = await fetch(icsUrl, { cache: "no-cache" });
   if (!response.ok) {
     throw new Error(`Failed to fetch sample ICS: ${response.status}`);
@@ -124,33 +92,66 @@ const seedCandidatesIfNeeded = async (projectId) => {
   const parsed = ICAL.parse(text);
   const component = new ICAL.Component(parsed);
   const vevents = component.getAllSubcomponents("vevent") || [];
-  const imported = [];
-  for (let i = 0; i < vevents.length; i += 1) {
-    const candidate = scheduleService.createCandidateFromVevent(vevents[i]);
-    if (candidate) {
-      imported.push(candidate);
-    }
-  }
-  if (!imported.length) {
-    throw new Error("No VEVENT entries found in sample ICS");
-  }
-  scheduleService.replaceCandidatesFromImport(projectId, imported, text);
-  logDebug("candidates seeded", imported.length);
+  if (!vevents.length) throw new Error("No VEVENT entries in sample ICS");
+
+  const candidates = [];
+  vevents.forEach((vevent) => {
+    const candidate = scheduleService.createCandidateFromVevent(vevent);
+    if (candidate) candidates.push(candidate);
+  });
+  if (!candidates.length) throw new Error("Failed to map VEVENT entries to candidates");
+
+  scheduleService.replaceCandidatesFromImport(projectId, candidates, text);
+  logDebug("seeded candidates", { projectId, count: candidates.length });
 };
 
-const ensureDemoProjectData = (projectId) => {
-  if (inflight.has(projectId)) {
-    return inflight.get(projectId);
+const seedParticipantsIfNeeded = (projectId) => {
+  const existing = projectStore.getParticipants(projectId);
+  if (existing && existing.length) {
+    logDebug("participants already seeded", { projectId, count: existing.length });
+    return existing;
   }
+  const seeded = SAMPLE_PARTICIPANTS.map((participant) =>
+    participantService.addParticipant(projectId, participant)
+  );
+  logDebug("seeded participants", { projectId, count: seeded.length });
+  return seeded;
+};
+
+const seedResponsesIfNeeded = (projectId, aliasMap) => {
+  const existing = projectStore.getResponses(projectId);
+  if (existing && existing.length) {
+    logDebug("responses already seeded", { projectId, count: existing.length });
+    return existing;
+  }
+  const imported = [];
+  SAMPLE_RESPONSES.forEach((item) => {
+    const candidate = aliasMap.get(item.candidateAlias);
+    if (!candidate) return;
+    const response = responseService.upsertResponse(projectId, {
+      participantId: item.participantId,
+      candidateId: candidate.id,
+      mark: item.mark,
+      comment: item.comment || ""
+    });
+    imported.push(response);
+  });
+  logDebug("seeded responses", { projectId, count: imported.length });
+  return imported;
+};
+
+const ensureDemoProjectData = (projectId = projectStore.getDefaultProjectId()) => {
+  if (inflight.has(projectId)) return inflight.get(projectId);
 
   const promise = (async () => {
     await seedCandidatesIfNeeded(projectId);
-    const aliasMap = buildAliasToCandidateMap(projectId);
+    const aliasMap = buildAliasMap(projectId);
     seedParticipantsIfNeeded(projectId);
     seedResponsesIfNeeded(projectId, aliasMap);
+    return projectStore.getProjectStateSnapshot(projectId);
   })()
     .catch((error) => {
-      logDebug("demo data seeding failed", error);
+      logDebug("failed to seed demo data", { projectId, error });
       throw error;
     })
     .finally(() => {
@@ -163,7 +164,7 @@ const ensureDemoProjectData = (projectId) => {
 
 module.exports = {
   ensureDemoProjectData,
+  SAMPLE_CANDIDATE_ALIAS_BY_UID,
   SAMPLE_PARTICIPANTS,
-  SAMPLE_RESPONSES,
-  SAMPLE_CANDIDATE_ALIAS_BY_UID
+  SAMPLE_RESPONSES
 };
