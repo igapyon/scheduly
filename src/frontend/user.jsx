@@ -528,17 +528,31 @@ function AdminResponsesApp() {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
-        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
-          <span aria-hidden="true">📋</span>
-          <span>Scheduly 参加者</span>
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
-        </p>
-        {DASHBOARD_META.description ? (
-          <p className="mt-1 text-xs text-zinc-500">{DASHBOARD_META.description}</p>
-        ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
+              <span aria-hidden="true">📋</span>
+              <span>Scheduly 参加者</span>
+            </h1>
+            <p className="mt-2 text-sm text-zinc-600">
+              プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
+            </p>
+            {DASHBOARD_META.description ? (
+              <p className="mt-1 text-xs text-zinc-500">{DASHBOARD_META.description}</p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+              onClick={() => logDebug("add participant button clicked")}
+            >
+              <span aria-hidden="true">＋</span>
+              <span>参加者を新規登録</span>
+            </button>
+          </div>
+        </div>
       </header>
 
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
