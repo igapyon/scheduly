@@ -2,6 +2,9 @@
 
 Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)、データ構造は [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、フローと内部 API の草案は [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md) を参照してください。
 
+> ⚠ **匿名アクセスの注意**  
+> 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
+
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
 | React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
