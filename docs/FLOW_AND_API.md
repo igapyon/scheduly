@@ -8,13 +8,13 @@ React 版 Scheduly をオンメモリ構成で動かす際のユーザーフロ�
 管理者 (admin.jsx)
   ├─ プロジェクト初期化 → ProjectState.load()
   ├─ 候補編集・ICS入出力 → scheduleService.*
-  └─ 共有URL生成 → shareService.generateTokens()
+  └─ 管理者 URL 発行 → shareService.generateAdminToken()
 
 参加者一覧 (user.jsx)
-  └─ ProjectState を読み取り → read facade (readonly)
+  └─ 参加者トークンで ProjectState を読み取り → read facade (readonly)
 
 参加者回答編集 (user-edit.jsx)
-  ├─ ProjectState を読み取り
+  ├─ 同じ参加者トークンで ProjectState を読み取り
   └─ 回答を登録 → responseService.upsert()
 
 共通: ProjectState を in-memory store (スコープ内の JS オブジェクト) に保持
@@ -31,18 +31,20 @@ React 版 Scheduly をオンメモリ構成で動かす際のユーザーフロ�
    - 手動: `scheduleService.addCandidate(projectId, candidateDraft)` → VEVENT を作成 → `icsText` 再構築  
    - ICS: `scheduleService.importIcs(projectId, fileText)` → VEVENT 群をマージ → `icsText` 更新
 3. 参加者の初期データがある場合  
-   - `participantService.bulkUpsert(projectId, participants)`  
+   - `participantService.bulkUpsert(projectId, participants)`（各参加者に固有トークンを付与）
 
 ### 2.2 共有準備～閲覧（管理者 → 参加者）
 
-1. 管理者が共有 URL を生成  
-   - `shareService.generateTokens(projectId)` → `shareTokens` を更新
-2. 参加者一覧画面は共有 URL 経由で `projectService.load(projectToken)` を呼び出し、`ProjectState` を読み取り（読み取り専用）
+1. 管理者が管理用 URL を生成  
+   - `shareService.generateAdminToken(projectId)` → `shareTokens.admin` を更新
+2. 参加者一覧／回答編集画面は参加者固有トークンつき URL でアクセス  
+   - 例: 一覧 `https://scheduly.app/p/{participantToken}`、回答編集 `https://scheduly.app/r/{participantToken}`（デモ時は `demo-participant-001` のような固定文字列を利用すると便利）
+   - `projectService.loadByParticipantToken(participantToken)` を呼び出し、`ProjectState` を読み取り（参加者は日程の更新権限なし）
 3. 画面内では `ProjectState.candidates`（UI 内で扱う日程配列）と `responses` を組み合わせてサマリーを表示
 
 ### 2.3 参加者回答（参加者）
 
-1. `user-edit.jsx` が参加者識別用のトークンを受け取り、`participantService.resolveByToken()` などで `participantId` を取得
+1. `user-edit.jsx` が参加者識別用のトークンを受け取り、`participantService.resolveByToken()` で `projectId` / `participantId` を取得
 2. 回答を送信  
    - `responseService.upsert({ projectId, participantId, candidateId, mark, comment })`
    - 同時に `responses` 内の該当レコードを更新し、`updatedAt` を現在時刻に更新
@@ -102,26 +104,27 @@ scheduleService.markStatus(projectId, candidateId, status: CandidateStatus)
 ### 3.3 Share Service（共有トークン）
 
 ```ts
-shareService.generateTokens(projectId): { admin: string; guest: string }
-shareService.getTokens(projectId): { admin: string | null; guest: string | null }
-shareService.invalidate(projectId, role?: 'admin' | 'guest'): void
+shareService.generateAdminToken(projectId): string
+shareService.getAdminToken(projectId): string | null
+shareService.invalidateAdminToken(projectId): void
 ```
 
-> 管理者／参加者向けの共有 URL に付与するトークンを生成・管理する。オンメモリ構成では `Project.shareTokens` に保存するだけでよいが、REST API としては `POST /projects/:projectId/share-tokens`（生成）、`GET /projects/:projectId/share-tokens`（取得）、`DELETE /projects/:projectId/share-tokens/:role`（無効化）といったエンドポイントを想定。
+> 管理者向けの制御用 URL に付与するトークンを生成・管理する。オンメモリ構成では `Project.shareTokens.admin` に保存するだけでよいが、REST API としては `POST /projects/:projectId/share-tokens/admin`（生成）、`GET /projects/:projectId/share-tokens/admin`（取得）、`DELETE /projects/:projectId/share-tokens/admin`（無効化）といったエンドポイントを想定。
 
 ### 3.4 Participant Service
 
 ```ts
-participantService.add(projectId, payload: { displayName: string; email?: string }): Participant
+participantService.add(projectId, payload: { displayName: string; email?: string }): Participant // トークン生成含む
 participantService.update(projectId, participantId, changes: Partial<Participant>): Participant
 participantService.remove(projectId, participantId): void
 
 participantService.bulkUpsert(projectId, list: Participant[]): void // 既存を残しつつ差分 upsert
-participantService.resolveByToken(projectToken: string): { projectId: string; participantId: string }
+participantService.resolveByToken(participantToken: string): { projectId: string; participantId: string }
+participantService.getToken(projectId, participantId): string
 ```
 
 > REST API 化する場合は `POST /projects/:projectId/participants:bulk` のように `POST` を使ったバルク upsert エンドポイントを用意し、既存レコードは維持したまま追加・更新のみ行う想定。全置き換えが必要になったら `PUT /projects/:projectId/participants` を別途定義する。  
-> `participantService.resolveByToken` は参加者 URL に埋め込まれたトークンから `projectId` と `participantId` を逆引きする役割。REST API に落とす場合は `POST /tokens/resolve`（ボディに token）や `GET /participants/resolve?token=...` といったエンドポイントが考えられる。
+> `participantService.resolveByToken` は参加者 URL に埋め込まれたトークンから `projectId` と `participantId` を逆引きする役割。REST API に落とす場合は `POST /participants:resolve`（ボディに token）や `GET /participants/resolve?token=...` といったエンドポイントが考えられる。URL 生成時は `/p/{token}`（一覧）と `/r/{token}`（回答）の両方に同一トークンを埋め込む。
 
 ### 3.5 Response Service
 
