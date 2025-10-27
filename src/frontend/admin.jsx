@@ -2,10 +2,22 @@ import React, { useEffect, useMemo, useState, useId, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import projectStore from "./store/project-store";
+import scheduleService from "./services/schedule-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger } = sharedIcalUtils;
+
+const {
+  addCandidate: addScheduleCandidate,
+  updateCandidate: updateScheduleCandidate,
+  removeCandidate: removeScheduleCandidate,
+  exportAllCandidatesToIcs,
+  exportCandidateToIcs,
+  createCandidateFromVevent: mapVeventToCandidate,
+  replaceCandidatesFromImport
+} = scheduleService;
 
 const ICAL_LINE_BREAK = "\r\n";
 const ICAL_HEADER_LINES = [
@@ -49,40 +61,6 @@ function icalStatusBadgeClass(status) {
   return ICAL_STATUS_BADGE_CLASSES[key] || "border-zinc-200 bg-zinc-50 text-zinc-600";
 }
 
-const toInputValue = (date) => {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
-const timeFromLocalInput = (value) => {
-  if (!value) return null;
-  const parts = value.split("T");
-  if (parts.length !== 2) return null;
-  const datePart = parts[0];
-  const timePart = parts[1];
-  const dateSegments = datePart.split("-").map(Number);
-  const timeSegments = timePart.split(":").map(Number);
-  if (dateSegments.length < 3 || timeSegments.length < 2) return null;
-  const jsDate = new Date(Date.UTC(
-    dateSegments[0],
-    dateSegments[1] - 1,
-    dateSegments[2],
-    timeSegments[0],
-    timeSegments[1],
-    0,
-    0
-  ));
-  const ICAL = ensureICAL();
-  return ICAL.Time.fromJSDate(jsDate, true);
-};
-
-const toLocalInputFromICAL = (icalTime) => {
-  if (!icalTime) return "";
-  return toInputValue(icalTime.toJSDate());
-};
-
-const createDtstampIso = () => new Date().toISOString();
-
 const ensureString = (value) => (value === undefined || value === null ? "" : String(value));
 
 const escapeICalText = (value) => {
@@ -104,95 +82,6 @@ const formatUtcForICal = (value) => {
   const minute = pad(date.getUTCMinutes());
   const second = pad(date.getUTCSeconds());
   return `${year}${month}${day}T${hour}${minute}${second}Z`;
-};
-
-const buildICalVeventJCal = (candidate) => {
-  const ICAL = ensureICAL();
-  const component = new ICAL.Component(["VEVENT", [], []]);
-  const event = new ICAL.Event(component);
-  event.uid = candidate.uid;
-  event.summary = candidate.summary || "";
-  event.location = candidate.location || "";
-  event.description = candidate.description || "";
-  event.status = candidate.status || "CONFIRMED";
-  const initialSequence = typeof candidate.sequence === "number" ? candidate.sequence : 0;
-  event.sequence = initialSequence;
-  const dtstartTime = timeFromLocalInput(candidate.dtstart);
-  if (dtstartTime) event.startDate = dtstartTime;
-  const dtendTime = timeFromLocalInput(candidate.dtend);
-  if (dtendTime) event.endDate = dtendTime;
-  if (candidate.tzid) {
-    const assignedTz = ICAL.TimezoneService.get(candidate.tzid);
-    if (assignedTz) {
-      if (event.startDate) event.startDate.zone = assignedTz;
-      if (event.endDate) event.endDate.zone = assignedTz;
-    }
-  }
-  const dtstampTime = candidate.dtstamp ? ICAL.Time.fromJSDate(new Date(candidate.dtstamp)) : ICAL.Time.fromJSDate(new Date());
-  event.component.updatePropertyWithValue("dtstamp", dtstampTime);
-  return component.toJSON();
-};
-
-const createCandidateFromVevent = (vevent) => {
-  const ICAL = ensureICAL();
-  const event = new ICAL.Event(vevent);
-  const uid = event.uid;
-  if (!uid) return null;
-  const startDate = event.startDate;
-  const zone = startDate && startDate.zone ? startDate.zone.tzid : null;
-  const schedulyTzid = event.component.getFirstPropertyValue("x-scheduly-tzid");
-  let tzid = zone || schedulyTzid || DEFAULT_TZID;
-  if (tzid && typeof tzid === "string") {
-    const normalized = tzid.trim();
-    if (normalized && normalized.toLowerCase() !== "floating") {
-      tzid = normalized;
-    } else if (schedulyTzid && typeof schedulyTzid === "string" && schedulyTzid.trim()) {
-      tzid = schedulyTzid.trim();
-    } else {
-      tzid = DEFAULT_TZID;
-    }
-  } else {
-    tzid = DEFAULT_TZID;
-  }
-  const dtstampTime = event.component.getFirstPropertyValue("dtstamp");
-  const dtstampIso = dtstampTime ? dtstampTime.toJSDate().toISOString() : createDtstampIso();
-  return {
-    id: randomUUID(),
-    uid,
-    summary: event.summary || "",
-    dtstart: toLocalInputFromICAL(event.startDate),
-    dtend: toLocalInputFromICAL(event.endDate),
-    tzid,
-    status: event.status || "CONFIRMED",
-    sequence: event.sequence || 0,
-    dtstamp: dtstampIso,
-    location: event.location || "",
-    description: event.description || "",
-    rawICalVevent: vevent.toJSON()
-  };
-};
-
-const createBlankICalCandidate = () => {
-  const now = new Date();
-  now.setSeconds(0, 0);
-  const start = new Date(now.getTime() + 60 * 60 * 1000);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
-  const candidate = {
-    id: randomUUID(),
-    uid: generateSchedulyUid(),
-    summary: "",
-    dtstart: toInputValue(start),
-    dtend: toInputValue(end),
-    tzid: DEFAULT_TZID,
-    status: "CONFIRMED",
-    sequence: 0,
-    dtstamp: createDtstampIso(),
-    location: "",
-    description: "",
-    rawICalVevent: null
-  };
-  candidate.rawICalVevent = buildICalVeventJCal(candidate);
-  return candidate;
 };
 
 const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
@@ -544,15 +433,38 @@ function candidateToDisplayMeta(candidate) {
 }
 
 function OrganizerApp() {
-  const [summary, setSummary] = useState("秋の合宿 調整会議");
-  const [description, setDescription] = useState("秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。");
+  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
+  const [summary, setSummary] = useState(initialProjectState.project?.name || "秋の合宿 調整会議");
+  const [description, setDescription] = useState(
+    initialProjectState.project?.description ||
+      "秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。"
+  );
   const responseOptions = ["○", "△", "×"];
-  const [candidates, setCandidates] = useState([]);
+  const [candidates, setCandidates] = useState(initialProjectState.candidates || []);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [urls, setUrls] = useState({ admin: "", guest: "" });
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
+
+  useEffect(() => {
+    setCandidates(initialProjectState.candidates || []);
+    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
+      if (!nextState) return;
+      const nextProject = nextState.project || {};
+      setSummary((prev) => (nextProject.name !== undefined && nextProject.name !== prev ? nextProject.name : prev));
+      setDescription((prev) =>
+        nextProject.description !== undefined && nextProject.description !== prev ? nextProject.description : prev
+      );
+      setCandidates(nextState.candidates || []);
+    });
+    return unsubscribe;
+  }, [projectId, initialProjectState]);
+
+  useEffect(() => {
+    projectStore.updateProjectMeta(projectId, { name: summary, description });
+  }, [projectId, summary, description]);
 
   useEffect(() => {
     let cancelled = false;
@@ -574,7 +486,7 @@ function OrganizerApp() {
         const loadedCandidates = [];
         logDebug("parsed VEVENT count", vevents.length);
         for (let i = 0; i < vevents.length; i += 1) {
-          const candidate = createCandidateFromVevent(vevents[i]);
+          const candidate = mapVeventToCandidate(vevents[i]);
           if (candidate) {
             loadedCandidates.push(candidate);
           }
@@ -583,13 +495,13 @@ function OrganizerApp() {
           throw new Error("No VEVENT entries found in sample ICS");
         }
         if (!cancelled) {
-          setCandidates(loadedCandidates);
+          replaceCandidatesFromImport(projectId, loadedCandidates, text);
         }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.warn("[Scheduly] sample ICS load failed; candidates will remain empty until manual input", error);
         if (!cancelled) {
-          setCandidates([]);
+          replaceCandidatesFromImport(projectId, [], "");
           logDebug("load candidates error", error);
         }
       } finally {
@@ -622,19 +534,15 @@ function OrganizerApp() {
   };
 
   const updateCandidate = (id, next) => {
-    setCandidates((prev) => prev.map((item) => (item.id === id ? next : item)));
+    updateScheduleCandidate(projectId, id, next);
   };
 
   const removeCandidate = (id) => {
-    setCandidates((prev) => prev.filter((item) => item.id !== id));
+    removeScheduleCandidate(projectId, id);
   };
 
   const addCandidate = () => {
-    setCandidates((prev) => {
-      const next = createBlankICalCandidate();
-      next.sequence = prev.length;
-      return prev.concat(next);
-    });
+    addScheduleCandidate(projectId);
     popToast("日程を追加しました");
   };
 
@@ -644,7 +552,7 @@ function OrganizerApp() {
       return;
     }
     try {
-      const icsText = exportAllCandidatesToICal(candidates);
+      const icsText = exportAllCandidatesToIcs(projectId);
       const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
       downloadTextFile(filename, icsText);
       popToast("全候補を ICS でダウンロードしました（モック）");
@@ -660,17 +568,15 @@ function OrganizerApp() {
       popToast("候補が見つかりませんでした");
       return;
     }
-    let exportResult;
     try {
-      exportResult = exportCandidateToICal(target);
+      const exportResult = exportCandidateToIcs(projectId, candidateId);
+      downloadTextFile(exportResult.filename, exportResult.icsText);
+      popToast(`${exportResult.filename} をダウンロードしました（モック）`);
     } catch (error) {
       console.error("ICS export error", error);
       popToast("ICSの生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
       return;
     }
-    downloadTextFile(exportResult.filename, exportResult.icsText);
-    popToast(`${exportResult.filename} をダウンロードしました（モック）`);
-    setCandidates((prev) => prev.map((item) => (item.id === candidateId ? exportResult.updatedCandidate : item)));
   };
 
   const handleIcsImport = async (file) => {
@@ -712,7 +618,7 @@ function OrganizerApp() {
         skippedNoDtstamp += 1;
         continue;
       }
-      const candidate = createCandidateFromVevent(vevent);
+      const candidate = mapVeventToCandidate(vevent);
       if (!candidate) {
         continue;
       }
@@ -784,26 +690,24 @@ function OrganizerApp() {
     let updatedCount = 0;
     let skippedCount = (importPreview.skippedNoUid || 0) + (importPreview.skippedNoDtstamp || 0);
     const selectedItems = importPreview.items.slice();
-    setCandidates((prev) => {
-      const next = prev.slice();
-      selectedItems.forEach((item) => {
-        if (!item.selected) {
-          skippedCount += 1;
-          return;
-        }
-        const imported = item.candidate;
-        if (item.existingIndex >= 0 && item.existingIndex < next.length) {
-          const existing = next[item.existingIndex];
-          imported.id = existing.id;
-          next[item.existingIndex] = imported;
-          updatedCount += 1;
-        } else {
-          next.push(imported);
-          addedCount += 1;
-        }
-      });
-      return next;
+    const next = candidates.slice();
+    selectedItems.forEach((item) => {
+      if (!item.selected) {
+        skippedCount += 1;
+        return;
+      }
+      const imported = item.candidate;
+      if (item.existingIndex >= 0 && item.existingIndex < next.length) {
+        const existing = next[item.existingIndex];
+        imported.id = existing.id;
+        next[item.existingIndex] = imported;
+        updatedCount += 1;
+      } else {
+        next.push(imported);
+        addedCount += 1;
+      }
     });
+    replaceCandidatesFromImport(projectId, next);
     const parts = [];
     if (addedCount) parts.push("追加 " + addedCount + "件");
     if (updatedCount) parts.push("更新 " + updatedCount + "件");
