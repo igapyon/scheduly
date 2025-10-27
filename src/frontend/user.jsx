@@ -168,21 +168,19 @@ const createParticipantSummaries = (participants, candidates, responses) => {
     const responsesForParticipant = (candidates || []).map((candidate) => {
       const found = candidateMap.get(candidate.id);
       const mark = normalizeMark(found?.mark);
-      const comment = found?.comment ? `コメント: ${found.comment}` : "コメント: 未入力";
+      const hasComment = typeof found?.comment === "string" && found.comment.trim().length > 0;
+      const commentText = hasComment ? found.comment.trim() : "";
       return {
         scheduleId: candidate.id,
         datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
         mark,
-        comment
+        hasComment,
+        comment: hasComment ? `コメント: ${commentText}` : "コメント: 未入力"
       };
     });
 
-    const commentHighlights = [];
-    responsesForParticipant.forEach((item) => {
-      if (item.comment && item.comment !== "コメント: 未入力") {
-        commentHighlights.push(`コメント記入: ${candidateLookup.get(item.scheduleId)?.summary || "候補"}`);
-      }
-    });
+    const commentCount = responsesForParticipant.reduce((acc, item) => (item.hasComment ? acc + 1 : acc), 0);
+    const commentHighlights = commentCount > 0 ? [`コメントあり (${commentCount}件)`] : [];
 
     return {
       id: participant.id,
