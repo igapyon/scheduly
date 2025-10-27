@@ -6,7 +6,7 @@ const participantService = require("../services/participant-service");
 const responseService = require("../services/response-service");
 const projectStore = require("../store/project-store");
 
-const { waitForIcal, ensureICAL, getSampleIcsUrl, createLogger } = sharedIcalUtils;
+const { waitForIcal, ensureICAL, getSampleIcsUrl, getSampleProjectJsonUrl, createLogger } = sharedIcalUtils;
 
 const logDebug = createLogger("demo-data");
 
@@ -61,6 +61,39 @@ const SAMPLE_RESPONSES = [
   { participantId: "tanaka", candidateAlias: "day3", mark: "x", comment: "他プロジェクトとバッティング" },
   { participantId: "tanaka", candidateAlias: "day4", mark: "pending", comment: "未回答（フォロー待ち）" }
 ];
+
+const fetchSampleProjectPayload = async () => {
+  const url = getSampleProjectJsonUrl();
+  logDebug("fetching sample project JSON", { url });
+  const response = await fetch(url, { cache: "no-cache" });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sample project JSON: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+};
+
+const seedProjectFromJsonIfNeeded = async (projectId) => {
+  const snapshot = projectStore.getProjectStateSnapshot(projectId);
+  const hasData =
+    (snapshot.candidates && snapshot.candidates.length) ||
+    (snapshot.participants && snapshot.participants.length) ||
+    (snapshot.responses && snapshot.responses.length);
+  if (hasData) {
+    logDebug("project already initialized, skipping JSON seed", { projectId });
+    return snapshot;
+  }
+
+  const payload = await fetchSampleProjectPayload();
+  projectStore.importProjectState(projectId, payload);
+  const imported = projectStore.getProjectStateSnapshot(projectId);
+  logDebug("imported sample project JSON", {
+    projectId,
+    candidateCount: imported.candidates?.length ?? 0,
+    participantCount: imported.participants?.length ?? 0,
+    responseCount: imported.responses?.length ?? 0
+  });
+  return imported;
+};
 
 const inflight = new Map();
 
@@ -142,6 +175,14 @@ const seedResponsesIfNeeded = (projectId, aliasMap) => {
   return imported;
 };
 
+const seedProjectFromLegacySamples = async (projectId) => {
+  await seedCandidatesIfNeeded(projectId);
+  const aliasMap = buildAliasMap(projectId);
+  seedParticipantsIfNeeded(projectId);
+  seedResponsesIfNeeded(projectId, aliasMap);
+  return projectStore.getProjectStateSnapshot(projectId);
+};
+
 const ensureDemoProjectData = (projectId = projectStore.getDefaultProjectId()) => {
   if (inflight.has(projectId)) return inflight.get(projectId);
 
@@ -151,11 +192,16 @@ const ensureDemoProjectData = (projectId = projectStore.getDefaultProjectId()) =
       logDebug("demo seed skipped: project opted out", { projectId });
       return snapshotBefore;
     }
-    await seedCandidatesIfNeeded(projectId);
-    const aliasMap = buildAliasMap(projectId);
-    seedParticipantsIfNeeded(projectId);
-    seedResponsesIfNeeded(projectId, aliasMap);
-    return projectStore.getProjectStateSnapshot(projectId);
+    try {
+      return await seedProjectFromJsonIfNeeded(projectId);
+    } catch (jsonError) {
+      logDebug("failed to seed from sample project JSON, falling back to legacy seeds", {
+        projectId,
+        error: jsonError
+      });
+      await seedProjectFromLegacySamples(projectId);
+      return projectStore.getProjectStateSnapshot(projectId);
+    }
   })()
     .catch((error) => {
       logDebug("failed to seed demo data", { projectId, error });

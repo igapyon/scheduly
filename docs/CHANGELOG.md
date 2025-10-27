@@ -8,6 +8,9 @@ Scheduly の変更履歴を記録するドキュメントです。まだ公式�
   - `docs/DEVELOPMENT_JOURNEY.md` に開発フェーズを整理
   - `docs/SERVER_INTEGRATION.md`（ドラフト）、`docs/DISCLAIMER.md`、`docs/CONTRIBUTING.md`、`docs/CONTRIBUTORS.md` を追加
   - `docs/SCREEN_OVERVIEW.md` に参加者回答管理ビューの計画を統合
+- サンプルデータの整備
+  - 公開用サンプルを `public/ics/` および `public/proj/` に配置
+  - デモシード時に `scheduly-project-sampledata-001.json` を優先的にインポートするよう変更
 - README に Documentation Index を追加
 - 免責事項・QA 手順・開発メモの役割を明確化
 
