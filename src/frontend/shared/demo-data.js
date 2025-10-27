@@ -144,6 +144,11 @@ const ensureDemoProjectData = (projectId = projectStore.getDefaultProjectId()) =
   if (inflight.has(projectId)) return inflight.get(projectId);
 
   const promise = (async () => {
+    const snapshotBefore = projectStore.getProjectStateSnapshot(projectId);
+    if (snapshotBefore?.project?.demoSeedOptOut) {
+      logDebug("demo seed skipped: project opted out", { projectId });
+      return snapshotBefore;
+    }
     await seedCandidatesIfNeeded(projectId);
     const aliasMap = buildAliasMap(projectId);
     seedParticipantsIfNeeded(projectId);

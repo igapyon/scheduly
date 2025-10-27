@@ -47,6 +47,7 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
   const timestamp = new Date().toISOString();
   const name = typeof options.name === "string" ? options.name : DEFAULT_PROJECT_NAME;
   const description = typeof options.description === "string" ? options.description : DEFAULT_PROJECT_DESCRIPTION;
+  const demoSeedOptOut = Boolean(options.demoSeedOptOut);
   return {
     project: {
       id: projectId,
@@ -55,7 +56,8 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
       defaultTzid: DEFAULT_TZID,
       shareTokens: { admin: DEMO_ADMIN_TOKEN },
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
+      demoSeedOptOut
     },
     icsText: "",
     candidates: [],
@@ -332,7 +334,7 @@ const getDefaultProjectId = () => DEFAULT_PROJECT_ID;
 const getDemoAdminToken = () => DEMO_ADMIN_TOKEN;
 
 const resetProject = (projectId = DEFAULT_PROJECT_ID) => {
-  const nextState = createInitialProjectState(projectId, { name: "", description: "" });
+  const nextState = createInitialProjectState(projectId, { name: "", description: "", demoSeedOptOut: true });
   projectStore.set(projectId, nextState);
   rebuildParticipantTokenIndex(projectId);
   persistToStorage();
