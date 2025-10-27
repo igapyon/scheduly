@@ -28,6 +28,11 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
 
+### Sample Data
+
+- ICS: `public/ics/scheduly-ics-sampledata-001.ics`
+- Project JSON: `public/proj/scheduly-project-sampledata-001.json`
+
 ## React / webpack 版（`src/frontend/`）
 
 - `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。候補編集に加えて、ICS インポート／エクスポート、プロジェクト全体の JSON エクスポート／インポートをサポートしており、`public/index.html` で読み込みます。ヘッダーから参加者回答一覧（`user.html`）へのリンクを設置済みです。
