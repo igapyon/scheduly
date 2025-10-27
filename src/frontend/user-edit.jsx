@@ -787,27 +787,6 @@ function SchedulyMock() {
         </aside>
       </main>
 
-      <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="h-10 rounded-xl border border-gray-200 bg-white px-4 font-semibold text-gray-600 hover:border-gray-300"
-            onClick={() => {
-              window.location.href = "./user.html";
-            }}
-          >
-            キャンセル
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-            onClick={submit}
-          >
-            保存
-          </button>
-        </div>
-      </footer>
-
       <Modal
         open={!!detailCandidate}
         title={detailCandidate ? `${detailCandidate.summary || "回答詳細"} の詳細` : "回答詳細"}
