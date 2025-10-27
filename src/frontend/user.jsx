@@ -59,7 +59,7 @@ const normalizeMark = (mark) => {
 };
 
 const createScheduleSummaries = (candidates, participants, responses) => {
-  const participantMap = new Map((participants || []).map((participant) => [participant.id, participant]));
+  const participantMap = new Map((participants || []).map((participant, index) => [participant.id, { participant, index }]));
   const responseMap = new Map();
   (responses || []).forEach((response) => {
     if (!response || !response.candidateId) return;
@@ -79,32 +79,31 @@ const createScheduleSummaries = (candidates, participants, responses) => {
       const mark = normalizeMark(response.mark);
       if (counts[mark] !== undefined) counts[mark] += 1;
       else counts.pending += 1;
-      const participant = participantMap.get(response.participantId);
+      const participantEntry = participantMap.get(response.participantId);
+      const participant = participantEntry?.participant;
       detailed.push({
         participantId: response.participantId,
         name: participant?.displayName || "参加者",
+        order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
         comment: response.comment || "コメントなし"
       });
       respondedIds.add(response.participantId);
     });
 
-    (participants || []).forEach((participant) => {
+    (participants || []).forEach((participant, index) => {
       if (!participant || respondedIds.has(participant.id)) return;
       counts.pending += 1;
       detailed.push({
         participantId: participant.id,
         name: participant.displayName || "参加者",
+        order: index,
         mark: "pending",
         comment: "未回答"
       });
     });
 
-    detailed.sort((a, b) => {
-      if (a.mark === "pending" && b.mark !== "pending") return 1;
-      if (b.mark === "pending" && a.mark !== "pending") return -1;
-      return (a.name || "").localeCompare(b.name || "", "ja");
-    });
+    detailed.sort((a, b) => a.order - b.order);
 
     return {
       id: candidate.id,
