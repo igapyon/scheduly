@@ -461,7 +461,6 @@ function AdminResponsesApp() {
         if (!cancelled) setLoadError("");
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
         console.warn("[Scheduly] failed to seed demo data", error);
         if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
       })

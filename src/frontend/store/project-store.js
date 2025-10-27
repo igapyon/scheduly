@@ -4,6 +4,7 @@ const DEFAULT_PROJECT_ID = "demo-project";
 const DEFAULT_PROJECT_NAME = "";
 const DEFAULT_PROJECT_DESCRIPTION = "";
 const DEMO_ADMIN_TOKEN = "demo-admin";
+const PROJECT_EXPORT_VERSION = 1;
 
 const projectStore = new Map();
 const listeners = new Map();
@@ -21,7 +22,6 @@ const persistToStorage = () => {
     });
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.warn("[Scheduly] Failed to persist project store", error);
   }
 };
@@ -38,7 +38,6 @@ const loadFromStorage = () => {
       rebuildParticipantTokenIndex(projectId);
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.warn("[Scheduly] Failed to load project store from storage", error);
   }
 };
@@ -342,6 +341,146 @@ const resetProject = (projectId = DEFAULT_PROJECT_ID) => {
   return getProjectStateSnapshot(projectId);
 };
 
+const sanitizeParticipants = (list) => {
+  if (!Array.isArray(list)) return [];
+  const seenIds = new Set();
+  return list.reduce((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+    const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : null;
+    if (!id || seenIds.has(id)) return acc;
+    seenIds.add(id);
+    acc.push({
+      id,
+      token: typeof item.token === "string" ? item.token : "",
+      displayName: typeof item.displayName === "string" ? item.displayName : "",
+      email: typeof item.email === "string" ? item.email : "",
+      comment: typeof item.comment === "string" ? item.comment : "",
+      createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+    });
+    return acc;
+  }, []);
+};
+
+const sanitizeCandidatesForImport = (list) => {
+  if (!Array.isArray(list)) return [];
+  const seenIds = new Set();
+  return list.reduce((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+    const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : null;
+    if (!id || seenIds.has(id)) return acc;
+    seenIds.add(id);
+    acc.push({
+      id,
+      uid: typeof item.uid === "string" ? item.uid : "",
+      summary: typeof item.summary === "string" ? item.summary : "",
+      dtstart: typeof item.dtstart === "string" ? item.dtstart : "",
+      dtend: typeof item.dtend === "string" ? item.dtend : "",
+      tzid: typeof item.tzid === "string" ? item.tzid : DEFAULT_TZID,
+      status: typeof item.status === "string" ? item.status : "CONFIRMED",
+      sequence: typeof item.sequence === "number" ? item.sequence : 0,
+      dtstamp: typeof item.dtstamp === "string" ? item.dtstamp : "",
+      location: typeof item.location === "string" ? item.location : "",
+      description: typeof item.description === "string" ? item.description : "",
+      rawICalVevent: item.rawICalVevent !== undefined ? item.rawICalVevent : null
+    });
+    return acc;
+  }, []);
+};
+
+const sanitizeResponsesForImport = (list, validParticipantIds, validCandidateIds) => {
+  if (!Array.isArray(list)) return [];
+  return list.reduce((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+    const participantId = typeof item.participantId === "string" && item.participantId.trim() ? item.participantId.trim() : null;
+    const candidateId = typeof item.candidateId === "string" && item.candidateId.trim() ? item.candidateId.trim() : null;
+    if (!participantId || !candidateId) return acc;
+    if (!validParticipantIds.has(participantId) || !validCandidateIds.has(candidateId)) return acc;
+    acc.push({
+      id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : `${participantId}:${candidateId}`,
+      participantId,
+      candidateId,
+      mark: typeof item.mark === "string" ? item.mark : "",
+      comment: typeof item.comment === "string" ? item.comment : "",
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+    });
+    return acc;
+  }, []);
+};
+
+const sanitizeProjectForImport = (projectId, project, defaultProject) => {
+  const nextProject = { ...defaultProject };
+  if (project && typeof project === "object") {
+    if (typeof project.name === "string") nextProject.name = project.name;
+    if (typeof project.description === "string") nextProject.description = project.description;
+    if (typeof project.defaultTzid === "string" && project.defaultTzid.trim()) {
+      nextProject.defaultTzid = project.defaultTzid;
+    }
+    if (project.shareTokens && typeof project.shareTokens === "object") {
+      nextProject.shareTokens = { ...defaultProject.shareTokens, ...project.shareTokens };
+    }
+    if (typeof project.createdAt === "string") nextProject.createdAt = project.createdAt;
+    if (typeof project.updatedAt === "string") nextProject.updatedAt = project.updatedAt;
+  }
+  nextProject.id = projectId;
+  nextProject.demoSeedOptOut = true;
+  return nextProject;
+};
+
+const sanitizeImportedState = (projectId, rawState) => {
+  const base = createInitialProjectState(projectId, { demoSeedOptOut: true });
+  const nextState = {
+    ...base,
+    project: sanitizeProjectForImport(projectId, rawState?.project, base.project),
+    icsText: typeof rawState?.icsText === "string" ? rawState.icsText : "",
+    candidates: [],
+    participants: [],
+    responses: []
+  };
+
+  const participants = sanitizeParticipants(rawState?.participants);
+  const candidates = sanitizeCandidatesForImport(rawState?.candidates);
+  const participantIdSet = new Set(participants.map((item) => item.id));
+  const candidateIdSet = new Set(candidates.map((item) => item.id));
+  const responses = sanitizeResponsesForImport(rawState?.responses, participantIdSet, candidateIdSet);
+
+  nextState.participants = participants;
+  nextState.candidates = candidates;
+  nextState.responses = responses;
+  return nextState;
+};
+
+const exportProjectState = (projectId = DEFAULT_PROJECT_ID) => {
+  const snapshot = getProjectStateSnapshot(projectId);
+  return {
+    version: PROJECT_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    projectId,
+    state: snapshot
+  };
+};
+
+const importProjectState = (projectId = DEFAULT_PROJECT_ID, payload = null) => {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid import payload");
+  }
+  const version = payload.version ?? PROJECT_EXPORT_VERSION;
+  if (version !== PROJECT_EXPORT_VERSION) {
+    throw new Error(`Unsupported project export version: ${version}`);
+  }
+  const rawState = payload.state ?? payload;
+  if (!rawState || typeof rawState !== "object") {
+    throw new Error("Import data missing state");
+  }
+
+  const sanitized = sanitizeImportedState(projectId, rawState);
+  projectStore.set(projectId, sanitized);
+  rebuildParticipantTokenIndex(projectId);
+  persistToStorage();
+  notify(projectId);
+  return getProjectStateSnapshot(projectId);
+};
+
 const cloneState = (state) => JSON.parse(JSON.stringify(state));
 
 module.exports = {
@@ -363,5 +502,7 @@ module.exports = {
   replaceResponses,
   upsertResponse,
   removeResponsesByCandidate,
-  resetProject
+  resetProject,
+  exportProjectState,
+  importProjectState
 };

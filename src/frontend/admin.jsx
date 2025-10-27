@@ -444,6 +444,7 @@ function OrganizerApp() {
   const [urls, setUrls] = useState({ admin: "", guest: "" });
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
+  const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
 
   useEffect(() => {
@@ -470,7 +471,6 @@ function OrganizerApp() {
 
     ensureDemoProjectData(projectId)
       .catch((error) => {
-        // eslint-disable-next-line no-console
         console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
       })
       .finally(() => {
@@ -484,8 +484,8 @@ function OrganizerApp() {
     };
   }, [projectId]);
 
-  const downloadTextFile = (filename, text) => {
-    const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const downloadTextFile = (filename, text, mimeType = "text/plain;charset=utf-8") => {
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -520,7 +520,7 @@ function OrganizerApp() {
     try {
       const icsText = exportAllCandidatesToIcs(projectId);
       const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
-      downloadTextFile(filename, icsText);
+      downloadTextFile(filename, icsText, "text/calendar;charset=utf-8");
       popToast("全候補を ICS でダウンロードしました（モック）");
     } catch (error) {
       console.error("ICS bulk export error", error);
@@ -536,7 +536,7 @@ function OrganizerApp() {
     }
     try {
       const exportResult = exportCandidateToIcs(projectId, candidateId);
-      downloadTextFile(exportResult.filename, exportResult.icsText);
+      downloadTextFile(exportResult.filename, exportResult.icsText, "text/calendar;charset=utf-8");
       popToast(`${exportResult.filename} をダウンロードしました（モック）`);
     } catch (error) {
       console.error("ICS export error", error);
@@ -705,12 +705,53 @@ function OrganizerApp() {
     popToast("編集URL／閲覧URLを発行しました（モック）");
   };
 
-  const mockExportProjectInfo = () => {
-    popToast("プロジェクト情報をエクスポートしました（モック）");
+  const handleExportProjectInfo = () => {
+    try {
+      const exportData = projectStore.exportProjectState(projectId);
+      const serialized = JSON.stringify(exportData, null, 2);
+      const filename = `scheduly-project-${projectId}-${new Date().toISOString().split("T")[0]}.json`;
+      downloadTextFile(filename, serialized, "application/json;charset=utf-8");
+      popToast("プロジェクト情報をエクスポートしました");
+    } catch (error) {
+      console.error("Project export error", error);
+      popToast("プロジェクト情報のエクスポートに失敗しました");
+    }
   };
 
-  const mockImportProjectInfo = () => {
-    popToast("プロジェクト情報をインポートしました（モック）");
+  const handleProjectImportFromFile = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const confirmed = window.confirm("現在のプロジェクトを置き換えます。よろしいですか？");
+      if (!confirmed) {
+        event.target.value = "";
+        return;
+      }
+      const text = await file.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(
+          "JSON の解析に失敗しました: " +
+            (parseError instanceof Error ? parseError.message : String(parseError))
+        );
+      }
+      projectStore.importProjectState(projectId, parsed);
+      const snapshot = projectStore.getProjectStateSnapshot(projectId);
+      setSummary(snapshot.project?.name || "");
+      setDescription(snapshot.project?.description || "");
+      setCandidates(snapshot.candidates || []);
+      setUrls({ admin: "", guest: "" });
+      setImportPreview(null);
+      setInitialDataLoaded(true);
+      popToast("プロジェクト情報をインポートしました");
+    } catch (error) {
+      console.error("Project import error", error);
+      popToast("プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const handleDeleteProject = () => {
@@ -901,14 +942,14 @@ function OrganizerApp() {
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
-                onClick={mockExportProjectInfo}
+                onClick={handleExportProjectInfo}
               >
                 プロジェクトをエクスポート
               </button>
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
-                onClick={mockImportProjectInfo}
+                onClick={() => projectImportInputRef.current?.click()}
               >
                 プロジェクトをインポート
               </button>
@@ -920,6 +961,13 @@ function OrganizerApp() {
                 プロジェクトを削除
               </button>
             </div>
+            <input
+              ref={projectImportInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleProjectImportFromFile}
+            />
           </SectionCard>
         </aside>
       </div>
