@@ -1,8 +1,8 @@
 const { DEFAULT_TZID } = require("../shared/ical-utils");
 
 const DEFAULT_PROJECT_ID = "demo-project";
-const DEFAULT_PROJECT_NAME = "秋の合宿 調整会議";
-const DEFAULT_PROJECT_DESCRIPTION = "秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。";
+const DEFAULT_PROJECT_NAME = "";
+const DEFAULT_PROJECT_DESCRIPTION = "";
 const DEMO_ADMIN_TOKEN = "demo-admin";
 
 const projectStore = new Map();
@@ -43,15 +43,15 @@ const loadFromStorage = () => {
   }
 };
 
-const cloneState = (state) => JSON.parse(JSON.stringify(state));
-
-const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID) => {
+const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {}) => {
   const timestamp = new Date().toISOString();
+  const name = typeof options.name === "string" ? options.name : DEFAULT_PROJECT_NAME;
+  const description = typeof options.description === "string" ? options.description : DEFAULT_PROJECT_DESCRIPTION;
   return {
     project: {
       id: projectId,
-      name: DEFAULT_PROJECT_NAME,
-      description: DEFAULT_PROJECT_DESCRIPTION,
+      name,
+      description,
       defaultTzid: DEFAULT_TZID,
       shareTokens: { admin: DEMO_ADMIN_TOKEN },
       createdAt: timestamp,
@@ -331,6 +331,17 @@ const subscribeProjectState = (projectId, callback) => {
 const getDefaultProjectId = () => DEFAULT_PROJECT_ID;
 const getDemoAdminToken = () => DEMO_ADMIN_TOKEN;
 
+const resetProject = (projectId = DEFAULT_PROJECT_ID) => {
+  const nextState = createInitialProjectState(projectId, { name: "", description: "" });
+  projectStore.set(projectId, nextState);
+  rebuildParticipantTokenIndex(projectId);
+  persistToStorage();
+  notify(projectId);
+  return getProjectStateSnapshot(projectId);
+};
+
+const cloneState = (state) => JSON.parse(JSON.stringify(state));
+
 module.exports = {
   resolveProjectIdFromLocation,
   getProjectStateSnapshot,
@@ -349,5 +360,6 @@ module.exports = {
   getResponses,
   replaceResponses,
   upsertResponse,
-  removeResponsesByCandidate
+  removeResponsesByCandidate,
+  resetProject
 };
