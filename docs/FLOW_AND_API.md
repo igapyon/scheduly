@@ -38,7 +38,7 @@ React 版 Scheduly をオンメモリ構成で動かす際のユーザーフロ�
 1. 管理者が共有 URL を生成  
    - `shareService.generateTokens(projectId)` → `shareTokens` を更新
 2. 参加者一覧画面は共有 URL 経由で `projectService.load(projectToken)` を呼び出し、`ProjectState` を読み取り（読み取り専用）
-3. 画面内では `ProjectState.candidates` と `responses` を組み合わせてサマリーを表示
+3. 画面内では `ProjectState.candidates`（UI 内で扱う日程配列）と `responses` を組み合わせてサマリーを表示
 
 ### 2.3 参加者回答（参加者）
 
@@ -97,20 +97,33 @@ scheduleService.markStatus(projectId, candidateId, status: CandidateStatus)
 ```
 
 **実装メモ**  
-すべての更新は `ProjectState.icsText` を再生成し、`ProjectState.candidates` をパースし直す。`CandidateDraft` → VEVENT 変換には既存の `shared/ical-utils` 関数を流用できる。
+すべての更新は管理者権限でのみ許可し、`ProjectState.icsText` を再生成 → `ProjectState.candidates` を再パースするサイクルで一元管理する。参加者向け API／UI からは `scheduleService` の更新系を公開せず、読み取り専用のビュー（`summaryService.*`）を経由させることでセキュリティを担保する。`CandidateDraft` → VEVENT 変換には既存の `shared/ical-utils` 関数を流用できる。REST API 化する場合はリソース名を「日程」に合わせて `/projects/:projectId/schedules` を採用すると自然（内部プロパティ名は ICS 由来の `candidates` を維持しても、英語圏では “schedule candidates” として違和感は少ない）。
 
-### 3.3 Participant Service
+### 3.3 Share Service（共有トークン）
+
+```ts
+shareService.generateTokens(projectId): { admin: string; guest: string }
+shareService.getTokens(projectId): { admin: string | null; guest: string | null }
+shareService.invalidate(projectId, role?: 'admin' | 'guest'): void
+```
+
+> 管理者／参加者向けの共有 URL に付与するトークンを生成・管理する。オンメモリ構成では `Project.shareTokens` に保存するだけでよいが、REST API としては `POST /projects/:projectId/share-tokens`（生成）、`GET /projects/:projectId/share-tokens`（取得）、`DELETE /projects/:projectId/share-tokens/:role`（無効化）といったエンドポイントを想定。
+
+### 3.4 Participant Service
 
 ```ts
 participantService.add(projectId, payload: { displayName: string; email?: string }): Participant
 participantService.update(projectId, participantId, changes: Partial<Participant>): Participant
 participantService.remove(projectId, participantId): void
 
-participantService.bulkUpsert(projectId, list: Participant[]): void
+participantService.bulkUpsert(projectId, list: Participant[]): void // 既存を残しつつ差分 upsert
 participantService.resolveByToken(projectToken: string): { projectId: string; participantId: string }
 ```
 
-### 3.4 Response Service
+> REST API 化する場合は `POST /projects/:projectId/participants:bulk` のように `POST` を使ったバルク upsert エンドポイントを用意し、既存レコードは維持したまま追加・更新のみ行う想定。全置き換えが必要になったら `PUT /projects/:projectId/participants` を別途定義する。  
+> `participantService.resolveByToken` は参加者 URL に埋め込まれたトークンから `projectId` と `participantId` を逆引きする役割。REST API に落とす場合は `POST /tokens/resolve`（ボディに token）や `GET /participants/resolve?token=...` といったエンドポイントが考えられる。
+
+### 3.5 Response Service
 
 ```ts
 responseService.upsert(projectId, response: {
@@ -126,7 +139,7 @@ responseService.clear(projectId, participantId): void
 
 更新後は `response.updatedAt` を現在時刻で上書き。必要に応じて `tallyService.recalculate` を呼ぶ。
 
-### 3.5 Tally / Summary Service
+### 3.6 Tally / Summary Service
 
 ```ts
 tallyService.recalculate(projectId): void // 全候補まとめて
@@ -152,7 +165,7 @@ const candidate = scheduleService.addCandidate(projectId, {
   description: "予備日その2"
 });
 
-// UI では ProjectState から candidates を再取得して再描画する
+// UI では ProjectState から candidates（日程）を再取得して再描画する
 const state = projectStore.get(projectId);
 renderCandidates(state.candidates);
 ```
