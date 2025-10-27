@@ -9,7 +9,7 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## ICS まわりのメモ
 
-- 管理者モック（`scheduly-admin-mock.html`）は候補ごとに `rawVevent` を保持しつつ、エクスポート時は文字列を組み立てて `.ics` を生成します。実装の詳細は `exportCandidateToIcs` と `exportAllCandidatesToIcs` を参照。
+- 管理者モック（`scheduly-admin-mock.html`）は候補ごとに `rawVevent` を保持しつつ、エクスポート時は文字列を組み立てて `.ics` を生成します。React 版の `admin.jsx` ではこの処理に加え、プロジェクト全体を JSON としてエクスポート／インポートする機能も実装済みです。実装の詳細は `exportCandidateToIcs` ・ `exportAllCandidatesToIcs` ・ `projectStore.exportProjectState` ・ `projectStore.importProjectState` を参照。
 - ICS 生成に失敗した場合は、候補データを含めて `console.error` を出力するようにしています。Chrome 開発者ツールの Console で状況を確認してください。
 - ICS インポートのプレビューは既定で全候補 OFF、既存の UID と一致する候補のみ ON になります。振る舞いを変えるときは `handleIcsImport` とプレビュー UI をセットで確認すると迷いません。
 
@@ -46,7 +46,6 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 
 ## TODO のタネ
 
-- `exportAllCandidatesToIcs` を使った「日程一覧をまとめてダウンロード」ボタンを追加し、全候補の一括エクスポートを実現する。
 - ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で組み込むなど、タイムゾーン情報の扱いを強化する（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
 - 参加者の名前変更／削除フローを実装し、現在のモックボタンを実処理に置き換える。
 - 「参加者を新規登録」ボタンから起動する登録モーダル（もしくは画面）を作成し、管理画面とデータ連携できるようにする。

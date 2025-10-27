@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const sharedIcalUtils = require("./ical-utils");
 const scheduleService = require("../services/schedule-service");
 const participantService = require("../services/participant-service");

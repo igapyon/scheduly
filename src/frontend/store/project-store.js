@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const { DEFAULT_TZID } = require("../shared/ical-utils");
 
 const DEFAULT_PROJECT_ID = "demo-project";

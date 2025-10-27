@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const projectStore = require("../store/project-store");
 
 const randomUUID = () => {

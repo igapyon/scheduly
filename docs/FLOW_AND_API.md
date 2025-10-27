@@ -32,6 +32,9 @@ React 版 Scheduly をオンメモリ構成で動かす際のユーザーフロ�
    - ICS: `scheduleService.importIcs(projectId, fileText)` → VEVENT 群をマージ → `icsText` 更新
 3. 参加者の初期データがある場合  
    - `participantService.bulkUpsert(projectId, participants)`（各参加者に固有トークンを付与）
+4. 既存プロジェクトの状態を再利用する場合  
+   - `projectStore.importProjectState(projectId, payload)` で JSON スナップショットを読み込み、全データを置き換える  
+   - エクスポートは `projectStore.exportProjectState(projectId)` を呼び出し、管理画面からは「プロジェクトをエクスポート」ボタンでダウンロードできる
 
 ### 2.2 共有準備～閲覧（管理者 → 参加者）
 
