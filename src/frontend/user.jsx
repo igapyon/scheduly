@@ -2,162 +2,22 @@ import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import projectStore from "./store/project-store";
+import scheduleService from "./services/schedule-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
+import { ensureDemoProjectData } from "./shared/demo-data";
 
-const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
-
-const ICS_LINE_BREAK = "\r\n";
-const PARTICIPANT_ICS_HEADER_LINES = [
-  "BEGIN:VCALENDAR",
-  "VERSION:2.0",
-  "PRODID:-//Scheduly//Participant//JA",
-  "CALSCALE:GREGORIAN",
-  "METHOD:PUBLISH"
-];
+const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   description: "秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。",
   deadline: "2025/05/01 23:59",
-  participantCount: 12,
   lastUpdated: "2025/04/12 17:45"
 };
 
 const logDebug = createLogger("user");
-
-const padNumber = (value) => String(value).padStart(2, "0");
-
-const formatDateTimeAsUtc = (value) => {
-  if (!value) return "";
-  const date = value instanceof Date ? value : new Date(value);
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-  const year = date.getUTCFullYear();
-  const month = padNumber(date.getUTCMonth() + 1);
-  const day = padNumber(date.getUTCDate());
-  const hour = padNumber(date.getUTCHours());
-  const minute = padNumber(date.getUTCMinutes());
-  const second = padNumber(date.getUTCSeconds());
-  return `${year}${month}${day}T${hour}${minute}${second}Z`;
-};
-
-const escapeIcsText = (value) => {
-  if (value === undefined || value === null) return "";
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/\r?\n/g, "\\n")
-    .replace(/,/g, "\\,")
-    .replace(/;/g, "\\;");
-};
-
-const buildIcsFromSchedules = (schedules) => {
-  if (!Array.isArray(schedules) || !schedules.length) return "";
-  const lines = PARTICIPANT_ICS_HEADER_LINES.slice();
-  const sharedDtstamp = formatDateTimeAsUtc(new Date());
-
-  schedules.forEach((schedule, index) => {
-    if (!schedule || !schedule.uid) return;
-    const dtstartLine = formatDateTimeAsUtc(schedule.startsAt);
-    const dtendLine = formatDateTimeAsUtc(schedule.endsAt);
-    const statusText = schedule.status ? String(schedule.status).toUpperCase() : "";
-
-    lines.push("BEGIN:VEVENT");
-    lines.push("UID:" + escapeIcsText(schedule.uid));
-    if (sharedDtstamp) lines.push("DTSTAMP:" + sharedDtstamp);
-    if (dtstartLine) lines.push("DTSTART:" + dtstartLine);
-    if (dtendLine) lines.push("DTEND:" + dtendLine);
-    if (statusText) lines.push("STATUS:" + escapeIcsText(statusText));
-    lines.push("SUMMARY:" + escapeIcsText(schedule.label || schedule.uid));
-    lines.push("LOCATION:" + escapeIcsText(schedule.location || ""));
-    if (schedule.tzid) lines.push("X-SCHEDULY-TZID:" + escapeIcsText(schedule.tzid));
-    lines.push("SEQUENCE:" + String(index));
-    lines.push("END:VEVENT");
-  });
-
-  lines.push("END:VCALENDAR");
-  return lines.join(ICS_LINE_BREAK) + ICS_LINE_BREAK;
-};
-
-const SAMPLE_SCHEDULE_DETAILS = {
-  "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
-    id: "day1",
-    counts: { o: 8, d: 3, x: 1 },
-    responses: [
-      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "オフィス参加可" },
-      { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
-      { participantId: "tanaka", name: "田中 一郎", mark: "o", comment: "コメントなし" },
-      { participantId: "others", name: "・・・", mark: "pending", comment: "残り9名の回答は実装時に取得" }
-    ]
-  },
-  "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
-    id: "day2",
-    counts: { o: 4, d: 5, x: 3 },
-    responses: [
-      { participantId: "sato", name: "佐藤 太郎", mark: "d", comment: "オンラインなら可" },
-      { participantId: "suzuki", name: "鈴木 花子", mark: "d", comment: "開始時間を 19:00 にできれば ○" },
-      { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "平日は難しいです。" },
-      { participantId: "others", name: "・・・", mark: "pending", comment: "他 8 名の回答を表示（実装時にロード）" }
-    ]
-  },
-  "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
-    id: "day3",
-    counts: { o: 6, d: 2, x: 4 },
-    responses: [
-      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "コメントなし" },
-      { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "20:00 までなら参加可" },
-      { participantId: "tanaka", name: "田中 一郎", mark: "x", comment: "他会議とバッティング" }
-    ]
-  },
-  "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
-    id: "day4",
-    counts: { o: 14, d: 1, x: 0 },
-    responses: [
-      { participantId: "sato", name: "佐藤 太郎", mark: "o", comment: "終日参加可能" },
-      { participantId: "suzuki", name: "鈴木 花子", mark: "o", comment: "午前は在宅参加になります" },
-      { participantId: "tanaka", name: "田中 一郎", mark: "o", comment: "午前に別予定があったが調整済み" },
-      { participantId: "others", name: "・・・", mark: "pending", comment: "詳細は未回答" }
-    ]
-  }
-};
-
-const PARTICIPANTS = [
-  {
-    id: "sato",
-    name: "佐藤 太郎",
-    lastUpdated: "2025/04/12 17:42",
-    commentHighlights: ["コメント記入: Day2"],
-    responses: [
-      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: オフィス参加可" },
-      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "d", comment: "コメント: オンラインなら参加可能" },
-      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 特になし" },
-      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 終日参加可能" }
-    ]
-  },
-  {
-    id: "suzuki",
-    name: "鈴木 花子",
-    lastUpdated: "2025/04/10 09:15",
-    commentHighlights: ["コメント記入: Day1 / Day3"],
-    responses: [
-      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "d", comment: "コメント: 子どものお迎えがあるため 16:30 まで" },
-      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 開始時間を 19:00 にできれば参加可" },
-      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "o", comment: "コメント: 20:00 までなら参加可" },
-      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "o", comment: "コメント: 午前は在宅参加になります" }
-    ]
-  },
-  {
-    id: "tanaka",
-    name: "田中 一郎",
-    lastUpdated: "2025/04/05 21:03",
-    commentHighlights: ["コメント記入: Day2 / Day3"],
-    responses: [
-      { scheduleId: "day1", datetime: "2025/10/26(日) 13:00 – 17:00", mark: "o", comment: "コメント: 自家用車で参加予定" },
-      { scheduleId: "day2", datetime: "2025/10/27(月) 18:00 – 21:00", mark: "x", comment: "コメント: 平日は別件の会議があり難しい" },
-      { scheduleId: "day3", datetime: "2025/10/28(火) 18:00 – 21:00", mark: "x", comment: "コメント: 他プロジェクトとバッティング" },
-      { scheduleId: "day4", datetime: "2025/11/03(月) 10:00 – 12:00", mark: "pending", comment: "コメント: 未回答（フォロー待ち）" }
-    ]
-  }
-];
 
 const STATUS_LABELS = {
   CONFIRMED: { label: "確定", badgeClass: "bg-emerald-100 text-emerald-700" },
@@ -191,26 +51,153 @@ function formatStatusBadge(status) {
   };
 }
 
-function participantTotals(participant) {
-  return participant.responses.reduce(
-    (totals, response) => {
-      if (response.mark === "o" || response.mark === "d" || response.mark === "x") {
-        totals[response.mark] += 1;
-      } else {
-        totals.pending += 1;
-      }
-      return totals;
-    },
-    { o: 0, d: 0, x: 0, pending: 0 }
-  );
-}
+const normalizeMark = (mark) => {
+  const value = typeof mark === "string" ? mark.trim().toLowerCase() : "";
+  if (value === "o" || value === "d" || value === "x") return value;
+  return "pending";
+};
 
-function ScheduleSummary({ schedule }) {
-  const [open, setOpen] = useState(schedule.id === "day1");
+const createScheduleSummaries = (candidates, participants, responses) => {
+  const participantMap = new Map((participants || []).map((participant) => [participant.id, participant]));
+  const responseMap = new Map();
+  (responses || []).forEach((response) => {
+    if (!response || !response.candidateId) return;
+    const list = responseMap.get(response.candidateId) || [];
+    list.push(response);
+    responseMap.set(response.candidateId, list);
+  });
+
+  const summaries = (candidates || []).map((candidate) => {
+    const rangeLabel = formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
+    const counts = { o: 0, d: 0, x: 0, pending: 0 };
+    const detailed = [];
+    const respondedIds = new Set();
+
+    const candidateResponses = responseMap.get(candidate.id) || [];
+    candidateResponses.forEach((response) => {
+      const mark = normalizeMark(response.mark);
+      if (counts[mark] !== undefined) counts[mark] += 1;
+      else counts.pending += 1;
+      const participant = participantMap.get(response.participantId);
+      detailed.push({
+        participantId: response.participantId,
+        name: participant?.displayName || "参加者",
+        mark,
+        comment: response.comment || "コメントなし"
+      });
+      respondedIds.add(response.participantId);
+    });
+
+    (participants || []).forEach((participant) => {
+      if (!participant || respondedIds.has(participant.id)) return;
+      counts.pending += 1;
+      detailed.push({
+        participantId: participant.id,
+        name: participant.displayName || "参加者",
+        mark: "pending",
+        comment: "未回答"
+      });
+    });
+
+    detailed.sort((a, b) => {
+      if (a.mark === "pending" && b.mark !== "pending") return 1;
+      if (b.mark === "pending" && a.mark !== "pending") return -1;
+      return (a.name || "").localeCompare(b.name || "", "ja");
+    });
+
+    return {
+      id: candidate.id,
+      uid: candidate.uid,
+      label: candidate.summary || "タイトル未設定",
+      summary: candidate.summary || "タイトル未設定",
+      rangeLabel,
+      dtstart: candidate.dtstart,
+      dtend: candidate.dtend,
+      location: candidate.location || "",
+      description: candidate.description || "",
+      status: candidate.status || "TENTATIVE",
+      tzid: candidate.tzid || DEFAULT_TZID,
+      counts,
+      responses: detailed
+    };
+  });
+
+  summaries.sort((a, b) => {
+    const aTime = a.dtstart ? new Date(a.dtstart).getTime() : Number.POSITIVE_INFINITY;
+    const bTime = b.dtstart ? new Date(b.dtstart).getTime() : Number.POSITIVE_INFINITY;
+    if (aTime === bTime) {
+      return (a.label || "").localeCompare(b.label || "", "ja");
+    }
+    return aTime - bTime;
+  });
+
+  return summaries;
+};
+
+const formatTimestampForDisplay = (isoString) => {
+  if (!isoString) return "—";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+};
+
+const createParticipantSummaries = (participants, candidates, responses) => {
+  const candidateLookup = new Map((candidates || []).map((candidate) => [candidate.id, candidate]));
+  const responseLookup = new Map();
+  (responses || []).forEach((response) => {
+    if (!response || !response.participantId || !response.candidateId) return;
+    let map = responseLookup.get(response.participantId);
+    if (!map) {
+      map = new Map();
+      responseLookup.set(response.participantId, map);
+    }
+    map.set(response.candidateId, response);
+  });
+
+  return (participants || []).map((participant) => {
+    const candidateMap = responseLookup.get(participant.id) || new Map();
+    const responsesForParticipant = (candidates || []).map((candidate) => {
+      const found = candidateMap.get(candidate.id);
+      const mark = normalizeMark(found?.mark);
+      const comment = found?.comment ? `コメント: ${found.comment}` : "コメント: 未入力";
+      return {
+        scheduleId: candidate.id,
+        datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
+        mark,
+        comment
+      };
+    });
+
+    const commentHighlights = [];
+    responsesForParticipant.forEach((item) => {
+      if (item.comment && item.comment !== "コメント: 未入力") {
+        commentHighlights.push(`コメント記入: ${candidateLookup.get(item.scheduleId)?.summary || "候補"}`);
+      }
+    });
+
+    return {
+      id: participant.id,
+      name: participant.displayName || "参加者",
+      lastUpdated: formatTimestampForDisplay(participant.updatedAt),
+      commentHighlights: Array.from(new Set(commentHighlights)),
+      responses: responsesForParticipant
+    };
+  });
+};
+
+function ScheduleSummary({ schedule, defaultOpen = false }) {
+  const [open, setOpen] = useState(Boolean(defaultOpen));
 
   useEffect(() => {
-    setOpen((prev) => (schedule.id === "day1" ? true : prev));
-  }, [schedule.id]);
+    setOpen(Boolean(defaultOpen));
+  }, [defaultOpen]);
 
   const status = formatStatusBadge(schedule.status);
 
@@ -228,7 +215,7 @@ function ScheduleSummary({ schedule }) {
           <EventMeta
             summary={schedule.label}
             summaryClassName="text-base font-semibold text-zinc-800"
-            dateTime={schedule.rangeLabel || schedule.datetime}
+            dateTime={schedule.rangeLabel}
             dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-zinc-600"
             description={schedule.description}
             descriptionClassName="text-xs text-zinc-500"
@@ -250,8 +237,11 @@ function ScheduleSummary({ schedule }) {
         </div>
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
-        {schedule.responses.map((response) => (
-          <li key={response.name} className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+        {schedule.responses.map((response, index) => (
+          <li
+            key={response.participantId || `${schedule.id}-resp-${index}`}
+            className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
+          >
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="font-semibold text-zinc-800">{response.name}</div>
@@ -273,6 +263,20 @@ function ScheduleSummary({ schedule }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+function participantTotals(participant) {
+  return participant.responses.reduce(
+    (totals, response) => {
+      if (response.mark === "o" || response.mark === "d" || response.mark === "x") {
+        totals[response.mark] += 1;
+      } else {
+        totals.pending += 1;
+      }
+      return totals;
+    },
+    { o: 0, d: 0, x: 0, pending: 0 }
   );
 }
 
@@ -321,9 +325,9 @@ function ParticipantSummary({ participant, defaultOpen, scheduleLookup }) {
         {participant.responses.map((response) => {
           const schedule = scheduleLookup ? scheduleLookup.get(response.scheduleId) : null;
           const rangeLabel = schedule
-            ? formatDateTimeRangeLabel(schedule.startsAt, schedule.endsAt, schedule.tzid)
+            ? formatDateTimeRangeLabel(schedule.dtstart, schedule.dtend, schedule.tzid || DEFAULT_TZID)
             : response.datetime;
-          const summaryLabel = schedule ? schedule.label : response.datetime;
+          const summaryLabel = schedule ? schedule.summary || schedule.label : response.datetime;
           const location = schedule?.location;
           const description = schedule?.description;
           const timezone = schedule?.tzid;
@@ -398,132 +402,101 @@ function TabNavigation({ activeTab, onChange }) {
   );
 }
 
-function AdminResponsesApp() {
-  const [activeTab, setActiveTab] = useState("schedule");
-  const [schedules, setSchedules] = useState([]);
-  const [schedulesLoading, setSchedulesLoading] = useState(true);
-  const [schedulesError, setSchedulesError] = useState("");
-  const [icsSource, setIcsSource] = useState("");
+const downloadIcsFile = (filename, contents) => {
+  if (!contents) return;
+  const blob = new Blob([contents], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  window.setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 0);
+};
 
-  const scheduleLookup = useMemo(() => {
-    const map = new Map();
-    schedules.forEach((schedule) => {
-      map.set(schedule.id, schedule);
-    });
-    return map;
-  }, [schedules]);
+function AdminResponsesApp() {
+  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const [activeTab, setActiveTab] = useState("schedule");
+  const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-
-    const loadSchedulesFromIcs = async () => {
-      setSchedulesLoading(true);
-      setSchedulesError("");
-      try {
-        await waitForIcal();
-        const icsUrl = getSampleIcsUrl();
-        logDebug("fetching ICS", icsUrl);
-        const response = await fetch(icsUrl, { cache: "no-cache" });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
-        }
-        const text = await response.text();
-        const ICAL = ensureICAL();
-        const parsed = ICAL.parse(text);
-        const component = new ICAL.Component(parsed);
-        const vevents = component.getAllSubcomponents("vevent") || [];
-        logDebug("parsed VEVENT count", vevents.length);
-        if (!vevents.length) {
-          throw new Error("No VEVENT entries in sample ICS");
-        }
-        const converted = [];
-        for (let i = 0; i < vevents.length; i += 1) {
-          const vevent = vevents[i];
-          const event = new ICAL.Event(vevent);
-          if (!event.uid) continue;
-          const details = SAMPLE_SCHEDULE_DETAILS[event.uid];
-          const startDate = event.startDate ? event.startDate.toJSDate() : null;
-          const endDate = event.endDate ? event.endDate.toJSDate() : null;
-          const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
-          const rangeLabel = formatDateTimeRangeLabel(startDate, endDate, tzid);
-
-          converted.push({
-            uid: event.uid,
-            id: details?.id || event.uid,
-            label: event.summary || event.uid,
-            datetime: rangeLabel,
-            rangeLabel,
-            location: event.location || "",
-            status: event.status || "TENTATIVE",
-            tzid,
-            startsAt: startDate ? startDate.toISOString() : null,
-            endsAt: endDate ? endDate.toISOString() : null,
-            counts: details?.counts ? { ...details.counts } : { o: 0, d: 0, x: 0 },
-            description: event.description || "",
-            responses: details?.responses ? details.responses.map((item) => ({ ...item })) : []
-          });
-        }
-        converted.sort((a, b) => {
-          if (a.startsAt && b.startsAt) {
-            return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
-          }
-          return (a.label || "").localeCompare(b.label || "", "ja");
-        });
-        logDebug("schedules after conversion", converted);
-        if (!cancelled) {
-          setSchedules(converted);
-          setIcsSource(text);
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn("[Scheduly] failed to hydrate participant schedules from ICS, leaving schedules empty", error);
-        if (!cancelled) {
-          setSchedules([]);
-          setSchedulesError(error instanceof Error ? error.message : String(error));
-          logDebug("load schedules error", error);
-          setIcsSource("");
-        }
-      } finally {
-        if (!cancelled) {
-          setSchedulesLoading(false);
-        }
+    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
+      if (!cancelled && nextState) {
+        setProjectState(nextState);
       }
-    };
+    });
 
-    loadSchedulesFromIcs();
+    ensureDemoProjectData(projectId)
+      .then(() => {
+        if (!cancelled) setLoadError("");
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn("[Scheduly] failed to seed demo data", error);
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    setProjectState(projectStore.getProjectStateSnapshot(projectId));
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, []);
+  }, [projectId]);
 
-  const downloadIcsFile = (filename, contents) => {
-    if (!contents) return;
-    const blob = new Blob([contents], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    window.setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 0);
-  };
+  const candidates = projectState.candidates || [];
+  const participants = projectState.participants || [];
+  const responses = projectState.responses || [];
+
+  const schedules = useMemo(
+    () => createScheduleSummaries(candidates, participants, responses),
+    [candidates, participants, responses]
+  );
+
+  const scheduleLookup = useMemo(() => {
+    const map = new Map();
+    schedules.forEach((schedule) => map.set(schedule.id, schedule));
+    return map;
+  }, [schedules]);
+
+  const participantSummaries = useMemo(
+    () => createParticipantSummaries(participants, candidates, responses),
+    [participants, candidates, responses]
+  );
 
   const handleDownloadAllIcs = () => {
-    const source = icsSource || buildIcsFromSchedules(schedules);
-    if (!source) {
+    let icsText = projectState.icsText || "";
+    if (!icsText) {
+      try {
+        icsText = scheduleService.exportAllCandidatesToIcs(projectId);
+      } catch (error) {
+        logDebug("ICS export failed", error);
+        icsText = "";
+      }
+    }
+    if (!icsText) {
       logDebug("skip ICS download: no data");
       return;
     }
-    const filename = `scheduly-schedules-${new Date().toISOString().split("T")[0]}.ics`;
-    downloadIcsFile(filename, source);
+    const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
+    downloadIcsFile(filename, icsText);
   };
 
-  const hasIcsData = Boolean((icsSource && icsSource.trim()) || schedules.length);
+  const hasIcsData = Boolean((projectState.icsText && projectState.icsText.trim()) || schedules.length);
+  const participantCount = participants.length;
+
+  const projectName = projectState.project?.name || DASHBOARD_META.projectName;
+  const projectDescription = projectState.project?.description || DASHBOARD_META.description;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -535,12 +508,10 @@ function AdminResponsesApp() {
               <span aria-hidden="true">📋</span>
               <span>Scheduly 参加者</span>
             </h1>
-            <p className="mt-2 text-sm text-zinc-600">
-              プロジェクト「{DASHBOARD_META.projectName}」の日程と回答状況です。
-            </p>
-            {DASHBOARD_META.description ? (
-              <p className="mt-1 text-xs text-zinc-500">{DASHBOARD_META.description}</p>
-            ) : null}
+            <p className="mt-2 text-sm text-zinc-600">プロジェクト「{projectName}」の日程と回答状況です。</p>
+            {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
+            <p className="mt-1 text-xs text-zinc-500">締切目安: {DASHBOARD_META.deadline}</p>
+            <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
@@ -560,19 +531,19 @@ function AdminResponsesApp() {
       {activeTab === "schedule" && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">日程ごとの回答サマリー</h2>
-          {schedulesLoading && !schedules.length ? (
+          {loading && !schedules.length ? (
             <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center text-xs text-emerald-600">
               日程データを読み込んでいます…
             </div>
           ) : schedules.length ? (
-            schedules.map((schedule) => <ScheduleSummary key={schedule.id} schedule={schedule} />)
+            schedules.map((schedule, index) => (
+              <ScheduleSummary key={schedule.id} schedule={schedule} defaultOpen={index === 0} />
+            ))
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
               表示できる日程がありません。
-              {schedulesError && (
-                <span className="mt-2 block text-[11px] text-rose-500">
-                  読み込みエラー: {schedulesError}
-                </span>
+              {loadError && (
+                <span className="mt-2 block text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
               )}
             </div>
           )}
@@ -583,14 +554,20 @@ function AdminResponsesApp() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
           <div className="space-y-3">
-              {PARTICIPANTS.map((participant, index) => (
+            {participantSummaries.length ? (
+              participantSummaries.map((participant, index) => (
                 <ParticipantSummary
                   key={participant.id}
                   participant={participant}
                   defaultOpen={index === 0}
                   scheduleLookup={scheduleLookup}
                 />
-              ))}
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
+                表示できる参加者がありません。
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">

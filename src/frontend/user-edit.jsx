@@ -2,57 +2,14 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
+import projectStore from "./store/project-store";
+import { ensureDemoProjectData } from "./shared/demo-data";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
-const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger, sanitizeTzid } = sharedIcalUtils;
-
-const logDebug = createLogger("user-edit");
+const { DEFAULT_TZID, sanitizeTzid } = sharedIcalUtils;
 
 const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
-
-const SAMPLE_CANDIDATE_METADATA = {
-  "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": {
-    legacyId: "2025-10-26",
-    tally: { o: 12, d: 3, x: 2 },
-    responses: [
-      { name: "佐藤", mark: "o" },
-      { name: "鈴木", mark: "o" },
-      { name: "田中", mark: "o" },
-      { name: "高橋", mark: "d" },
-      { name: "伊藤", mark: "x" }
-    ]
-  },
-  "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": {
-    legacyId: "2025-10-27",
-    tally: { o: 8, d: 4, x: 5 },
-    responses: [
-      { name: "佐藤", mark: "o" },
-      { name: "鈴木", mark: "d" },
-      { name: "田中", mark: "x" },
-      { name: "高橋", mark: "x" }
-    ]
-  },
-  "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": {
-    legacyId: "2025-10-28",
-    tally: { o: 10, d: 2, x: 3 },
-    responses: [
-      { name: "佐藤", mark: "d" },
-      { name: "鈴木", mark: "o" },
-      { name: "田中", mark: "o" }
-    ]
-  },
-  "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": {
-    legacyId: "2025-11-03",
-    tally: { o: 14, d: 1, x: 0 },
-    responses: [
-      { name: "佐藤", mark: "o" },
-      { name: "鈴木", mark: "o" },
-      { name: "田中", mark: "o" },
-      { name: "高橋", mark: "o" }
-    ]
-  }
-};
 
 const deriveTally = (responses) => {
   return responses.reduce(
@@ -64,6 +21,117 @@ const deriveTally = (responses) => {
     },
     { o: 0, d: 0, x: 0 }
   );
+};
+
+const normalizeResponseMark = (mark) => {
+  const value = typeof mark === "string" ? mark.trim().toLowerCase() : "";
+  if (value === "o" || value === "d" || value === "x") return value;
+  return "pending";
+};
+
+const formatTimestampForDisplay = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+};
+
+const buildCandidateViews = (state) => {
+  if (!state) return [];
+  const participants = state.participants || [];
+  const participantsMap = new Map(participants.map((participant) => [participant.id, participant]));
+  const responses = state.responses || [];
+  const responsesByCandidate = new Map();
+  responses.forEach((response) => {
+    if (!response || !response.candidateId) return;
+    const list = responsesByCandidate.get(response.candidateId) || [];
+    list.push(response);
+    responsesByCandidate.set(response.candidateId, list);
+  });
+
+  const toTime = (value) => {
+    if (!value) return Number.POSITIVE_INFINITY;
+    const time = Date.parse(value);
+    return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+  };
+
+  return (state.candidates || []).map((candidate) => {
+    const detailed = [];
+    const tallySeed = [];
+    const responded = new Set();
+    const candidateResponses = responsesByCandidate.get(candidate.id) || [];
+
+    candidateResponses.forEach((response) => {
+      const mark = normalizeResponseMark(response.mark);
+      tallySeed.push({ mark });
+      const participant = participantsMap.get(response.participantId);
+      detailed.push({
+        id: response.participantId,
+        name: participant?.displayName || "参加者",
+        mark,
+        comment: response.comment || "コメントなし"
+      });
+      responded.add(response.participantId);
+    });
+
+    participants.forEach((participant) => {
+      if (!participant || responded.has(participant.id)) return;
+      tallySeed.push({ mark: "pending" });
+      detailed.push({
+        id: participant.id,
+        name: participant.displayName || "参加者",
+        mark: "pending",
+        comment: "未回答"
+      });
+    });
+
+    detailed.sort((a, b) => {
+      if (a.mark === "pending" && b.mark !== "pending") return 1;
+      if (b.mark === "pending" && a.mark !== "pending") return -1;
+      return (a.name || "").localeCompare(b.name || "", "ja");
+    });
+
+    return {
+      ...candidate,
+      tally: deriveTally(tallySeed),
+      responses: detailed
+    };
+  }).sort((a, b) => toTime(a.dtstart) - toTime(b.dtstart));
+};
+
+const buildAnswersForParticipant = (state, participantId) => {
+  const answers = {};
+  if (!state || !participantId) return answers;
+  const responses = state.responses || [];
+  const responsesByParticipant = new Map();
+  responses.forEach((response) => {
+    if (!response || !response.participantId || !response.candidateId) return;
+    if (!responsesByParticipant.has(response.participantId)) {
+      responsesByParticipant.set(response.participantId, new Map());
+    }
+    responsesByParticipant.get(response.participantId).set(response.candidateId, response);
+  });
+  const participantResponses = responsesByParticipant.get(participantId) || new Map();
+  (state.candidates || []).forEach((candidate) => {
+    const entry = participantResponses.get(candidate.id);
+    if (entry) {
+      const mark = normalizeResponseMark(entry.mark);
+      answers[candidate.id] = {
+        mark: mark === "pending" ? null : mark,
+        comment: entry.comment || ""
+      };
+    } else {
+      answers[candidate.id] = { mark: null, comment: "" };
+    }
+  });
+  return answers;
 };
 
 const ICAL_STATUS_LABELS = {
@@ -199,6 +267,7 @@ const ParticipantList = ({ list, label, color }) => (
 );
 
 function SchedulyMock() {
+  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -207,6 +276,8 @@ function SchedulyMock() {
   const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [selectedParticipantId, setSelectedParticipantId] = useState(null);
 
   const itemRefs = useRef({});
   const commentTextareaRef = useRef(null);
@@ -218,107 +289,87 @@ function SchedulyMock() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadCandidates = async () => {
-      setLoading(true);
-      setLoadError("");
-      try {
-        await waitForIcal();
-        const icsUrl = getSampleIcsUrl();
-        logDebug("fetching ICS", icsUrl);
-        const response = await fetch(icsUrl, { cache: "no-cache" });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
+    const syncFromState = (nextState, { resetAnswers = false } = {}) => {
+      if (!nextState) return;
+      const participantList = nextState.participants || [];
+      setParticipants(participantList);
+
+      let editingId = selectedParticipantId;
+      const hasEditingParticipant =
+        editingId && participantList.some((participant) => participant && participant.id === editingId);
+      if (!hasEditingParticipant) {
+        editingId = participantList[0]?.id || null;
+        if (editingId !== selectedParticipantId) {
+          setSelectedParticipantId(editingId);
         }
-        const text = await response.text();
-        const ICAL = ensureICAL();
-        const parsed = ICAL.parse(text);
-        const component = new ICAL.Component(parsed);
-        const vevents = component.getAllSubcomponents("vevent") || [];
-        logDebug("parsed VEVENT count", vevents.length);
-        const converted = [];
-        for (let i = 0; i < vevents.length; i += 1) {
-          const vevent = vevents[i];
-          const event = new ICAL.Event(vevent);
-          if (!event.uid) continue;
-          const metadata = SAMPLE_CANDIDATE_METADATA[event.uid] || null;
-          const startDate = event.startDate ? event.startDate.toJSDate() : null;
-          const endDate = event.endDate ? event.endDate.toJSDate() : null;
-          const tzid = sanitizeTzid((event.startDate && event.startDate.zone && event.startDate.zone.tzid) || DEFAULT_TZID);
-          const dtstampProp = vevent.getFirstPropertyValue("dtstamp");
-          const dtstampIso = dtstampProp ? dtstampProp.toJSDate().toISOString() : new Date().toISOString();
-          const sequenceValue = typeof event.sequence === "number" ? event.sequence : Number(event.sequence || 0);
-          const responses = metadata?.responses ? metadata.responses.map((item, idx) => ({ ...item, id: idx })) : [];
-          const tally = metadata?.tally || deriveTally(responses);
-          const legacyId = metadata?.legacyId || event.uid;
-          converted.push({
-            uid: event.uid,
-            id: legacyId,
-            summary: event.summary || "(タイトル未設定)",
-            dtstart: startDate ? startDate.toISOString() : "",
-            dtend: endDate ? endDate.toISOString() : "",
-            tzid,
-            status: event.status || "TENTATIVE",
-            sequence: Number.isFinite(sequenceValue) ? sequenceValue : 0,
-            dtstamp: dtstampIso,
-            location: event.location || "",
-            description: event.description || "",
-            tally,
-            responses,
-            rawIcs: vevent.toJSON()
-          });
+        resetAnswers = true;
+      }
+
+      const candidateViews = buildCandidateViews(nextState);
+      setCandidates(candidateViews);
+
+      if (resetAnswers) {
+        if (editingId) {
+          setAnswers(buildAnswersForParticipant(nextState, editingId));
+          const participant = participantList.find((item) => item && item.id === editingId);
+          setSavedAt(formatTimestampForDisplay(participant?.updatedAt));
+        } else {
+          setAnswers({});
+          setSavedAt("");
         }
-        converted.sort((a, b) => {
-          const aTime = a.dtstart ? Date.parse(a.dtstart) : Number.POSITIVE_INFINITY;
-          const bTime = b.dtstart ? Date.parse(b.dtstart) : Number.POSITIVE_INFINITY;
-          return aTime - bTime;
-        });
-        logDebug("candidates after conversion", converted);
-        if (!converted.length) {
-          throw new Error("No VEVENT entries in sample ICS");
-        }
-        if (!cancelled) {
-          setCandidates(converted);
-          setIndex(0);
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn("[Scheduly][user-edit] failed to hydrate candidates from ICS", error);
-        if (!cancelled) {
-          setCandidates([]);
-          setLoadError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        setIndex(0);
       }
     };
 
-    loadCandidates();
+    const initialSnapshot = projectStore.getProjectStateSnapshot(projectId);
+    syncFromState(initialSnapshot, { resetAnswers: true });
+
+    setLoading(true);
+    ensureDemoProjectData(projectId)
+      .then(() => {
+        if (cancelled) return;
+        setLoadError("");
+        const snapshot = projectStore.getProjectStateSnapshot(projectId);
+        syncFromState(snapshot, { resetAnswers: true });
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn("[Scheduly][user-edit] failed to seed demo data", error);
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
+      if (!cancelled) syncFromState(nextState);
+    });
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, []);
+  }, [projectId, selectedParticipantId]);
 
   const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
   const currentCandidate = candidates.length ? candidates[safeIndex] : null;
-  const mark = currentCandidate ? (answers[currentCandidate.id] && answers[currentCandidate.id].mark) || null : null;
-  const currentComment = currentCandidate
-    ? (answers[currentCandidate.id] && answers[currentCandidate.id].comment) || ""
-    : "";
+  const mark = currentCandidate ? answers[currentCandidate.id]?.mark || null : null;
+  const currentComment = currentCandidate ? answers[currentCandidate.id]?.comment || "" : "";
   const currentDateRange = currentCandidate
     ? formatDateTimeRangeLabel(currentCandidate.dtstart, currentCandidate.dtend, currentCandidate.tzid)
     : "";
   const detailCandidate = detailCandidateId ? candidates.find((candidate) => candidate.id === detailCandidateId) || null : null;
 
   const completeCount = useMemo(() => {
-    return candidates.reduce((acc, candidate) => (answers[candidate.id] && answers[candidate.id].mark ? acc + 1 : acc), 0);
+    return candidates.reduce((acc, candidate) => (answers[candidate.id]?.mark ? acc + 1 : acc), 0);
   }, [answers, candidates]);
 
   const maxTallyO = useMemo(() => {
     return candidates.reduce((max, candidate) => Math.max(max, candidate.tally ? candidate.tally.o : 0), 0);
   }, [candidates]);
+
+  const editingParticipant = participants.find((participant) => participant.id === selectedParticipantId) || null;
+  const participantName = editingParticipant?.displayName || "匿名参加者";
 
   useEffect(() => {
     if (!currentCandidate) return undefined;
@@ -471,7 +522,7 @@ function SchedulyMock() {
               <span aria-hidden="true">✏️</span>
               <span>Scheduly 回答編集</span>
             </h1>
-            <p className="mt-1 text-xs text-zinc-500">参加者「高橋」さんの回答を編集します。</p>
+            <p className="mt-1 text-xs text-zinc-500">参加者「{participantName}」さんの回答を編集します。</p>
             <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
           <div className="flex flex-col items-end gap-2 text-xs text-zinc-500">
@@ -479,7 +530,7 @@ function SchedulyMock() {
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
                 <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
               </span>
-              <span>👤 匿名参加者</span>
+              <span>👤 {participantName}</span>
               <a
                 href="./user.html"
                 className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"

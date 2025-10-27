@@ -1,6 +1,9 @@
 # scheduly
 
-Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
+Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)、データ構造は [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、フローと内部 API の草案は [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md) を参照してください。
+
+> ⚠ **匿名アクセスの注意**  
+> 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
@@ -43,7 +46,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 - 主なファイル
   - `scheduly-admin-mock.html`: 管理画面の見た目を再現したモック。インポート／エクスポートなどのボタンはトースト表示のみの仮実装です。
   - `scheduly-user-mock.html`: 参加者回答一覧ビュー（タブ切り替え含む）のワイヤーフレーム。表示のみで実データ連携は行いません。
-  - `scheduly-user-edit-mock.html`: 参加者向け回答編集モック（スマホ想定）。○△× の選択やトースト表示なども画面確認用途です。
+  - `scheduly-user-edit-mock.html`: 個別参加者の回答編集画面を再現したモック。○△× の選択やサマリーは見た目確認のみで、操作は反映されません。
 - 使い方
   1. 対象の HTML をブラウザで直接開く
   2. レイアウトやスタイル差分を確認する（挙動は React 版を参照）
