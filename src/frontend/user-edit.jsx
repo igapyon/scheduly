@@ -468,10 +468,10 @@ function SchedulyMock() {
     touchSavedAt();
   };
 
-  const handleCommentChange = (value) => {
-    if (!currentCandidate || !selectedParticipantId) return;
-    setAnswers((prev) => {
-      const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
+const handleCommentChange = (value) => {
+  if (!currentCandidate || !selectedParticipantId) return;
+  setAnswers((prev) => {
+    const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
       return {
         ...prev,
         [currentCandidate.id]: {
@@ -482,17 +482,26 @@ function SchedulyMock() {
     });
   };
 
-  const commitComment = (value) => {
-    if (!currentCandidate || !selectedParticipantId) return;
-    const currentMark = answersRef.current[currentCandidate.id]?.mark || null;
-    responseService.upsertResponse(projectId, {
-      participantId: selectedParticipantId,
-      candidateId: currentCandidate.id,
-      mark: currentMark || "pending",
-      comment: value
-    });
-    touchSavedAt();
-  };
+const commitComment = (value) => {
+  if (!currentCandidate || !selectedParticipantId) return;
+  const currentEntry = answersRef.current[currentCandidate.id] || { mark: null, comment: "" };
+  const participantsResponses = projectStore.getResponses(projectId) || [];
+  const existing = participantsResponses.find(
+    (response) => response && response.participantId === selectedParticipantId && response.candidateId === currentCandidate.id
+  );
+  const existingComment = existing?.comment || "";
+  if (existingComment === value) {
+    return;
+  }
+  const currentMark = currentEntry.mark || null;
+  responseService.upsertResponse(projectId, {
+    participantId: selectedParticipantId,
+    candidateId: currentCandidate.id,
+    mark: currentMark || "pending",
+    comment: value
+  });
+  touchSavedAt();
+};
 
   const go = (dir) => {
     if (!candidates.length) return;
