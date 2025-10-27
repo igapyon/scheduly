@@ -6,8 +6,9 @@ import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
+import { ensureDemoProjectData } from "./shared/demo-data";
 
-const { DEFAULT_TZID, ensureICAL, waitForIcal, getSampleIcsUrl, createLogger } = sharedIcalUtils;
+const { DEFAULT_TZID, ensureICAL, createLogger } = sharedIcalUtils;
 
 const {
   addCandidate: addScheduleCandidate,
@@ -468,55 +469,23 @@ function OrganizerApp() {
 
   useEffect(() => {
     let cancelled = false;
+    setInitialDataLoaded(false);
 
-    const loadSampleIcs = async () => {
-      try {
-        await waitForIcal();
-        const icsUrl = getSampleIcsUrl();
-        logDebug("fetching ICS", icsUrl);
-        const response = await fetch(icsUrl, { cache: "no-cache" });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch sample ICS: ${response.status}`);
-        }
-        const text = await response.text();
-        const ICAL = ensureICAL();
-        const parsed = ICAL.parse(text);
-        const component = new ICAL.Component(parsed);
-        const vevents = component.getAllSubcomponents("vevent") || [];
-        const loadedCandidates = [];
-        logDebug("parsed VEVENT count", vevents.length);
-        for (let i = 0; i < vevents.length; i += 1) {
-          const candidate = mapVeventToCandidate(vevents[i]);
-          if (candidate) {
-            loadedCandidates.push(candidate);
-          }
-        }
-        if (!loadedCandidates.length) {
-          throw new Error("No VEVENT entries found in sample ICS");
-        }
-        if (!cancelled) {
-          replaceCandidatesFromImport(projectId, loadedCandidates, text);
-        }
-      } catch (error) {
+    ensureDemoProjectData(projectId)
+      .catch((error) => {
         // eslint-disable-next-line no-console
-        console.warn("[Scheduly] sample ICS load failed; candidates will remain empty until manual input", error);
-        if (!cancelled) {
-          replaceCandidatesFromImport(projectId, [], "");
-          logDebug("load candidates error", error);
-        }
-      } finally {
+        console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
+      })
+      .finally(() => {
         if (!cancelled) {
           setInitialDataLoaded(true);
         }
-      }
-    };
-
-    loadSampleIcs();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [projectId]);
 
   const downloadTextFile = (filename, text) => {
     const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });

@@ -35,14 +35,16 @@ const upsertResponse = (projectId, payload) => {
   const id = buildResponseId(payload.participantId, payload.candidateId);
   const existing = responses.find((item) => item && item.id === id);
   const timestamp = new Date().toISOString();
+  const createdAt = payload?.createdAt || (existing && existing.createdAt) || timestamp;
+  const updatedAt = payload?.updatedAt || timestamp;
   const response = {
     id,
     participantId: payload.participantId,
     candidateId: payload.candidateId,
     mark: normalizeMark(payload.mark),
     comment: payload.comment || "",
-    createdAt: existing?.createdAt || timestamp,
-    updatedAt: timestamp
+    createdAt,
+    updatedAt
   };
   projectStore.upsertResponse(projectId, response);
   return response;
@@ -68,8 +70,8 @@ const bulkImportResponses = (projectId, list) => {
       candidateId: item.candidateId,
       mark: normalizeMark(item.mark),
       comment: item.comment || "",
-      createdAt: previous?.createdAt || timestamp,
-      updatedAt: timestamp
+      createdAt: item.createdAt || previous?.createdAt || timestamp,
+      updatedAt: item.updatedAt || timestamp
     };
     merged.set(id, response);
     imported.push(response);

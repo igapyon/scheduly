@@ -48,14 +48,16 @@ const addParticipant = (projectId, payload) => {
   const timestamp = new Date().toISOString();
   const id = randomUUID();
   const token = ensureUniqueToken(payload?.token, projectId, id);
+  const createdAt = payload?.createdAt || timestamp;
+  const updatedAt = payload?.updatedAt || timestamp;
   const participant = {
     id,
     token,
     displayName: payload?.displayName || "",
     email: payload?.email || "",
     comment: payload?.comment || "",
-    createdAt: timestamp,
-    updatedAt: timestamp
+    createdAt,
+    updatedAt
   };
   projectStore.upsertParticipant(projectId, participant);
   return participant;
@@ -75,7 +77,7 @@ const updateParticipant = (projectId, participantId, changes) => {
     email: changes?.email ?? existing.email,
     comment: changes?.comment ?? existing.comment,
     token: nextToken,
-    updatedAt: new Date().toISOString()
+    updatedAt: changes?.updatedAt || new Date().toISOString()
   };
   projectStore.upsertParticipant(projectId, nextParticipant);
   return nextParticipant;
@@ -101,7 +103,7 @@ const bulkUpsertParticipants = (projectId, list) => {
     const existing = item.id ? existingById.get(item.id) : null;
     const base = existing || {
       id: item.id || randomUUID(),
-      createdAt: new Date().toISOString()
+      createdAt: item.createdAt || new Date().toISOString()
     };
     const token = ensureUniqueToken(item.token || base.token, projectId, base.id);
     const participant = {
@@ -110,7 +112,8 @@ const bulkUpsertParticipants = (projectId, list) => {
       displayName: item.displayName || base.displayName || "",
       email: item.email || base.email || "",
       comment: item.comment || base.comment || "",
-      updatedAt: new Date().toISOString()
+      createdAt: base.createdAt || item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || new Date().toISOString()
     };
     projectStore.upsertParticipant(projectId, participant);
     results.push(participant);
