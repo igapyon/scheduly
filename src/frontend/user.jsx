@@ -193,12 +193,17 @@ const createParticipantSummaries = (participants, candidates, responses) => {
   });
 };
 
-function ScheduleSummary({ schedule, defaultOpen = false }) {
+function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   useEffect(() => {
     setOpen(Boolean(defaultOpen));
   }, [defaultOpen]);
+  useEffect(() => {
+    if (defaultOpen) {
+      setOpen(true);
+    }
+  }, [defaultOpen, openTrigger]);
 
   const status = formatStatusBadge(schedule.status);
 
@@ -442,6 +447,7 @@ function AdminResponsesApp() {
   const [newParticipantName, setNewParticipantName] = useState("");
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
+  const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -529,6 +535,7 @@ function AdminResponsesApp() {
       setParticipantActionError("");
       setNewParticipantName("");
       setParticipantDialogOpen(false);
+      setOpenFirstScheduleTick((tick) => tick + 1);
     } catch (error) {
       setParticipantActionError(error instanceof Error ? error.message : String(error));
       setParticipantActionMessage("");
@@ -594,7 +601,12 @@ function AdminResponsesApp() {
             </div>
           ) : schedules.length ? (
             schedules.map((schedule, index) => (
-              <ScheduleSummary key={schedule.id} schedule={schedule} defaultOpen={index === 0} />
+              <ScheduleSummary
+                key={schedule.id}
+                schedule={schedule}
+                defaultOpen={index === 0}
+                openTrigger={index === 0 ? openFirstScheduleTick : 0}
+              />
             ))
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
@@ -689,7 +701,13 @@ function AdminResponsesApp() {
                 閉じる
               </button>
             </div>
-            <div className="space-y-3">
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleAddParticipant();
+              }}
+            >
               <label className="block text-xs text-zinc-500">
                 参加者名
                 <input
@@ -721,14 +739,13 @@ function AdminResponsesApp() {
                   キャンセル
                 </button>
                 <button
-                  type="button"
+                  type="submit"
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                  onClick={handleAddParticipant}
                 >
-                  追加する
+                  追加
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
