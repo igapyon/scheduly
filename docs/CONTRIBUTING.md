@@ -6,7 +6,7 @@ Scheduly へ貢献いただく際の基本的な流れとルールをまとめ�
 
 1. リポジトリを fork / clone する  
    ```bash
-   git clone https://github.com/<your-account>/scheduly.git
+   git clone https://github.com/igapyon/scheduly.git
    cd scheduly
    ```
 2. 依存関係をインストール  
