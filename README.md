@@ -1,6 +1,6 @@
 # scheduly
 
-Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
+Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md) を参照してください。
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
