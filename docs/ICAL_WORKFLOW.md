@@ -37,5 +37,4 @@ Scheduly で扱う日程候補は、ICS (iCalendar) をベースに整備・配�
 ## 今後の検討事項
 
 - `VTIMEZONE` の自動付与（特に海外メンバーがいる場合）
-- 複数候補をまとめて一括エクスポートする動線（`exportAllCandidatesToICal` の UI 化）
 - ICS の差分通知（外部の更新を定期的に取り込みたい場合）
