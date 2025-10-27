@@ -121,7 +121,6 @@ const buildCandidateViews = (state) => {
 
 const buildAnswersForParticipant = (state, participantId) => {
   const answers = {};
-  if (!state) return answers;
   if (!state || !participantId) return answers;
   const responses = state.responses || [];
   const responsesByParticipant = new Map();
@@ -290,6 +289,7 @@ function SchedulyMock() {
   const [loadError, setLoadError] = useState("");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
+  const answersRef = useRef(answers);
   const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
@@ -415,13 +415,12 @@ function SchedulyMock() {
   const participantName = editingParticipant?.displayName || "匿名参加者";
 
   useEffect(() => {
-    if (!currentCandidate) return undefined;
-    const id = setTimeout(() => {
-      const t = new Date();
-      setSavedAt(`${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`);
-    }, 250);
-    return () => clearTimeout(id);
-  }, [answers, currentCandidate, safeIndex]);
+    answersRef.current = answers;
+  }, [answers]);
+
+  const touchSavedAt = () => {
+    setSavedAt(formatTimestampForDisplay(new Date().toISOString()));
+  };
 
   useEffect(() => {
     if (!detailCandidate) return undefined;
@@ -466,27 +465,33 @@ function SchedulyMock() {
       });
       return nextAnswers;
     });
+    touchSavedAt();
   };
 
-  const setComment = (value) => {
+  const handleCommentChange = (value) => {
     if (!currentCandidate || !selectedParticipantId) return;
     setAnswers((prev) => {
       const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
-      const nextAnswers = {
+      return {
         ...prev,
         [currentCandidate.id]: {
           mark: prevEntry.mark || null,
           comment: value
         }
       };
-      responseService.upsertResponse(projectId, {
-        participantId: selectedParticipantId,
-        candidateId: currentCandidate.id,
-        mark: prevEntry.mark || "pending",
-        comment: value
-      });
-      return nextAnswers;
     });
+  };
+
+  const commitComment = (value) => {
+    if (!currentCandidate || !selectedParticipantId) return;
+    const currentMark = answersRef.current[currentCandidate.id]?.mark || null;
+    responseService.upsertResponse(projectId, {
+      participantId: selectedParticipantId,
+      candidateId: currentCandidate.id,
+      mark: currentMark || "pending",
+      comment: value
+    });
+    touchSavedAt();
   };
 
   const go = (dir) => {
@@ -526,10 +531,6 @@ function SchedulyMock() {
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(""), 1800);
-  };
-
-  const submit = () => {
-    showToast("送信しました。ありがとうございました！");
   };
 
   const openDetail = (candidateId) => setDetailCandidateId(candidateId);
@@ -694,7 +695,8 @@ function SchedulyMock() {
               rows={1}
               placeholder="この日程に何かコメントがありましたらこちらに入力してください…"
               value={currentComment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(e) => handleCommentChange(e.target.value)}
+              onBlur={(e) => commitComment(e.target.value)}
               style={{ overflow: "hidden" }}
             />
           </label>
