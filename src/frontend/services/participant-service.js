@@ -44,9 +44,16 @@ const getParticipant = (projectId, participantId) => {
   return participants.find((item) => item && item.id === participantId) || null;
 };
 
+const doesParticipantExist = (projectId, participantId) => {
+  if (!participantId) return false;
+  const participants = projectStore.getParticipants(projectId);
+  return participants.some((participant) => participant && participant.id === participantId);
+};
+
 const addParticipant = (projectId, payload) => {
   const timestamp = new Date().toISOString();
-  const id = randomUUID();
+  const preferredId = payload?.id;
+  const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
   const token = ensureUniqueToken(payload?.token, projectId, id);
   const createdAt = payload?.createdAt || timestamp;
   const updatedAt = payload?.updatedAt || timestamp;
@@ -101,8 +108,12 @@ const bulkUpsertParticipants = (projectId, list) => {
   list.forEach((item) => {
     if (!item) return;
     const existing = item.id ? existingById.get(item.id) : null;
+    const preferredId = item.id;
+    const baseId =
+      (existing && existing.id) ||
+      (preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID());
     const base = existing || {
-      id: item.id || randomUUID(),
+      id: baseId,
       createdAt: item.createdAt || new Date().toISOString()
     };
     const token = ensureUniqueToken(item.token || base.token, projectId, base.id);

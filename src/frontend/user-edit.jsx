@@ -7,7 +7,7 @@ import { ensureDemoProjectData } from "./shared/demo-data";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
-const { DEFAULT_TZID, sanitizeTzid } = sharedIcalUtils;
+const { sanitizeTzid } = sharedIcalUtils;
 
 const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
 
@@ -41,6 +41,18 @@ const formatTimestampForDisplay = (isoString) => {
     minute: "2-digit",
     hour12: false
   }).format(date);
+};
+
+const readParticipantIdFromLocation = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const participantId = params.get("participantId");
+    if (participantId) return participantId;
+  } catch (error) {
+    // ignore malformed query
+  }
+  return null;
 };
 
 const buildCandidateViews = (state) => {
@@ -268,6 +280,9 @@ const ParticipantList = ({ list, label, color }) => (
 
 function SchedulyMock() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const initialParticipantId = useMemo(() => readParticipantIdFromLocation(), []);
+  const requestedParticipantIdRef = useRef(initialParticipantId);
+  console.log("[user-edit] projectId", projectId, "initialParticipantId", initialParticipantId);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -277,7 +292,7 @@ function SchedulyMock() {
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
   const [participants, setParticipants] = useState([]);
-  const [selectedParticipantId, setSelectedParticipantId] = useState(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState(initialParticipantId);
 
   const itemRefs = useRef({});
   const commentTextareaRef = useRef(null);
@@ -292,19 +307,40 @@ function SchedulyMock() {
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
       const participantList = nextState.participants || [];
+      console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
+
+      const preferredId = requestedParticipantIdRef.current;
+      const hasPreferredParticipant =
+        preferredId && participantList.some((participant) => participant && participant.id === preferredId);
 
       let editingId = selectedParticipantId;
       const hasEditingParticipant =
         editingId && participantList.some((participant) => participant && participant.id === editingId);
-      if (!hasEditingParticipant) {
-        editingId = participantList[0]?.id || null;
+
+      if (hasPreferredParticipant && editingId !== preferredId) {
+        editingId = preferredId;
         if (editingId !== selectedParticipantId) {
+          console.log("[user-edit] switch to preferred participant", editingId);
           setSelectedParticipantId(editingId);
         }
         resetAnswers = true;
       }
 
+      if (!hasEditingParticipant) {
+        if (participantList.length) {
+          editingId = participantList[0]?.id || null;
+          if (editingId !== selectedParticipantId) {
+            setSelectedParticipantId(editingId);
+            console.log("[user-edit] fallback editingId", editingId);
+          }
+          resetAnswers = true;
+        } else {
+          editingId = selectedParticipantId;
+        }
+      }
+
+      console.log("[user-edit] editingId after check", editingId, "resetAnswers", resetAnswers);
       const candidateViews = buildCandidateViews(nextState);
       setCandidates(candidateViews);
 
@@ -312,6 +348,7 @@ function SchedulyMock() {
         if (editingId) {
           setAnswers(buildAnswersForParticipant(nextState, editingId));
           const participant = participantList.find((item) => item && item.id === editingId);
+          console.log("[user-edit] answers loaded for", editingId, participant);
           setSavedAt(formatTimestampForDisplay(participant?.updatedAt));
         } else {
           setAnswers({});
