@@ -10,6 +10,39 @@ const listeners = new Map();
 const participantTokenIndex = new Map();
 const participantTokenProjectMap = new Map();
 
+const STORAGE_KEY = "scheduly:project-store";
+
+const persistToStorage = () => {
+  if (typeof window === "undefined") return;
+  try {
+    const payload = {};
+    projectStore.forEach((state, projectId) => {
+      payload[projectId] = state;
+    });
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("[Scheduly] Failed to persist project store", error);
+  }
+};
+
+const loadFromStorage = () => {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const payload = JSON.parse(raw);
+    Object.entries(payload).forEach(([projectId, state]) => {
+      if (!state || typeof state !== "object") return;
+      projectStore.set(projectId, state);
+      rebuildParticipantTokenIndex(projectId);
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("[Scheduly] Failed to load project store from storage", error);
+  }
+};
+
 const cloneState = (state) => JSON.parse(JSON.stringify(state));
 
 const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID) => {
@@ -77,10 +110,13 @@ function rebuildParticipantTokenIndex(projectId) {
   }
 }
 
+loadFromStorage();
+
 const ensureProjectEntry = (projectId = DEFAULT_PROJECT_ID) => {
   if (!projectStore.has(projectId)) {
     projectStore.set(projectId, createInitialProjectState(projectId));
     rebuildParticipantTokenIndex(projectId);
+    persistToStorage();
   }
   return projectStore.get(projectId);
 };
@@ -118,6 +154,7 @@ const getCandidates = (projectId = DEFAULT_PROJECT_ID) => {
 const setProjectState = (projectId, nextState) => {
   projectStore.set(projectId, nextState);
   rebuildParticipantTokenIndex(projectId);
+  persistToStorage();
   notify(projectId);
 };
 

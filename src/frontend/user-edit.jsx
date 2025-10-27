@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import responseService from "./services/response-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
@@ -120,6 +121,7 @@ const buildCandidateViews = (state) => {
 
 const buildAnswersForParticipant = (state, participantId) => {
   const answers = {};
+  if (!state) return answers;
   if (!state || !participantId) return answers;
   const responses = state.responses || [];
   const responsesByParticipant = new Map();
@@ -295,6 +297,7 @@ function SchedulyMock() {
   const [selectedParticipantId, setSelectedParticipantId] = useState(initialParticipantId);
 
   const itemRefs = useRef({});
+  const lastFocusedCandidateIdRef = useRef(null);
   const commentTextareaRef = useRef(null);
   const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
   const startX = useRef(null);
@@ -325,6 +328,9 @@ function SchedulyMock() {
           setSelectedParticipantId(editingId);
         }
         resetAnswers = true;
+        requestedParticipantIdRef.current = null;
+      } else if (hasPreferredParticipant) {
+        requestedParticipantIdRef.current = null;
       }
 
       if (!hasEditingParticipant) {
@@ -428,6 +434,7 @@ function SchedulyMock() {
 
   useEffect(() => {
     if (!currentCandidate) return;
+    if (!shouldScrollToCurrent && lastFocusedCandidateIdRef.current === currentCandidate.id) return;
     const el = itemRefs.current[currentCandidate.id];
     if (el) {
       el.focus({ preventScroll: true });
@@ -435,29 +442,51 @@ function SchedulyMock() {
         el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
         setShouldScrollToCurrent(false);
       }
+      lastFocusedCandidateIdRef.current = currentCandidate.id;
     }
-  }, [safeIndex, currentCandidate, shouldScrollToCurrent]);
+  }, [currentCandidate, shouldScrollToCurrent]);
 
-  const setMark = (m) => {
-    if (!currentCandidate) return;
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) === m ? null : m,
-        comment: (prev[currentCandidate.id] && prev[currentCandidate.id].comment) || ""
-      }
-    }));
+  const setMark = (markKey) => {
+    if (!currentCandidate || !selectedParticipantId) return;
+    setAnswers((prev) => {
+      const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
+      const nextMark = prevEntry.mark === markKey ? null : markKey;
+      const nextAnswers = {
+        ...prev,
+        [currentCandidate.id]: {
+          mark: nextMark,
+          comment: prevEntry.comment || ""
+        }
+      };
+      responseService.upsertResponse(projectId, {
+        participantId: selectedParticipantId,
+        candidateId: currentCandidate.id,
+        mark: nextMark || "pending",
+        comment: prevEntry.comment || ""
+      });
+      return nextAnswers;
+    });
   };
 
   const setComment = (value) => {
-    if (!currentCandidate) return;
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) || null,
+    if (!currentCandidate || !selectedParticipantId) return;
+    setAnswers((prev) => {
+      const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
+      const nextAnswers = {
+        ...prev,
+        [currentCandidate.id]: {
+          mark: prevEntry.mark || null,
+          comment: value
+        }
+      };
+      responseService.upsertResponse(projectId, {
+        participantId: selectedParticipantId,
+        candidateId: currentCandidate.id,
+        mark: prevEntry.mark || "pending",
         comment: value
-      }
-    }));
+      });
+      return nextAnswers;
+    });
   };
 
   const go = (dir) => {
