@@ -11,55 +11,83 @@ const { waitForIcal, ensureICAL, getSampleIcsUrl, getSampleProjectJsonUrl, creat
 const logDebug = createLogger("demo-data");
 
 const SAMPLE_CANDIDATE_ALIAS_BY_UID = {
-  "igapyon-scheduly-5a2a47d2-56eb-4329-b3c2-92d9275480a2": "day1",
-  "igapyon-scheduly-6b5cd8fe-0f61-43c1-9aa3-7b8f22d6a140": "day2",
-  "igapyon-scheduly-44f4cf2e-c82e-4d6d-915b-676f2755c51a": "day3",
-  "igapyon-scheduly-0c8b19f2-5aba-4e24-9f06-0f1aeb8a2afb": "day4"
+  "5o29ma9bmfqm1knaq17vsn0cb0@google.com": "slot_rehearsal_reading",
+  "6ukce5fk013s99nju13d4ivtk4@google.com": "slot_rehearsal_nerimabunka",
+  "32qsrebbrvdiafk7a91771hvg2@google.com": "slot_rehearsal_tokyobunka",
+  "2dkvsni9j0bhvnvbpidadu0aov@google.com": "slot_rehearsal_geigeki",
+  "54hr9aps2ei6mmfq4clelscf67@google.com": "slot_gp_morning",
+  "5ps4k1vk0v6u5fqgp59gg4c44f@google.com": "slot_performance",
+  "1u3jrtqfk20kule5nnknelrv2o@google.com": "slot_afterparty"
 };
 
 const SAMPLE_PARTICIPANTS = [
   {
-    id: "sato",
-    displayName: "佐藤 太郎",
+    id: "10123751-d92f-4466-9030-d8ed8b8521e4",
+    displayName: "Vn白髪",
     email: "",
-    comment: "在宅＋出社を組み合わせて参加予定",
-    token: "demo-sato",
-    createdAt: "2025-04-01T09:00:00+09:00",
-    updatedAt: "2025-04-12T17:42:00+09:00"
+    comment: "",
+    token: "igywtsk3z71y",
+    createdAt: "2025-10-27T23:07:20.424Z",
+    updatedAt: "2025-10-27T23:07:20.424Z"
   },
   {
-    id: "suzuki",
-    displayName: "鈴木 花子",
+    id: "e060eeec-1a0a-42f9-9461-5b7880a470de",
+    displayName: "Vnかはし",
     email: "",
-    comment: "子育てと両立中。夜間帯の参加可否を確認する必要あり",
-    token: "demo-suzuki",
-    createdAt: "2025-04-01T09:10:00+09:00",
-    updatedAt: "2025-04-10T09:15:00+09:00"
+    comment: "",
+    token: "dxwsbv0wdsbm",
+    createdAt: "2025-10-27T23:07:31.190Z",
+    updatedAt: "2025-10-27T23:07:31.190Z"
   },
   {
-    id: "tanaka",
-    displayName: "田中 一郎",
+    id: "c90014d8-fa53-467b-bbb2-541633cec134",
+    displayName: "Vlaひげ",
     email: "",
-    comment: "繁忙期のため夜間の予定が混み合っています",
-    token: "demo-tanaka",
-    createdAt: "2025-04-02T20:30:00+09:00",
-    updatedAt: "2025-04-05T21:03:00+09:00"
+    comment: "",
+    token: "itgnq4a73goc",
+    createdAt: "2025-10-27T23:07:42.143Z",
+    updatedAt: "2025-10-27T23:07:42.143Z"
+  },
+  {
+    id: "ee25f324-711a-43ed-953f-bb086a302d10",
+    displayName: "Vcどら",
+    email: "",
+    comment: "",
+    token: "dm1xc4vztbts",
+    createdAt: "2025-10-27T23:07:59.407Z",
+    updatedAt: "2025-10-27T23:07:59.407Z"
   }
 ];
 
 const SAMPLE_RESPONSES = [
-  { participantId: "sato", candidateAlias: "day1", mark: "o", comment: "オフィス参加可" },
-  { participantId: "sato", candidateAlias: "day2", mark: "d", comment: "オンラインなら参加可能" },
-  { participantId: "sato", candidateAlias: "day3", mark: "o", comment: "" },
-  { participantId: "sato", candidateAlias: "day4", mark: "o", comment: "終日参加可能" },
-  { participantId: "suzuki", candidateAlias: "day1", mark: "d", comment: "子どものお迎えがあるため 16:30 まで" },
-  { participantId: "suzuki", candidateAlias: "day2", mark: "x", comment: "開始時間を 19:00 にできれば参加可" },
-  { participantId: "suzuki", candidateAlias: "day3", mark: "o", comment: "20:00 までなら参加可" },
-  { participantId: "suzuki", candidateAlias: "day4", mark: "o", comment: "午前は在宅参加になります" },
-  { participantId: "tanaka", candidateAlias: "day1", mark: "o", comment: "自家用車で参加予定" },
-  { participantId: "tanaka", candidateAlias: "day2", mark: "x", comment: "平日は別件の会議があり難しい" },
-  { participantId: "tanaka", candidateAlias: "day3", mark: "x", comment: "他プロジェクトとバッティング" },
-  { participantId: "tanaka", candidateAlias: "day4", mark: "pending", comment: "未回答（フォロー待ち）" }
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_rehearsal_reading", mark: "o", comment: "頑張って譜読みします。" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_rehearsal_nerimabunka", mark: "o", comment: "練文の練習楽しみ" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_rehearsal_tokyobunka", mark: "o", comment: "リニューアルの東京文化楽しみ" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_rehearsal_geigeki", mark: "o", comment: "本番前日がんばるぞい。" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_gp_morning", mark: "o", comment: "当日GPがんばるぞい。" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_performance", mark: "o", comment: "本番！" },
+  { participantId: "10123751-d92f-4466-9030-d8ed8b8521e4", candidateAlias: "slot_afterparty", mark: "o", comment: "のむどー" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_rehearsal_reading", mark: "o", comment: "" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_rehearsal_nerimabunka", mark: "d", comment: "この日の日程いま見え切っていません。" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_rehearsal_tokyobunka", mark: "x", comment: "この日都合悪いのです。" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_rehearsal_geigeki", mark: "o", comment: "" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_gp_morning", mark: "o", comment: "" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_performance", mark: "o", comment: "" },
+  { participantId: "e060eeec-1a0a-42f9-9461-5b7880a470de", candidateAlias: "slot_afterparty", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_rehearsal_reading", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_rehearsal_nerimabunka", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_rehearsal_tokyobunka", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_rehearsal_geigeki", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_gp_morning", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_performance", mark: "o", comment: "" },
+  { participantId: "ee25f324-711a-43ed-953f-bb086a302d10", candidateAlias: "slot_afterparty", mark: "x", comment: "打ち上げは欠席します。" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_rehearsal_reading", mark: "o", comment: "" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_rehearsal_nerimabunka", mark: "pending", comment: "予定が未定" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_rehearsal_tokyobunka", mark: "d", comment: "遅れて参加します。" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_rehearsal_geigeki", mark: "o", comment: "" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_gp_morning", mark: "o", comment: "" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_performance", mark: "o", comment: "" },
+  { participantId: "c90014d8-fa53-467b-bbb2-541633cec134", candidateAlias: "slot_afterparty", mark: "o", comment: "" }
 ];
 
 const fetchSampleProjectPayload = async () => {
