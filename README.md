@@ -16,6 +16,7 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 - [docs/VERIFY_CHECKLIST.md](docs/VERIFY_CHECKLIST.md): QA・目視確認の手順
 - [docs/DEVELOPER_NOTES.md](docs/DEVELOPER_NOTES.md): 作業メモと TODO の整理
 - [docs/SERVER_INTEGRATION.md](docs/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
+- [docs/DISCLAIMER.md](docs/DISCLAIMER.md): 免責事項と利用時の注意点
 
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
