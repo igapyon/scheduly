@@ -436,17 +436,15 @@ function candidateToDisplayMeta(candidate) {
 function OrganizerApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
-  const [summary, setSummary] = useState(initialProjectState.project?.name || "秋の合宿 調整会議");
-  const [description, setDescription] = useState(
-    initialProjectState.project?.description ||
-      "秋の合宿に向けた日程調整を行います。候補から都合の良いものを選択してください。"
-  );
+  const [summary, setSummary] = useState(initialProjectState.project?.name || "");
+  const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
   const [candidates, setCandidates] = useState(initialProjectState.candidates || []);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [urls, setUrls] = useState({ admin: "", guest: "" });
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
+  const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
 
   useEffect(() => {
@@ -473,7 +471,6 @@ function OrganizerApp() {
 
     ensureDemoProjectData(projectId)
       .catch((error) => {
-        // eslint-disable-next-line no-console
         console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
       })
       .finally(() => {
@@ -487,8 +484,8 @@ function OrganizerApp() {
     };
   }, [projectId]);
 
-  const downloadTextFile = (filename, text) => {
-    const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const downloadTextFile = (filename, text, mimeType = "text/plain;charset=utf-8") => {
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -523,7 +520,7 @@ function OrganizerApp() {
     try {
       const icsText = exportAllCandidatesToIcs(projectId);
       const filename = `scheduly-all-${new Date().toISOString().split("T")[0]}.ics`;
-      downloadTextFile(filename, icsText);
+      downloadTextFile(filename, icsText, "text/calendar;charset=utf-8");
       popToast("全候補を ICS でダウンロードしました（モック）");
     } catch (error) {
       console.error("ICS bulk export error", error);
@@ -539,7 +536,7 @@ function OrganizerApp() {
     }
     try {
       const exportResult = exportCandidateToIcs(projectId, candidateId);
-      downloadTextFile(exportResult.filename, exportResult.icsText);
+      downloadTextFile(exportResult.filename, exportResult.icsText, "text/calendar;charset=utf-8");
       popToast(`${exportResult.filename} をダウンロードしました（モック）`);
     } catch (error) {
       console.error("ICS export error", error);
@@ -708,16 +705,66 @@ function OrganizerApp() {
     popToast("編集URL／閲覧URLを発行しました（モック）");
   };
 
-  const mockExportProjectInfo = () => {
-    popToast("プロジェクト情報をエクスポートしました（モック）");
+  const handleExportProjectInfo = () => {
+    try {
+      const exportData = projectStore.exportProjectState(projectId);
+      const serialized = JSON.stringify(exportData, null, 2);
+      const filename = `scheduly-project-${projectId}-${new Date().toISOString().split("T")[0]}.json`;
+      downloadTextFile(filename, serialized, "application/json;charset=utf-8");
+      popToast("プロジェクト情報をエクスポートしました");
+    } catch (error) {
+      console.error("Project export error", error);
+      popToast("プロジェクト情報のエクスポートに失敗しました");
+    }
   };
 
-  const mockImportProjectInfo = () => {
-    popToast("プロジェクト情報をインポートしました（モック）");
+  const handleProjectImportFromFile = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const confirmed = window.confirm("現在のプロジェクトを置き換えます。よろしいですか？");
+      if (!confirmed) {
+        event.target.value = "";
+        return;
+      }
+      const text = await file.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(
+          "JSON の解析に失敗しました: " +
+            (parseError instanceof Error ? parseError.message : String(parseError))
+        );
+      }
+      projectStore.importProjectState(projectId, parsed);
+      const snapshot = projectStore.getProjectStateSnapshot(projectId);
+      setSummary(snapshot.project?.name || "");
+      setDescription(snapshot.project?.description || "");
+      setCandidates(snapshot.candidates || []);
+      setUrls({ admin: "", guest: "" });
+      setImportPreview(null);
+      setInitialDataLoaded(true);
+      popToast("プロジェクト情報をインポートしました");
+    } catch (error) {
+      console.error("Project import error", error);
+      popToast("プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      event.target.value = "";
+    }
   };
 
-  const handleSave = () => {
-    popToast("保存しました（モック）");
+  const handleDeleteProject = () => {
+    const confirmed = window.confirm("このプロジェクトの候補・参加者・回答データをすべて削除します。よろしいですか？");
+    if (!confirmed) return;
+    const fresh = projectStore.resetProject(projectId);
+    setSummary(fresh.project?.name || "");
+    setDescription(fresh.project?.description || "");
+    setCandidates(fresh.candidates || []);
+    setUrls({ admin: "", guest: "" });
+    setImportPreview(null);
+    setInitialDataLoaded(true);
+    popToast("プロジェクトを削除し初期状態に戻しました");
   };
 
   const eventPayload = useMemo(() => {
@@ -895,43 +942,35 @@ function OrganizerApp() {
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
-                onClick={mockExportProjectInfo}
+                onClick={handleExportProjectInfo}
               >
                 プロジェクトをエクスポート
               </button>
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-emerald-300"
-                onClick={mockImportProjectInfo}
+                onClick={() => projectImportInputRef.current?.click()}
               >
                 プロジェクトをインポート
               </button>
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-rose-500 hover:border-rose-400"
-                onClick={() => popToast("プロジェクトを削除しました（モック）")}
+                onClick={handleDeleteProject}
               >
                 プロジェクトを削除
               </button>
             </div>
+            <input
+              ref={projectImportInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleProjectImportFromFile}
+            />
           </SectionCard>
         </aside>
       </div>
-
-      <footer className="sticky bottom-0 z-30 border-t border-zinc-200 bg-white/90 shadow-[0_-4px_16px_rgba(24,24,27,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-          <div>保存すると参加者画面にも最新の内容を反映します</div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-              onClick={handleSave}
-            >
-              保存
-            </button>
-          </div>
-        </div>
-      </footer>
 
       {importPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">

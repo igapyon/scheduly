@@ -4,10 +4,11 @@ import ReactDOM from "react-dom/client";
 import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import responseService from "./services/response-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
-const { DEFAULT_TZID, sanitizeTzid } = sharedIcalUtils;
+const { sanitizeTzid } = sharedIcalUtils;
 
 const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
 
@@ -41,6 +42,18 @@ const formatTimestampForDisplay = (isoString) => {
     minute: "2-digit",
     hour12: false
   }).format(date);
+};
+
+const readParticipantIdFromLocation = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const participantId = params.get("participantId");
+    if (participantId) return participantId;
+  } catch (error) {
+    // ignore malformed query
+  }
+  return null;
 };
 
 const buildCandidateViews = (state) => {
@@ -268,18 +281,23 @@ const ParticipantList = ({ list, label, color }) => (
 
 function SchedulyMock() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const initialParticipantId = useMemo(() => readParticipantIdFromLocation(), []);
+  const requestedParticipantIdRef = useRef(initialParticipantId);
+  console.log("[user-edit] projectId", projectId, "initialParticipantId", initialParticipantId);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
+  const answersRef = useRef(answers);
   const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
   const [participants, setParticipants] = useState([]);
-  const [selectedParticipantId, setSelectedParticipantId] = useState(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState(initialParticipantId);
 
   const itemRefs = useRef({});
+  const lastFocusedCandidateIdRef = useRef(null);
   const commentTextareaRef = useRef(null);
   const [shouldScrollToCurrent, setShouldScrollToCurrent] = useState(false);
   const startX = useRef(null);
@@ -292,19 +310,43 @@ function SchedulyMock() {
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
       const participantList = nextState.participants || [];
+      console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
+
+      const preferredId = requestedParticipantIdRef.current;
+      const hasPreferredParticipant =
+        preferredId && participantList.some((participant) => participant && participant.id === preferredId);
 
       let editingId = selectedParticipantId;
       const hasEditingParticipant =
         editingId && participantList.some((participant) => participant && participant.id === editingId);
-      if (!hasEditingParticipant) {
-        editingId = participantList[0]?.id || null;
+
+      if (hasPreferredParticipant && editingId !== preferredId) {
+        editingId = preferredId;
         if (editingId !== selectedParticipantId) {
+          console.log("[user-edit] switch to preferred participant", editingId);
           setSelectedParticipantId(editingId);
         }
         resetAnswers = true;
+        requestedParticipantIdRef.current = null;
+      } else if (hasPreferredParticipant) {
+        requestedParticipantIdRef.current = null;
       }
 
+      if (!hasEditingParticipant) {
+        if (participantList.length) {
+          editingId = participantList[0]?.id || null;
+          if (editingId !== selectedParticipantId) {
+            setSelectedParticipantId(editingId);
+            console.log("[user-edit] fallback editingId", editingId);
+          }
+          resetAnswers = true;
+        } else {
+          editingId = selectedParticipantId;
+        }
+      }
+
+      console.log("[user-edit] editingId after check", editingId, "resetAnswers", resetAnswers);
       const candidateViews = buildCandidateViews(nextState);
       setCandidates(candidateViews);
 
@@ -312,6 +354,7 @@ function SchedulyMock() {
         if (editingId) {
           setAnswers(buildAnswersForParticipant(nextState, editingId));
           const participant = participantList.find((item) => item && item.id === editingId);
+          console.log("[user-edit] answers loaded for", editingId, participant);
           setSavedAt(formatTimestampForDisplay(participant?.updatedAt));
         } else {
           setAnswers({});
@@ -333,7 +376,6 @@ function SchedulyMock() {
         syncFromState(snapshot, { resetAnswers: true });
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
         console.warn("[Scheduly][user-edit] failed to seed demo data", error);
         if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
       })
@@ -372,13 +414,12 @@ function SchedulyMock() {
   const participantName = editingParticipant?.displayName || "匿名参加者";
 
   useEffect(() => {
-    if (!currentCandidate) return undefined;
-    const id = setTimeout(() => {
-      const t = new Date();
-      setSavedAt(`${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`);
-    }, 250);
-    return () => clearTimeout(id);
-  }, [answers, currentCandidate, safeIndex]);
+    answersRef.current = answers;
+  }, [answers]);
+
+  const touchSavedAt = () => {
+    setSavedAt(formatTimestampForDisplay(new Date().toISOString()));
+  };
 
   useEffect(() => {
     if (!detailCandidate) return undefined;
@@ -391,6 +432,7 @@ function SchedulyMock() {
 
   useEffect(() => {
     if (!currentCandidate) return;
+    if (!shouldScrollToCurrent && lastFocusedCandidateIdRef.current === currentCandidate.id) return;
     const el = itemRefs.current[currentCandidate.id];
     if (el) {
       el.focus({ preventScroll: true });
@@ -398,30 +440,67 @@ function SchedulyMock() {
         el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
         setShouldScrollToCurrent(false);
       }
+      lastFocusedCandidateIdRef.current = currentCandidate.id;
     }
-  }, [safeIndex, currentCandidate, shouldScrollToCurrent]);
+  }, [currentCandidate, shouldScrollToCurrent]);
 
-  const setMark = (m) => {
-    if (!currentCandidate) return;
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) === m ? null : m,
-        comment: (prev[currentCandidate.id] && prev[currentCandidate.id].comment) || ""
-      }
-    }));
+  const setMark = (markKey) => {
+    if (!currentCandidate || !selectedParticipantId) return;
+    setAnswers((prev) => {
+      const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
+      const nextMark = prevEntry.mark === markKey ? null : markKey;
+      const nextAnswers = {
+        ...prev,
+        [currentCandidate.id]: {
+          mark: nextMark,
+          comment: prevEntry.comment || ""
+        }
+      };
+      responseService.upsertResponse(projectId, {
+        participantId: selectedParticipantId,
+        candidateId: currentCandidate.id,
+        mark: nextMark || "pending",
+        comment: prevEntry.comment || ""
+      });
+      return nextAnswers;
+    });
+    touchSavedAt();
   };
 
-  const setComment = (value) => {
-    if (!currentCandidate) return;
-    setAnswers((prev) => ({
-      ...prev,
-      [currentCandidate.id]: {
-        mark: (prev[currentCandidate.id] && prev[currentCandidate.id].mark) || null,
-        comment: value
-      }
-    }));
+const handleCommentChange = (value) => {
+  if (!currentCandidate || !selectedParticipantId) return;
+  setAnswers((prev) => {
+    const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
+      return {
+        ...prev,
+        [currentCandidate.id]: {
+          mark: prevEntry.mark || null,
+          comment: value
+        }
+      };
+    });
   };
+
+const commitComment = (value) => {
+  if (!currentCandidate || !selectedParticipantId) return;
+  const currentEntry = answersRef.current[currentCandidate.id] || { mark: null, comment: "" };
+  const participantsResponses = projectStore.getResponses(projectId) || [];
+  const existing = participantsResponses.find(
+    (response) => response && response.participantId === selectedParticipantId && response.candidateId === currentCandidate.id
+  );
+  const existingComment = existing?.comment || "";
+  if (existingComment === value) {
+    return;
+  }
+  const currentMark = currentEntry.mark || null;
+  responseService.upsertResponse(projectId, {
+    participantId: selectedParticipantId,
+    candidateId: currentCandidate.id,
+    mark: currentMark || "pending",
+    comment: value
+  });
+  touchSavedAt();
+};
 
   const go = (dir) => {
     if (!candidates.length) return;
@@ -460,10 +539,6 @@ function SchedulyMock() {
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(""), 1800);
-  };
-
-  const submit = () => {
-    showToast("送信しました。ありがとうございました！");
   };
 
   const openDetail = (candidateId) => setDetailCandidateId(candidateId);
@@ -628,7 +703,8 @@ function SchedulyMock() {
               rows={1}
               placeholder="この日程に何かコメントがありましたらこちらに入力してください…"
               value={currentComment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(e) => handleCommentChange(e.target.value)}
+              onBlur={(e) => commitComment(e.target.value)}
               style={{ overflow: "hidden" }}
             />
           </label>
@@ -720,27 +796,6 @@ function SchedulyMock() {
           </section>
         </aside>
       </main>
-
-      <footer className="sticky bottom-0 border-t bg-white/95 p-3 backdrop-blur">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="h-10 rounded-xl border border-gray-200 bg-white px-4 font-semibold text-gray-600 hover:border-gray-300"
-            onClick={() => {
-              window.location.href = "./user.html";
-            }}
-          >
-            キャンセル
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-            onClick={submit}
-          >
-            保存
-          </button>
-        </div>
-      </footer>
 
       <Modal
         open={!!detailCandidate}

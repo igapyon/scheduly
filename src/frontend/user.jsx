@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
+import participantService from "./services/participant-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
@@ -58,7 +59,7 @@ const normalizeMark = (mark) => {
 };
 
 const createScheduleSummaries = (candidates, participants, responses) => {
-  const participantMap = new Map((participants || []).map((participant) => [participant.id, participant]));
+  const participantMap = new Map((participants || []).map((participant, index) => [participant.id, { participant, index }]));
   const responseMap = new Map();
   (responses || []).forEach((response) => {
     if (!response || !response.candidateId) return;
@@ -78,32 +79,31 @@ const createScheduleSummaries = (candidates, participants, responses) => {
       const mark = normalizeMark(response.mark);
       if (counts[mark] !== undefined) counts[mark] += 1;
       else counts.pending += 1;
-      const participant = participantMap.get(response.participantId);
+      const participantEntry = participantMap.get(response.participantId);
+      const participant = participantEntry?.participant;
       detailed.push({
         participantId: response.participantId,
         name: participant?.displayName || "参加者",
+        order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
         comment: response.comment || "コメントなし"
       });
       respondedIds.add(response.participantId);
     });
 
-    (participants || []).forEach((participant) => {
+    (participants || []).forEach((participant, index) => {
       if (!participant || respondedIds.has(participant.id)) return;
       counts.pending += 1;
       detailed.push({
         participantId: participant.id,
         name: participant.displayName || "参加者",
+        order: index,
         mark: "pending",
         comment: "未回答"
       });
     });
 
-    detailed.sort((a, b) => {
-      if (a.mark === "pending" && b.mark !== "pending") return 1;
-      if (b.mark === "pending" && a.mark !== "pending") return -1;
-      return (a.name || "").localeCompare(b.name || "", "ja");
-    });
+    detailed.sort((a, b) => a.order - b.order);
 
     return {
       id: candidate.id,
@@ -192,12 +192,17 @@ const createParticipantSummaries = (participants, candidates, responses) => {
   });
 };
 
-function ScheduleSummary({ schedule, defaultOpen = false }) {
+function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   useEffect(() => {
     setOpen(Boolean(defaultOpen));
   }, [defaultOpen]);
+  useEffect(() => {
+    if (defaultOpen) {
+      setOpen(true);
+    }
+  }, [defaultOpen, openTrigger]);
 
   const status = formatStatusBadge(schedule.status);
 
@@ -246,7 +251,7 @@ function ScheduleSummary({ schedule, defaultOpen = false }) {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="font-semibold text-zinc-800">{response.name}</div>
                 <a
-                  href="./user-edit.html"
+                  href={response.participantId ? `./user-edit.html?participantId=${encodeURIComponent(response.participantId)}` : "./user-edit.html"}
                   className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                 >
                   回答
@@ -280,7 +285,7 @@ function participantTotals(participant) {
   );
 }
 
-function ParticipantSummary({ participant, defaultOpen, scheduleLookup }) {
+function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove, canRemove = true }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
@@ -300,12 +305,25 @@ function ParticipantSummary({ participant, defaultOpen, scheduleLookup }) {
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
             <a
-              href="./user-edit.html"
+              href={`./user-edit.html?participantId=${encodeURIComponent(participant.id)}`}
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >
               回答
             </a>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRemove();
+                }}
+                disabled={!canRemove}
+                className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                削除
+              </button>
+            )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
             <span>最終更新: {participant.lastUpdated}</span>
@@ -424,6 +442,11 @@ function AdminResponsesApp() {
   const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState("");
+  const [participantActionMessage, setParticipantActionMessage] = useState("");
+  const [participantActionError, setParticipantActionError] = useState("");
+  const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -438,7 +461,6 @@ function AdminResponsesApp() {
         if (!cancelled) setLoadError("");
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
         console.warn("[Scheduly] failed to seed demo data", error);
         if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
       })
@@ -498,6 +520,43 @@ function AdminResponsesApp() {
   const projectName = projectState.project?.name || DASHBOARD_META.projectName;
   const projectDescription = projectState.project?.description || DASHBOARD_META.description;
 
+  const handleAddParticipant = () => {
+    const trimmed = newParticipantName.trim();
+    if (!trimmed) {
+      setParticipantActionError("参加者名を入力してください");
+      setParticipantActionMessage("");
+      return;
+    }
+    try {
+      const created = participantService.addParticipant(projectId, { displayName: trimmed });
+      setParticipantActionMessage(`${created.displayName || "参加者"}を追加しました`);
+      setParticipantActionError("");
+      setNewParticipantName("");
+      setParticipantDialogOpen(false);
+      setOpenFirstScheduleTick((tick) => tick + 1);
+    } catch (error) {
+      setParticipantActionError(error instanceof Error ? error.message : String(error));
+      setParticipantActionMessage("");
+    }
+  };
+
+  const handleRemoveParticipant = (participantId, displayName) => {
+    const summaryName = displayName || "参加者";
+    if (!window.confirm(`${summaryName} を削除しますか？`)) return;
+    participantService.removeParticipant(projectId, participantId);
+    setParticipantActionMessage(`${summaryName}を削除しました`);
+    setParticipantActionError("");
+  };
+
+  useEffect(() => {
+    if (!participantActionMessage && !participantActionError) return undefined;
+    const timer = window.setTimeout(() => {
+      setParticipantActionMessage("");
+      setParticipantActionError("");
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [participantActionMessage, participantActionError]);
+
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -517,7 +576,10 @@ function AdminResponsesApp() {
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-              onClick={() => logDebug("add participant button clicked")}
+              onClick={() => {
+                setParticipantDialogOpen(true);
+                setParticipantActionError("");
+              }}
             >
               <span aria-hidden="true">＋</span>
               <span>参加者を新規登録</span>
@@ -537,7 +599,12 @@ function AdminResponsesApp() {
             </div>
           ) : schedules.length ? (
             schedules.map((schedule, index) => (
-              <ScheduleSummary key={schedule.id} schedule={schedule} defaultOpen={index === 0} />
+              <ScheduleSummary
+                key={schedule.id}
+                schedule={schedule}
+                defaultOpen={index === 0}
+                openTrigger={index === 0 ? openFirstScheduleTick : 0}
+              />
             ))
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
@@ -553,6 +620,17 @@ function AdminResponsesApp() {
       {activeTab === "participant" && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
+          {(participantActionMessage || participantActionError) && (
+            <div
+              className={`rounded-xl border px-3 py-2 text-xs ${
+                participantActionError
+                  ? "border-rose-200 bg-rose-50 text-rose-600"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              {participantActionError || participantActionMessage}
+            </div>
+          )}
           <div className="space-y-3">
             {participantSummaries.length ? (
               participantSummaries.map((participant, index) => (
@@ -561,6 +639,8 @@ function AdminResponsesApp() {
                   participant={participant}
                   defaultOpen={index === 0}
                   scheduleLookup={scheduleLookup}
+                  onRemove={() => handleRemoveParticipant(participant.id, participant.name)}
+                  canRemove={participantSummaries.length > 1}
                 />
               ))
             ) : (
@@ -600,6 +680,73 @@ function AdminResponsesApp() {
           </div>
         </div>
       </section>
+
+      {participantDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={() => setParticipantDialogOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="参加者を追加"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">参加者を追加</h2>
+              <button className="text-xs text-zinc-500" onClick={() => setParticipantDialogOpen(false)}>
+                閉じる
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleAddParticipant();
+              }}
+            >
+              <label className="block text-xs text-zinc-500">
+                参加者名
+                <input
+                  type="text"
+                  value={newParticipantName}
+                  onChange={(event) => {
+                    setNewParticipantName(event.target.value);
+                    if (participantActionError) setParticipantActionError("");
+                  }}
+                  placeholder="例: 新規参加者"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  autoFocus
+                />
+              </label>
+              {participantActionError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                  {participantActionError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
+                  onClick={() => {
+                    setParticipantDialogOpen(false);
+                    setParticipantActionError("");
+                  }}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  追加
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
