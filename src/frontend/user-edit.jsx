@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 

@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 import React from "react";
 
 function EventMeta({

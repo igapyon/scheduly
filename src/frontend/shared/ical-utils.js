@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const DEFAULT_TZID = "Asia/Tokyo";
 const SAMPLE_ICS_RELATIVE_PATH = "ics/sample-candidates.ics";
 const DEFAULT_LOG_SCOPE = "shared";

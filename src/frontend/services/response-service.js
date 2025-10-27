@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const projectStore = require("../store/project-store");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);

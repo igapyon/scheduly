@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const sharedIcalUtils = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
 
