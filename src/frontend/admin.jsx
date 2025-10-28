@@ -494,6 +494,7 @@ function OrganizerApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
   const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
+  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
   const [summary, setSummary] = useState(initialProjectState.project?.name || "");
   const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
@@ -508,6 +509,7 @@ function OrganizerApp() {
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
+  const autoIssueHandledRef = useRef(false);
 
   useEffect(() => {
     setCandidates(initialProjectState.candidates || []);
@@ -798,6 +800,24 @@ function OrganizerApp() {
     }
   };
 
+  const updateLocationToAdminUrl = (entry) => {
+    if (!entry || !isNonEmptyString(entry.url)) return;
+    if (typeof window === "undefined") return;
+    try {
+      const target = new URL(entry.url);
+      const current = new URL(window.location.href);
+      if (target.origin === current.origin) {
+        window.history.replaceState(null, "", target.pathname + target.search + target.hash);
+        projectStore.resolveProjectIdFromLocation();
+      } else {
+        window.location.assign(entry.url);
+      }
+    } catch (error) {
+      console.warn("[Scheduly][admin] Failed to update location to admin URL", error);
+      window.location.assign(entry.url);
+    }
+  };
+
   const handleShareLinkAction = () => {
     const hasIssued = hasIssuedShareTokens;
     if (hasIssued) {
@@ -839,6 +859,36 @@ function OrganizerApp() {
       popToast("URLのコピーに失敗しました");
     }
   };
+
+  useEffect(() => {
+    if (autoIssueHandledRef.current) return;
+    const adminEntry = shareTokens?.admin || null;
+    const hasValidAdminToken =
+      adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
+
+    if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
+      autoIssueHandledRef.current = true;
+      return;
+    }
+
+    if (hasValidAdminToken) {
+      updateLocationToAdminUrl(adminEntry);
+      autoIssueHandledRef.current = true;
+      return;
+    }
+
+    try {
+      const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+      const tokens = refreshShareTokensState({ resetWhenMissing: true });
+      const nextAdmin = tokens.admin || result.admin;
+      updateLocationToAdminUrl(nextAdmin);
+      popToast("共有URLを発行しました。コピーしてください");
+    } catch (error) {
+      console.error("Auto issue share URLs failed", error);
+    } finally {
+      autoIssueHandledRef.current = true;
+    }
+  }, [projectId, baseUrl, shareTokens, initialRouteContext]);
 
   const handleExportProjectInfo = () => {
     try {
