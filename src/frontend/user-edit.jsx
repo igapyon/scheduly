@@ -788,7 +788,7 @@ const commitComment = (value) => {
               <InfoBadge
                 ariaLabel="回答編集画面の説明"
                 title="回答編集の使い方"
-                message="参加者自身が各候補に対して〇△×とコメントを入力する画面です。上部の完了数がリアルタイムで更新され、長押しで他参加者の回答を確認できます。"
+                message="日程に対して参加者の〇△×選択およびコメントを入力する画面です。上部の完了数がリアルタイムで更新されます。"
               />
             </div>
             <p className="mt-1 text-xs text-zinc-500">参加者「{participantName}」さんの回答を編集します。</p>

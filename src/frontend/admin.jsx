@@ -1125,7 +1125,7 @@ function OrganizerApp() {
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
-            infoMessage="ヘッダーや共有リンクに表示される名称と説明です。編集内容は即座に保存されるため、入力後に別操作は不要です。"
+            infoMessage="日程調整プロジェクトの情報を設定します。プロジェクトの目的を設定します。"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -1152,7 +1152,7 @@ function OrganizerApp() {
           <SectionCard
             title="日程"
             description="候補日や確定日を管理できます。カードを開いて詳細を編集してください。"
-            infoMessage="候補を追加・編集したら、ICS を使って他サービスと同期できます。インポート時はプレビューで必要な候補だけ選び、更新するか追加するかを確認してください。"
+            infoMessage="日程を設定します。ICS を利用することにより日程を他サービスと同期することができます。ICSからのインポートではプレビューで必要な日程だけ選ぶことができます。"
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1215,7 +1215,7 @@ function OrganizerApp() {
           <SectionCard
             title="共有URL"
             description="参加者へ共有するリンクと管理者リンクを確認できます。"
-            infoMessage="基準URLを整えてからリンクを再発行すると、管理者・参加者用のアクセス先が最新になります。コピーしたURLは必要な人にのみ共有してください。"
+            infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
             action={
               <button
                 type="button"
@@ -1301,7 +1301,7 @@ function OrganizerApp() {
 
           <SectionCard
             title="管理アクション"
-            infoMessage="プロジェクト全体のバックアップや初期化をまとめています。インポートや削除を行う前に、現在のデータをエクスポートしておくと安心です。"
+            infoMessage="プロジェクト全体のバックアップや初期化をおこなうことができます。こまめにプロジェクトをエクスポートしてバックアップしておくと安心です。インポートや削除を行う前に、現在のデータを事前にエクスポートしておくと安心です。"
           >
             <div className="grid gap-2">
               <button

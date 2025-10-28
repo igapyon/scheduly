@@ -786,7 +786,7 @@ function AdminResponsesApp() {
             <InfoBadge
               ariaLabel="日程サマリーの説明"
               title="日程サマリー"
-              message="各候補日ごとの〇△×集計と自分の回答を確認できます。候補をタップすると詳細に移動します。"
+              message="各日程ごとの〇△×集計を確認できます。日程をタップすると回答状況の詳細を確認でき、必要があれば回答を変更する画面に進むことができます。"
             />
           </div>
           {loading && !schedules.length ? (
@@ -821,7 +821,7 @@ function AdminResponsesApp() {
             <InfoBadge
               ariaLabel="参加者サマリーの説明"
               title="参加者サマリー"
-              message="参加者ごとの回答状況を一覧できます。カードを開いて個別の参加者の回答やコメントを確認し、必要に応じて名前変更や削除を行えます。"
+              message="参加者ごとの回答状況を一覧できます。カードを開いて個別の参加者の回答やコメントを確認し、必要に応じて回答の変更画面に移動できます。"
             />
           </div>
           {(participantActionMessage || participantActionError) && (
@@ -872,7 +872,7 @@ function AdminResponsesApp() {
             <InfoBadge
               ariaLabel="回答アクションの説明"
               title="回答全体の操作"
-              message="全候補の ICS 出力や回答一覧のエクスポートができます。CSV ダウンロードやクリップボードコピーを使って共有資料を作成してください。"
+              message="全日程の ICS 出力や回答一覧のエクスポートができます。"
             />
           </div>
           <div className="flex flex-wrap gap-2">
