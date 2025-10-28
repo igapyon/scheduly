@@ -50,7 +50,13 @@ module.exports = {
     client: {
       overlay: true
     },
-    historyApiFallback: false,
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/a(?:\/.*)?$/, to: "/index.html" },
+        { from: /^\/p(?:\/.*)?$/, to: "/user.html" },
+        { from: /^\/r(?:\/.*)?$/, to: "/user-edit.html" }
+      ]
+    },
     hot: true,
     compress: true,
     port: 5173,

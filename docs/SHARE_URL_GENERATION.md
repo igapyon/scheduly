@@ -67,10 +67,10 @@
 
 5. **UI 連携**
    - URL は `KeyValueList` にテキストで表示。未発行時は `–– 未発行 ––` を表示し、発行済み時は「再発行」ボタンにラベルを切り替える。
-   - クリック 1 回でクリップボードへコピーする補助ボタンの有無は後日検討。今回は表示のみでも可。
-   - トースト文言: 初回発行は「共有URLを発行しました」、再発行時は「共有URLを再発行しました（以前のリンクは無効です）」とする。
-   - 基準 URL の入力欄（プレースホルダー: `https://scheduly.app`）を用意し、初期値には `window.location.origin` をセットする。入力値はトークン生成・再発行時に送信する。
-   - 発行完了後に管理者 URL へ画面遷移したい場合に備え、`shareService.generate` / `shareService.rotate` で `options.navigateToAdminUrl === true` が指定されたときは `admin.url` を取得して `window.location.assign(admin.url)` を呼び出す。`baseUrl` が現在のオリジンと異なる場合は遷移せず警告トーストを表示する。
+- クリック 1 回でクリップボードへコピーする補助ボタンの有無は後日検討。今回は表示のみでも可。
+- トースト文言: 初回発行は「共有URLを発行しました」、再発行時は「共有URLを再発行しました（以前のリンクは無効です）」とする。
+- 基準 URL の入力欄（プレースホルダー: `https://scheduly.app`）を用意し、初期値には `window.location.origin` をセットする。入力値はトークン生成・再発行時に送信する。
+- 発行完了後に管理者 URL へ画面遷移したい場合に備え、`shareService.generate` / `shareService.rotate` で `options.navigateToAdminUrl === true` が指定されたときは `admin.url` を取得して `window.location.assign(admin.url)` を呼び出す。`baseUrl` が現在のオリジンと異なる場合は遷移せず警告トーストを表示する。
 
 6. **エラー処理**
    - 生成処理中に例外が発生した場合は `console.error` と「共有URLの生成に失敗しました」というトーストを表示。既存トークンは破壊しない。
@@ -189,5 +189,11 @@ DELETE /projects/:projectId/share-links/:type   // type = admin | participant
 | 再発行後に旧 URL へアクセスされた場合 | サーバー側で無効扱いとし、適切なエラー画面を返す（将来のバックエンド実装で定義）。 |
 
 ---
+
+## 12. Routing Notes
+
+- 開発中（`npm run dev`）は webpack-dev-server の `historyApiFallback` で `/a/*` → `index.html`、`/p/*` → `user.html`、`/r/*` → `user-edit.html` へリライトする。
+- 本番静的ホスティングでも同様のリライト設定（例: Netlify `_redirects`, Firebase rewrites など）を追加し、トークン付きパスが 404 にならないようにする。
+- クライアント側では `projectStore.resolveProjectIdFromLocation()` が `/a/{adminToken}` / `/p/{participantToken}` / `/r/{participantToken}` を解析し、該当プロジェクトをロードする。
 
 本仕様に沿って `shareService` や `projectStore` の API を整備し、`admin.jsx` 側の `generateUrls` ダミー実装を実機能へ置き換えることを次のステップとする。

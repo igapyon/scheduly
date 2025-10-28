@@ -10,6 +10,7 @@ const PROJECT_EXPORT_VERSION = 1;
 const SHARE_TOKEN_TYPES = ["admin", "participant"];
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+const isPlaceholderShareToken = (token) => typeof token === "string" && token.startsWith("demo-");
 
 const sanitizeShareTokenEntry = (input) => {
   if (!input) return null;
@@ -77,8 +78,36 @@ const projectStore = new Map();
 const listeners = new Map();
 const participantTokenIndex = new Map();
 const participantTokenProjectMap = new Map();
+const shareTokenIndex = {
+  admin: new Map(),
+  participant: new Map()
+};
+const shareTokenProjectMap = new Map();
 
 const STORAGE_KEY = "scheduly:project-store";
+const defaultRouteContext = Object.freeze({
+  projectId: DEFAULT_PROJECT_ID,
+  kind: "default",
+  token: null,
+  shareType: null,
+  participantId: null
+});
+let currentRouteContext = { ...defaultRouteContext };
+
+const setRouteContext = (context) => {
+  currentRouteContext = { ...defaultRouteContext, ...context };
+};
+
+const getCurrentRouteContext = () => ({ ...currentRouteContext });
+
+const decodePathToken = (value) => {
+  if (!isNonEmptyString(value)) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch (error) {
+    return value;
+  }
+};
 
 const persistToStorage = () => {
   if (typeof window === "undefined") return;
@@ -104,6 +133,7 @@ const loadFromStorage = () => {
       const sanitized = ensureProjectStateShape(projectId, state, { includeDemoToken: true });
       projectStore.set(projectId, sanitized);
       rebuildParticipantTokenIndex(projectId);
+      rebuildShareTokenIndex(projectId);
     });
   } catch (error) {
     console.warn("[Scheduly] Failed to load project store from storage", error);
@@ -191,35 +221,54 @@ function rebuildParticipantTokenIndex(projectId) {
   }
 }
 
+function rebuildShareTokenIndex(projectId) {
+  const previous = shareTokenProjectMap.get(projectId);
+  if (previous && typeof previous === "object") {
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const token = previous[type];
+      if (!token) return;
+      const indexMap = shareTokenIndex[type];
+      const current = indexMap.get(token);
+      if (current && current.projectId === projectId) {
+        indexMap.delete(token);
+      }
+    });
+  }
+
+  const state = projectStore.get(projectId);
+  if (!state) {
+    shareTokenProjectMap.delete(projectId);
+    return;
+  }
+
+  const nextTracked = {};
+  const tokens = state.project?.shareTokens;
+  SHARE_TOKEN_TYPES.forEach((type) => {
+    const entry = tokens?.[type];
+    if (!entry || !isNonEmptyString(entry.token) || isPlaceholderShareToken(entry.token)) return;
+    const tokenKey = String(entry.token);
+    const indexMap = shareTokenIndex[type];
+    indexMap.set(tokenKey, { projectId });
+    nextTracked[type] = tokenKey;
+  });
+
+  if (Object.keys(nextTracked).length > 0) {
+    shareTokenProjectMap.set(projectId, nextTracked);
+  } else {
+    shareTokenProjectMap.delete(projectId);
+  }
+}
+
 loadFromStorage();
 
 const ensureProjectEntry = (projectId = DEFAULT_PROJECT_ID) => {
   if (!projectStore.has(projectId)) {
     projectStore.set(projectId, createInitialProjectState(projectId));
     rebuildParticipantTokenIndex(projectId);
+    rebuildShareTokenIndex(projectId);
     persistToStorage();
   }
   return projectStore.get(projectId);
-};
-
-const resolveProjectIdFromLocation = () => {
-  if (typeof window === "undefined") return DEFAULT_PROJECT_ID;
-  const { pathname, hash } = window.location;
-
-  // TODO: 後ほど `/a/{adminToken}` / `/p/{participantToken}` などを解析する
-  if (pathname && pathname.length > 3) {
-    const normalized = pathname.replace(/^\//, "");
-    if (normalized.startsWith("a/")) return DEFAULT_PROJECT_ID;
-    if (normalized.startsWith("p/")) return DEFAULT_PROJECT_ID;
-    if (normalized.startsWith("r/")) return DEFAULT_PROJECT_ID;
-  }
-
-  if (hash && hash.includes("project=")) {
-    const match = hash.match(/project=([\w-]+)/);
-    if (match && match[1]) return match[1];
-  }
-
-  return DEFAULT_PROJECT_ID;
 };
 
 const getProjectStateSnapshot = (projectId = DEFAULT_PROJECT_ID) => {
@@ -236,6 +285,7 @@ const setProjectState = (projectId, nextState) => {
   const sanitized = ensureProjectStateShape(projectId, nextState, { includeDemoToken: false });
   projectStore.set(projectId, sanitized);
   rebuildParticipantTokenIndex(projectId);
+  rebuildShareTokenIndex(projectId);
   persistToStorage();
   notify(projectId);
 };
@@ -267,6 +317,28 @@ const getParticipants = (projectId = DEFAULT_PROJECT_ID) => {
 const getShareTokens = (projectId = DEFAULT_PROJECT_ID) => {
   const state = ensureProjectEntry(projectId);
   return cloneShareTokens(state.project?.shareTokens);
+};
+
+const findProjectByShareToken = (type, token) => {
+  if (!isNonEmptyString(token)) return null;
+  if (!SHARE_TOKEN_TYPES.includes(type)) return null;
+  const indexMap = shareTokenIndex[type];
+  const key = String(token);
+  const entry = indexMap.get(key);
+  if (!entry) return null;
+  const projectId = entry.projectId;
+  if (!projectId) return null;
+  const state = ensureProjectEntry(projectId);
+  const tokens = state.project?.shareTokens;
+  const matched = tokens?.[type];
+  if (!matched || !isNonEmptyString(matched.token) || matched.token !== key) {
+    return null;
+  }
+  return {
+    projectId,
+    token: key,
+    entry: { ...matched }
+  };
 };
 
 const updateShareTokens = (projectId, updater) => {
@@ -585,6 +657,122 @@ const importProjectState = (projectId = DEFAULT_PROJECT_ID, payload = null) => {
 
 const cloneState = (state) => JSON.parse(JSON.stringify(state));
 
+const resolveProjectIdFromLocation = () => {
+  if (typeof window === "undefined") {
+    setRouteContext({ projectId: DEFAULT_PROJECT_ID, kind: "server" });
+    return DEFAULT_PROJECT_ID;
+  }
+
+  const { pathname, hash } = window.location;
+  const normalizedPath = typeof pathname === "string" ? pathname.replace(/^\/+/, "") : "";
+
+  if (normalizedPath) {
+    const segments = normalizedPath.split("/");
+    const prefix = segments[0] || "";
+    const rawToken = segments[1] || "";
+    const token = decodePathToken(rawToken);
+
+    if (prefix === "a" && token) {
+      const matched = findProjectByShareToken("admin", token);
+      if (matched) {
+        setRouteContext({
+          projectId: matched.projectId,
+          kind: "share",
+          shareType: "admin",
+          token
+        });
+        return matched.projectId;
+      }
+      setRouteContext({
+        projectId: DEFAULT_PROJECT_ID,
+        kind: "share-miss",
+        shareType: "admin",
+        token
+      });
+      return DEFAULT_PROJECT_ID;
+    }
+
+    if (prefix === "p" && token) {
+      const shareMatch = findProjectByShareToken("participant", token);
+      if (shareMatch) {
+        setRouteContext({
+          projectId: shareMatch.projectId,
+          kind: "share",
+          shareType: "participant",
+          token
+        });
+        return shareMatch.projectId;
+      }
+      const participantMatch = findParticipantByToken(token);
+      if (participantMatch) {
+        setRouteContext({
+          projectId: participantMatch.projectId,
+          kind: "participant-token",
+          shareType: "participant",
+          token,
+          participantId: participantMatch.participant.id
+        });
+        return participantMatch.projectId;
+      }
+      setRouteContext({
+        projectId: DEFAULT_PROJECT_ID,
+        kind: "share-miss",
+        shareType: "participant",
+        token
+      });
+      return DEFAULT_PROJECT_ID;
+    }
+
+    if (prefix === "r" && token) {
+      const participantMatch = findParticipantByToken(token);
+      if (participantMatch) {
+        setRouteContext({
+          projectId: participantMatch.projectId,
+          kind: "participant-token",
+          shareType: "participant",
+          token,
+          participantId: participantMatch.participant.id
+        });
+        return participantMatch.projectId;
+      }
+      const shareMatch = findProjectByShareToken("participant", token);
+      if (shareMatch) {
+        setRouteContext({
+          projectId: shareMatch.projectId,
+          kind: "share",
+          shareType: "participant",
+          token
+        });
+        return shareMatch.projectId;
+      }
+      setRouteContext({
+        projectId: DEFAULT_PROJECT_ID,
+        kind: "participant-token-miss",
+        shareType: "participant",
+        token
+      });
+      return DEFAULT_PROJECT_ID;
+    }
+  }
+
+  if (hash && hash.includes("project=")) {
+    const match = hash.match(/project=([\w-]+)/);
+    if (match && match[1]) {
+      const projectId = match[1];
+      setRouteContext({
+        projectId,
+        kind: "hash",
+        token: null,
+        shareType: null
+      });
+      return projectId;
+    }
+  }
+
+  setRouteContext(defaultRouteContext);
+  return DEFAULT_PROJECT_ID;
+};
+
 module.exports = {
   resolveProjectIdFromLocation,
   getProjectStateSnapshot,
@@ -595,7 +783,9 @@ module.exports = {
   getIcsText,
   getDefaultProjectId,
   getDemoAdminToken,
+  getCurrentRouteContext,
   getShareTokens,
+  findProjectByShareToken,
   updateShareTokens,
   getParticipants,
   replaceParticipants,
