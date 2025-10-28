@@ -70,6 +70,7 @@
    - クリック 1 回でクリップボードへコピーする補助ボタンの有無は後日検討。今回は表示のみでも可。
    - トースト文言: 初回発行は「共有URLを発行しました」、再発行時は「共有URLを再発行しました（以前のリンクは無効です）」とする。
    - 基準 URL の入力欄（プレースホルダー: `https://scheduly.app`）を用意し、初期値には `window.location.origin` をセットする。入力値はトークン生成・再発行時に送信する。
+   - 発行完了後に管理者 URL へ画面遷移したい場合に備え、`shareService.generate` / `shareService.rotate` で `options.navigateToAdminUrl === true` が指定されたときは `admin.url` を取得して `window.location.assign(admin.url)` を呼び出す。`baseUrl` が現在のオリジンと異なる場合は遷移せず警告トーストを表示する。
 
 6. **エラー処理**
    - 生成処理中に例外が発生した場合は `console.error` と「共有URLの生成に失敗しました」というトーストを表示。既存トークンは破壊しない。
