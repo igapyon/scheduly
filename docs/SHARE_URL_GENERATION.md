@@ -12,6 +12,7 @@
 
 ### Goals
 - プロジェクトごとに一意な管理者トークンと参加者トークン（`participantToken`）を生成し、それぞれの URL として表示できるようにする。
+- 各プロジェクトは管理者向け URL・参加者向け URL をそれぞれ 1 つだけ保持し、常に最新の値を参照する。
 - トークンは sessionStorage に保存され、ページリロード後も値が維持される。
 - トークンを一度発行したら同セッションで再発行できないよう UI をロックする（ボタンを `disabled` にする）。
 - UI からコピー・共有しやすい形で提示する（トークン値が空の場合はプレースホルダー表示）。
@@ -51,6 +52,7 @@
    - 管理者 URL 形式: `https://scheduly.app/a/{adminToken}`
    - 参加者 URL 形式: `https://scheduly.app/p/{participantToken}`（プロジェクト単位で 1 つ、回答画面へ遷移）
    - 生成時に `issuedAt` と `lastGeneratedBy`（将来のユーザー識別向け）を記録できるよう、オブジェクト構造を採用する。
+   - 既存の実トークンがある場合は再生成せず同値を返し、常に 1 プロジェクトにつき 1 トークンを維持する。
 
 3. **状態更新**
    - `shareService.generate(projectId)` → `projectStore.updateShareTokens(projectId, nextTokens)` を呼び出す、もしくは同等のロジックを実装する。
@@ -94,6 +96,7 @@
 - 旧実装で `guest` キーを使用していた場合は、読み込み時に `participant` キーへ移行するサニタイズを実施する。
 - `url` プロパティは画面表示用の冗長データ。URL 形式が変わった際に集中修正できるよう `shareService.buildUrl(type, token)` 関数を用意する。
 - `revokedAt`・`lastGeneratedBy` は将来的な再発行／監査機能向けの拡張プロパティであり、今回の仕様では利用しない。
+- `shareTokens` オブジェクト内で `admin` / `participant` はそれぞれ単一の有効トークンを保持し、複数値を蓄積しない。
 
 ## 7. Service Layer API（案）
 
