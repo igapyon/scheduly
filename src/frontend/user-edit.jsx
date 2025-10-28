@@ -789,7 +789,7 @@ const commitComment = (value) => {
           <div className="flex flex-col items-end gap-2 text-xs text-zinc-500">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
+                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 回答済
               </span>
               <span>👤 {participantName}</span>
               <a
