@@ -10,6 +10,7 @@ import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import { ClipboardIcon } from "@heroicons/react/24/outline";
 
 const { DEFAULT_TZID, ensureICAL, createLogger } = sharedIcalUtils;
 
@@ -1104,11 +1105,12 @@ function OrganizerApp() {
                   <span className="flex-1 break-words text-sm text-zinc-800">{adminUrlDisplay}</span>
                   <button
                     type="button"
-                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() => handleCopyShareUrl("admin")}
                     disabled={!canCopyAdminUrl}
+                    title="コピー"
                   >
-                    コピー
+                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -1118,11 +1120,12 @@ function OrganizerApp() {
                   <span className="flex-1 break-words text-sm text-zinc-800">{participantUrlDisplay}</span>
                   <button
                     type="button"
-                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() => handleCopyShareUrl("participant")}
                     disabled={!canCopyParticipantUrl}
+                    title="コピー"
                   >
-                    コピー
+                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
