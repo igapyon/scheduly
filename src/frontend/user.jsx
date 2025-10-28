@@ -251,6 +251,9 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-rose-100 px-3 font-semibold text-rose-700">
             × {schedule.counts.x}
           </span>
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-zinc-200 px-3 font-semibold text-zinc-600">
+            未回答 {schedule.counts.pending}
+          </span>
         </div>
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
