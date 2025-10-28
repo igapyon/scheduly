@@ -1,5 +1,8 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const DEFAULT_TZID = "Asia/Tokyo";
-const SAMPLE_ICS_RELATIVE_PATH = "ics/sample-candidates.ics";
+const SAMPLE_ICS_RELATIVE_PATH = "ics/scheduly-ics-sampledata-001.ics";
+const SAMPLE_PROJECT_RELATIVE_PATH = "proj/scheduly-project-sampledata-001.json";
 const DEFAULT_LOG_SCOPE = "shared";
 
 const ensureICAL = () => {
@@ -39,6 +42,16 @@ const getSampleIcsUrl = () => {
   }
 };
 
+const getSampleProjectJsonUrl = () => {
+  if (typeof window === "undefined") return `/${SAMPLE_PROJECT_RELATIVE_PATH}`;
+  try {
+    return new URL(SAMPLE_PROJECT_RELATIVE_PATH, window.location.href).toString();
+  } catch (error) {
+    console.warn("[Scheduly][shared] failed to resolve sample Project JSON URL", error);
+    return `/${SAMPLE_PROJECT_RELATIVE_PATH}`;
+  }
+};
+
 const createLogger = (scope = DEFAULT_LOG_SCOPE) => (...messages) => {
   console.debug(`[Scheduly][${scope}]`, ...messages);
 };
@@ -52,9 +65,11 @@ const sanitizeTzid = (tzid) => {
 module.exports = {
   DEFAULT_TZID,
   SAMPLE_ICS_RELATIVE_PATH,
+  SAMPLE_PROJECT_RELATIVE_PATH,
   ensureICAL,
   waitForIcal,
   getSampleIcsUrl,
+  getSampleProjectJsonUrl,
   createLogger,
   sanitizeTzid
 };

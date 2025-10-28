@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
@@ -5,7 +7,9 @@ import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
+import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
@@ -81,12 +85,17 @@ const createScheduleSummaries = (candidates, participants, responses) => {
       else counts.pending += 1;
       const participantEntry = participantMap.get(response.participantId);
       const participant = participantEntry?.participant;
+      const hasComment = typeof response.comment === "string" && response.comment.trim().length > 0;
+      const commentText = hasComment ? response.comment.trim() : "";
+      const participantToken = participant?.token ? String(participant.token) : "";
       detailed.push({
         participantId: response.participantId,
+        participantToken,
         name: participant?.displayName || "参加者",
         order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
-        comment: response.comment || "コメントなし"
+        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし",
+        hasComment
       });
       respondedIds.add(response.participantId);
     });
@@ -94,12 +103,15 @@ const createScheduleSummaries = (candidates, participants, responses) => {
     (participants || []).forEach((participant, index) => {
       if (!participant || respondedIds.has(participant.id)) return;
       counts.pending += 1;
+      const participantToken = participant?.token ? String(participant.token) : "";
       detailed.push({
         participantId: participant.id,
+        participantToken,
         name: participant.displayName || "参加者",
         order: index,
         mark: "pending",
-        comment: "未回答"
+        comment: "コメント: 入力なし",
+        hasComment: false
       });
     });
 
@@ -166,24 +178,24 @@ const createParticipantSummaries = (participants, candidates, responses) => {
     const responsesForParticipant = (candidates || []).map((candidate) => {
       const found = candidateMap.get(candidate.id);
       const mark = normalizeMark(found?.mark);
-      const comment = found?.comment ? `コメント: ${found.comment}` : "コメント: 未入力";
+      const hasComment = typeof found?.comment === "string" && found.comment.trim().length > 0;
+      const commentText = hasComment ? found.comment.trim() : "";
       return {
         scheduleId: candidate.id,
         datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
         mark,
-        comment
+        hasComment,
+        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし"
       };
     });
 
-    const commentHighlights = [];
-    responsesForParticipant.forEach((item) => {
-      if (item.comment && item.comment !== "コメント: 未入力") {
-        commentHighlights.push(`コメント記入: ${candidateLookup.get(item.scheduleId)?.summary || "候補"}`);
-      }
-    });
+    const commentCount = responsesForParticipant.reduce((acc, item) => (item.hasComment ? acc + 1 : acc), 0);
+    const commentHighlights =
+      commentCount > 0 ? [`(${commentCount}件のコメントあり)`] : ["(コメントなし)"];
 
     return {
       id: participant.id,
+      token: typeof participant.token === "string" ? participant.token : "",
       name: participant.displayName || "参加者",
       lastUpdated: formatTimestampForDisplay(participant.updatedAt),
       commentHighlights: Array.from(new Set(commentHighlights)),
@@ -192,7 +204,7 @@ const createParticipantSummaries = (participants, candidates, responses) => {
   });
 };
 
-function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
+function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, participantShareToken = "" }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   useEffect(() => {
@@ -239,33 +251,49 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-rose-100 px-3 font-semibold text-rose-700">
             × {schedule.counts.x}
           </span>
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-zinc-200 px-3 font-semibold text-zinc-600">
+            未回答 {schedule.counts.pending}
+          </span>
         </div>
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
-        {schedule.responses.map((response, index) => (
-          <li
-            key={response.participantId || `${schedule.id}-resp-${index}`}
-            className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
-          >
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="font-semibold text-zinc-800">{response.name}</div>
-                <a
-                  href={response.participantId ? `./user-edit.html?participantId=${encodeURIComponent(response.participantId)}` : "./user-edit.html"}
-                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                >
-                  回答
-                </a>
+        {schedule.responses.map((response, index) => {
+          const shareToken = participantShareToken && response.participantId ? participantShareToken : "";
+          const sharePath =
+            shareToken && response.participantId
+              ? `/r/${encodeURIComponent(shareToken)}?participantId=${encodeURIComponent(response.participantId)}`
+              : "";
+          const fallbackPath = response.participantToken
+            ? `/r/${encodeURIComponent(response.participantToken)}`
+            : response.participantId
+              ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
+              : "/user-edit.html";
+          const editLink = sharePath || fallbackPath;
+          return (
+            <li
+              key={response.participantId || `${schedule.id}-resp-${index}`}
+              className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-semibold text-zinc-800">{response.name}</div>
+                  <a
+                    href={editLink}
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                  >
+                    <span aria-hidden="true" className="mr-1">📝</span>回答
+                  </a>
+                </div>
+                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
+                  {response.comment}
+                </div>
               </div>
-              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
-                {response.comment}
-              </div>
-            </div>
-            <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
-              {MARK_SYMBOL[response.mark] ?? "？"}
-            </span>
-          </li>
-        ))}
+              <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
+                {MARK_SYMBOL[response.mark] ?? "？"}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </details>
   );
@@ -285,7 +313,15 @@ function participantTotals(participant) {
   );
 }
 
-function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove, canRemove = true }) {
+function ParticipantSummary({
+  participant,
+  defaultOpen,
+  scheduleLookup,
+  onRemove,
+  onRename,
+  canRemove = true,
+  participantShareToken = ""
+}) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
@@ -305,17 +341,36 @@ function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
             <a
-              href={`./user-edit.html?participantId=${encodeURIComponent(participant.id)}`}
+              href={
+                participantShareToken && participant.id
+                  ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
+                  : participant.token
+                    ? `/r/${encodeURIComponent(participant.token)}`
+                    : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`
+              }
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >
-              回答
+              <span aria-hidden="true" className="mr-1">📝</span>回答
             </a>
+            {onRename && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRename();
+                }}
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                名前変更
+              </button>
+            )}
             {onRemove && (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (!canRemove) return;
                   onRemove();
                 }}
                 disabled={!canRemove}
@@ -438,6 +493,22 @@ const downloadIcsFile = (filename, contents) => {
 
 function AdminResponsesApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const routeError = useMemo(() => {
+    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+      return {
+        title: "参加者用の共有URLが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    if (initialRouteContext?.kind === "participant-token-miss") {
+      return {
+        title: "回答用リンクが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    return null;
+  }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
   const [loading, setLoading] = useState(true);
@@ -447,8 +518,47 @@ function AdminResponsesApp() {
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
   const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
+  const [removeDialogParticipant, setRemoveDialogParticipant] = useState(null);
+  const [removeConfirmText, setRemoveConfirmText] = useState("");
+  const [removeInProgress, setRemoveInProgress] = useState(false);
+  const [renameDialogParticipant, setRenameDialogParticipant] = useState(null);
+  const [renameName, setRenameName] = useState("");
+  const [renameInProgress, setRenameInProgress] = useState(false);
+  const [renameError, setRenameError] = useState("");
+
+  const participantShareToken = useMemo(() => {
+    if (routeError) return "";
+    const tokenFromState = projectState?.project?.shareTokens?.participant?.token;
+    if (tokenFromState && !shareService.isPlaceholderToken(tokenFromState)) {
+      return String(tokenFromState);
+    }
+    if (
+      initialRouteContext &&
+      initialRouteContext.shareType === "participant" &&
+      initialRouteContext.token &&
+      (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss")
+    ) {
+      return String(initialRouteContext.token);
+    }
+    return "";
+  }, [initialRouteContext, projectState, routeError]);
 
   useEffect(() => {
+    if (routeError) return;
+    if (typeof window === "undefined") return;
+    if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
+    if (initialRouteContext.kind !== "participant-token") return;
+    if (!participantShareToken) return;
+    const currentUrl = new URL(window.location.href);
+    const desiredPath = `/p/${participantShareToken}`;
+    if (currentUrl.pathname === desiredPath) return;
+    currentUrl.pathname = desiredPath;
+    window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
+    projectStore.resolveProjectIdFromLocation();
+  }, [initialRouteContext, participantShareToken, routeError]);
+
+  useEffect(() => {
+    if (routeError) return;
     let cancelled = false;
     const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
       if (!cancelled && nextState) {
@@ -474,7 +584,7 @@ function AdminResponsesApp() {
       cancelled = true;
       unsubscribe();
     };
-  }, [projectId]);
+  }, [projectId, routeError]);
 
   const candidates = projectState.candidates || [];
   const participants = projectState.participants || [];
@@ -540,9 +650,78 @@ function AdminResponsesApp() {
     }
   };
 
+  const openRemoveParticipantDialog = (participant) => {
+    if (!participant || !participant.id) return;
+    setRemoveDialogParticipant(participant);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+    setParticipantActionError("");
+  };
+
+  const closeRemoveParticipantDialog = () => {
+    setRemoveDialogParticipant(null);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+  };
+
+  const confirmRemoveParticipant = () => {
+    if (!removeDialogParticipant) return;
+    if (removeConfirmText.trim() !== "DELETE") return;
+    const targetParticipant = removeDialogParticipant;
+    setRemoveInProgress(true);
+    try {
+      handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
+      closeRemoveParticipantDialog();
+    } catch (error) {
+      console.error("[Scheduly] failed to remove participant", error);
+      setParticipantActionError(
+        error instanceof Error ? error.message : "参加者の削除に失敗しました。しばらく待ってから再度お試しください。"
+      );
+      setParticipantActionMessage("");
+    } finally {
+      setRemoveInProgress(false);
+    }
+  };
+
+  const openRenameParticipantDialog = (participantSummary) => {
+    if (!participantSummary || !participantSummary.id) return;
+    setRenameDialogParticipant(participantSummary);
+    setRenameName(participantSummary.name || "");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const closeRenameParticipantDialog = () => {
+    if (renameInProgress) return;
+    setRenameDialogParticipant(null);
+    setRenameName("");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const confirmRenameParticipant = () => {
+    if (!renameDialogParticipant || !renameDialogParticipant.id) return;
+    const trimmed = renameName.trim();
+    if (!trimmed) {
+      setRenameError("参加者名を入力してください");
+      return;
+    }
+    setRenameInProgress(true);
+    try {
+      participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
+      setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
+      setParticipantActionError("");
+      closeRenameParticipantDialog();
+    } catch (error) {
+      console.error("[Scheduly] failed to rename participant", error);
+      setRenameError(error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。");
+    } finally {
+      setRenameInProgress(false);
+    }
+  };
+
   const handleRemoveParticipant = (participantId, displayName) => {
     const summaryName = displayName || "参加者";
-    if (!window.confirm(`${summaryName} を削除しますか？`)) return;
     participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
@@ -556,6 +735,15 @@ function AdminResponsesApp() {
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [participantActionMessage, participantActionError]);
+
+  if (routeError) {
+    return (
+      <ErrorScreen
+        title={routeError.title}
+        description={routeError.description}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -604,6 +792,7 @@ function AdminResponsesApp() {
                 schedule={schedule}
                 defaultOpen={index === 0}
                 openTrigger={index === 0 ? openFirstScheduleTick : 0}
+                participantShareToken={participantShareToken}
               />
             ))
           ) : (
@@ -631,19 +820,21 @@ function AdminResponsesApp() {
               {participantActionError || participantActionMessage}
             </div>
           )}
-          <div className="space-y-3">
-            {participantSummaries.length ? (
-              participantSummaries.map((participant, index) => (
-                <ParticipantSummary
-                  key={participant.id}
-                  participant={participant}
-                  defaultOpen={index === 0}
-                  scheduleLookup={scheduleLookup}
-                  onRemove={() => handleRemoveParticipant(participant.id, participant.name)}
-                  canRemove={participantSummaries.length > 1}
-                />
-              ))
-            ) : (
+              <div className="space-y-3">
+                {participantSummaries.length ? (
+                  participantSummaries.map((participant, index) => (
+                    <ParticipantSummary
+                      key={participant.id}
+                      participant={participant}
+                      defaultOpen={index === 0}
+                      scheduleLookup={scheduleLookup}
+                      onRemove={() => openRemoveParticipantDialog(participant)}
+                      onRename={() => openRenameParticipantDialog(participant)}
+                      canRemove={participantSummaries.length > 1}
+                      participantShareToken={participantShareToken}
+                    />
+                  ))
+                ) : (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
                 表示できる参加者がありません。
               </div>
@@ -741,6 +932,140 @@ function AdminResponsesApp() {
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
                   追加
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {removeDialogParticipant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={closeRemoveParticipantDialog}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="参加者を削除"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">参加者を削除</h2>
+              <button className="text-xs text-zinc-500" onClick={closeRemoveParticipantDialog} disabled={removeInProgress}>
+                閉じる
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmRemoveParticipant();
+              }}
+            >
+              <p className="text-xs text-zinc-500">
+                <span className="font-semibold text-zinc-700">
+                  {removeDialogParticipant.name || "参加者"}
+                </span>
+                を削除するには、確認のため「DELETE」と入力してください。
+              </p>
+              <label className="block text-xs text-zinc-500">
+                確認ワード
+                <input
+                  type="text"
+                  value={removeConfirmText}
+                  onChange={(event) => setRemoveConfirmText(event.target.value.toUpperCase())}
+                  placeholder="DELETE"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  autoFocus
+                  autoComplete="off"
+                  disabled={removeInProgress}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
+                  onClick={closeRemoveParticipantDialog}
+                  disabled={removeInProgress}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={removeInProgress || removeConfirmText.trim() !== "DELETE"}
+                >
+                  {removeInProgress ? "削除中…" : "削除"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {renameDialogParticipant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={closeRenameParticipantDialog}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="参加者名を変更"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">参加者名を変更</h2>
+              <button className="text-xs text-zinc-500" onClick={closeRenameParticipantDialog} disabled={renameInProgress}>
+                閉じる
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmRenameParticipant();
+              }}
+            >
+              <p className="text-xs text-zinc-500">
+                <span className="font-semibold text-zinc-700">{renameDialogParticipant.name || "参加者"}</span>
+                の表示名を変更します。
+              </p>
+              <label className="block text-xs text-zinc-500">
+                新しい参加者名
+                <input
+                  type="text"
+                  value={renameName}
+                  onChange={(event) => {
+                    setRenameName(event.target.value);
+                    if (renameError) setRenameError("");
+                  }}
+                  placeholder="参加者名"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  autoFocus
+                  autoComplete="off"
+                  disabled={renameInProgress}
+                />
+              </label>
+              {renameError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">{renameError}</div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={closeRenameParticipantDialog}
+                  disabled={renameInProgress}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={renameInProgress || !renameName.trim()}
+                >
+                  {renameInProgress ? "保存中…" : "更新"}
                 </button>
               </div>
             </form>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scheduly | 免責事項</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #f4f4f5;
+        color: #111827;
+      }
+      a { text-decoration: none; }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <header class="border-b border-zinc-200 bg-white">
+      <div class="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-5">
+        <div class="flex flex-col">
+          <span class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-500">Scheduly</span>
+          <h1 class="text-2xl font-bold text-zinc-900">免責事項</h1>
+        </div>
+        <div class="hidden" aria-hidden="true"></div>
+      </div>
+    </header>
+
+    <main class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-8 text-sm leading-relaxed text-zinc-700">
+      <article class="space-y-5 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <header class="space-y-3">
+          <h2 class="text-lg font-semibold text-zinc-800">Disclaimer</h2>
+          <p>
+            Scheduly は Apache License 2.0 の下で公開されるオープンソースソフトウェアです。本ドキュメントは、同ライセンスに基づく免責条項を補足し、利用者の皆さまに留意していただきたい事項を整理したものです。
+          </p>
+        </header>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">1. 無保証 / AS IS</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>本ソフトウェアは「現状のまま」（AS IS）提供され、明示・黙示を問わず、商品性、特定目的適合性、権利非侵害性など一切の保証を行いません。</li>
+            <li>本ソフトウェアの利用または利用不能により発生した直接的・間接的損害、逸失利益、データ損失その他の不利益について、開発者および著作権者は責任を負いません。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">2. 利用者の責任</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>本ソフトウェアの導入、設定、運用は利用者自身の責任で行ってください。重要データのバックアップやアクセス制御、セキュリティ対策を含む各種リスク管理も利用者の判断に委ねられます。</li>
+            <li>法令・業界ガイドライン・社内規程等への適合性を確認する責任は、利用者にあります。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">3. 仕様変更・開発方針</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>機能改善やバグ修正の過程で、挙動や API、データ形式、UI などが予告なく変更されることがあります。</li>
+            <li>開発者は特定バージョンの継続提供、後方互換性の保持、サポート期間の保証を行いません。必要に応じて最新のドキュメントやリリースノートをご確認ください。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">4. 外部サービスおよび依存コンポーネント</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>ICS/カレンダーなど外部サービスと連携する機能は、各サービスの仕様変更や障害の影響を受ける可能性があります。互換性や可用性は保証されません。</li>
+            <li>本ソフトウェアは第三者が提供するライブラリやツール（例: Node.js、React、Tailwind CSS、ical.js 等）に依存しています。これら依存コンポーネントの瑕疵による不具合について、開発者は責任を負いません。</li>
+            <li>依存コンポーネントのライセンス条件や脆弱性情報をご確認のうえ、ご自身で適切なアップデートや運用を行ってください。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">5. データ取扱い・プライバシー</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>本ソフトウェアは既定でブラウザの <code class="rounded bg-zinc-100 px-1 py-0.5 text-xs text-zinc-600">sessionStorage</code> にデータを保持するモック実装から出発しています。製品リリース時には同方式をそのまま利用しないことが想定されており、個人情報や機微情報を扱う場合は利用者側で適切な永続ストア・暗号化・アクセス制御を設計してください。</li>
+            <li>外部ストレージやサーバーと連携する構成に移行する際は、暗号化・認証・アクセス制御など必要なセキュリティ対策を利用者の責任で設計・実装してください。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">6. サポート / 問い合わせ</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>バグ報告や機能要望には善意で対応する場合がありますが、開発者は個別対応や修正を保証しません。</li>
+            <li>サポートが提供された場合でも、それはベストエフォートであり、結果の正確性や完全性を保証するものではありません。</li>
+            <li>問い合わせは GitHub Issues 等の公開チャネルを推奨します。機密情報を含む内容は投稿しないでください。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">7. コントリビューション</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>コード・ドキュメント・翻訳・アイデア等のコントリビューションを送付いただく場合、Apache License 2.0 に準拠した形で取り扱われることに同意したものとみなします。</li>
+            <li>提供いただくコントリビューションにも保証は付されず、採用・非採用の判断は開発者に委ねられます。</li>
+          </ul>
+        </section>
+
+        <section class="space-y-3">
+          <h3 class="text-base font-semibold text-zinc-800">8. 追加的な注意事項</h3>
+          <ul class="list-disc space-y-2 pl-5">
+            <li>本ソフトウェアの名称・ロゴ・画面デザイン等を用いた第三者向けサービスの提供にあたり、商標やブランドに関する権利を付与するものではありません。</li>
+            <li>法的助言を提供する立場にはありません。本ドキュメントの記載内容は一般的な注意喚起であり、具体的な法的判断については専門家にご相談ください。</li>
+          </ul>
+        </section>
+
+        <footer class="space-y-3 border-t border-dashed border-zinc-200 pt-4 text-sm">
+          <p>本ソフトウェアを利用することで、利用者は上記の免責条項に同意したものとみなされます。ご了承のうえ、Scheduly をご利用ください。</p>
+          <p class="text-xs text-zinc-500">
+            元ドキュメント: <a class="text-emerald-600 hover:text-emerald-700" href="https://github.com/igapyon/scheduly/blob/main/docs/DISCLAIMER.md" target="_blank" rel="noopener noreferrer">docs/DISCLAIMER.md</a>
+          </p>
+        </footer>
+      </article>
+    </main>
+
+    <footer class="border-t border-zinc-200 bg-white">
+      <div class="mx-auto flex w-full max-w-4xl flex-col gap-1 px-5 py-4 text-xs text-zinc-500">
+        <span>© Toshiki Iga.</span>
+        <span>Scheduly mock project — Apache License 2.0.</span>
+      </div>
+    </footer>
+  </body>
+</html>

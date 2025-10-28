@@ -1,3 +1,5 @@
+// Copyright (c) Toshiki Iga. All Rights Reserved.
+
 const toDate = (value) => {
   if (!value) return null;
   if (value instanceof Date) {
