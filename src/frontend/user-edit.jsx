@@ -805,7 +805,7 @@ const commitComment = (value) => {
                 className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
                 onClick={openRenameParticipantDialog}
               >
-                名前を変更
+                名前変更
               </button>
               <button
                 type="button"
