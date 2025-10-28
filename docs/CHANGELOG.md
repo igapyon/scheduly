@@ -2,22 +2,8 @@
 
 Scheduly の変更履歴を記録するドキュメントです。まだ公式リリース前のため、暫定的なメモとして運用します。
 
-## Unreleased
+## 2025-10-29 
 
-- ドキュメント整備
-  - `docs/DEVELOPMENT_JOURNEY.md` に開発フェーズを整理
-  - `docs/SERVER_INTEGRATION.md`（ドラフト）、`docs/DISCLAIMER.md`、`docs/CONTRIBUTING.md`、`docs/CONTRIBUTORS.md` を追加
-  - `docs/SCREEN_OVERVIEW.md` に参加者回答管理ビューの計画を統合
-- サンプルデータの整備
-  - 公開用サンプルを `public/ics/` および `public/proj/` に配置
-  - デモシード時に `scheduly-project-sampledata-001.json` を優先的にインポートするよう変更
-- README に Documentation Index を追加
-- 免責事項・QA 手順・開発メモの役割を明確化
-
-## 2024-xx-xx 初期モックフェーズ（参考）
-
-- ローカル HTML モックで UI を整備
-- Tailwind CDN と軽量 JavaScript を導入
-- ICS 連携の基本機能を試作
-
-> 日付・バージョン番号は正式リリース時に更新する予定です。
+- About/免責事項/コントリビューターの静的ページを新規追加しました。
+- 主要セクションにクリック式ツールチップ InfoBadge を追加し、管理画面・参加者一覧・回答編集の各画面で操作の意図や使い方を参照できるようにしました
+- 共有 URL 発行やサンプル JSON／ICS データを含むドキュメント群を拡充し、仕様とモックの実態が一致するよう整備しました
