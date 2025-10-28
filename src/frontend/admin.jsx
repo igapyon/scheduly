@@ -972,7 +972,7 @@ function OrganizerApp() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-5 xl:grid-cols-[2fr,1fr]">
+      <div className="grid flex-1 gap-5">
 
         <main className="space-y-5">
           <SectionCard
@@ -1101,11 +1101,16 @@ function OrganizerApp() {
             <div className="space-y-3">
               <div>
                 <span className="text-xs font-semibold text-zinc-500">管理者URL</span>
-                <div className="mt-1 flex items-start gap-2">
-                  <span className="flex-1 break-words text-sm text-zinc-800">{adminUrlDisplay}</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className="flex-1 truncate text-sm text-zinc-800"
+                    title={adminShareEntry?.url || ""}
+                  >
+                    {adminUrlDisplay}
+                  </span>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() => handleCopyShareUrl("admin")}
                     disabled={!canCopyAdminUrl}
                     title="コピー"
@@ -1116,11 +1121,16 @@ function OrganizerApp() {
               </div>
               <div>
                 <span className="text-xs font-semibold text-zinc-500">参加者URL</span>
-                <div className="mt-1 flex items-start gap-2">
-                  <span className="flex-1 break-words text-sm text-zinc-800">{participantUrlDisplay}</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className="flex-1 truncate text-sm text-zinc-800"
+                    title={participantShareEntry?.url || ""}
+                  >
+                    {participantUrlDisplay}
+                  </span>
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() => handleCopyShareUrl("participant")}
                     disabled={!canCopyParticipantUrl}
                     title="コピー"
