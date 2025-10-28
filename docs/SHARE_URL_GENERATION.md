@@ -160,6 +160,8 @@ shareService.invalidate(projectId: string, type: 'admin' | 'participant'): void;
 
 ## 10. Future API Endpoints（バックエンド化を見据えた草案）
 
+当面はブラウザ内オンメモリ運用（1 ブラウザ = 1 プロジェクト）であり、トークンもセッション単位で管理される。しかし将来 Node.js などの常駐サーバーへ移行した場合は、1 サーバーで複数プロジェクトをホストする前提になる。バックエンド側では `projectId` をキーとしたデータストアと API を用意し、トークンの生成・無効化・重複チェックをプロジェクト単位で行う必要がある。
+
 ```
 POST   /projects/:projectId/share-links
 GET    /projects/:projectId/share-links
