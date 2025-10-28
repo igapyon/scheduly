@@ -7,6 +7,7 @@ import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
+import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
@@ -85,8 +86,10 @@ const createScheduleSummaries = (candidates, participants, responses) => {
       const participant = participantEntry?.participant;
       const hasComment = typeof response.comment === "string" && response.comment.trim().length > 0;
       const commentText = hasComment ? response.comment.trim() : "";
+      const participantToken = participant?.token ? String(participant.token) : "";
       detailed.push({
         participantId: response.participantId,
+        participantToken,
         name: participant?.displayName || "参加者",
         order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
@@ -99,8 +102,10 @@ const createScheduleSummaries = (candidates, participants, responses) => {
     (participants || []).forEach((participant, index) => {
       if (!participant || respondedIds.has(participant.id)) return;
       counts.pending += 1;
+      const participantToken = participant?.token ? String(participant.token) : "";
       detailed.push({
         participantId: participant.id,
+        participantToken,
         name: participant.displayName || "参加者",
         order: index,
         mark: "pending",
@@ -189,6 +194,7 @@ const createParticipantSummaries = (participants, candidates, responses) => {
 
     return {
       id: participant.id,
+      token: typeof participant.token === "string" ? participant.token : "",
       name: participant.displayName || "参加者",
       lastUpdated: formatTimestampForDisplay(participant.updatedAt),
       commentHighlights: Array.from(new Set(commentHighlights)),
@@ -197,7 +203,7 @@ const createParticipantSummaries = (participants, candidates, responses) => {
   });
 };
 
-function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
+function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, participantShareToken = "" }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   useEffect(() => {
@@ -247,30 +253,43 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
         </div>
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
-        {schedule.responses.map((response, index) => (
-          <li
-            key={response.participantId || `${schedule.id}-resp-${index}`}
-            className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
-          >
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="font-semibold text-zinc-800">{response.name}</div>
-                <a
-                  href={response.participantId ? `./user-edit.html?participantId=${encodeURIComponent(response.participantId)}` : "./user-edit.html"}
-                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                >
-                  回答
-                </a>
+        {schedule.responses.map((response, index) => {
+          const shareToken = participantShareToken && response.participantId ? participantShareToken : "";
+          const sharePath =
+            shareToken && response.participantId
+              ? `/r/${encodeURIComponent(shareToken)}?participantId=${encodeURIComponent(response.participantId)}`
+              : "";
+          const fallbackPath = response.participantToken
+            ? `/r/${encodeURIComponent(response.participantToken)}`
+            : response.participantId
+              ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
+              : "/user-edit.html";
+          const editLink = sharePath || fallbackPath;
+          return (
+            <li
+              key={response.participantId || `${schedule.id}-resp-${index}`}
+              className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-semibold text-zinc-800">{response.name}</div>
+                  <a
+                    href={editLink}
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                  >
+                    回答
+                  </a>
+                </div>
+                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
+                  {response.comment}
+                </div>
               </div>
-              <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
-                {response.comment}
-              </div>
-            </div>
-            <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
-              {MARK_SYMBOL[response.mark] ?? "？"}
-            </span>
-          </li>
-        ))}
+              <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
+                {MARK_SYMBOL[response.mark] ?? "？"}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </details>
   );
@@ -290,7 +309,14 @@ function participantTotals(participant) {
   );
 }
 
-function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove, canRemove = true }) {
+function ParticipantSummary({
+  participant,
+  defaultOpen,
+  scheduleLookup,
+  onRemove,
+  canRemove = true,
+  participantShareToken = ""
+}) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
@@ -310,7 +336,13 @@ function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
             <a
-              href={`./user-edit.html?participantId=${encodeURIComponent(participant.id)}`}
+              href={
+                participantShareToken && participant.id
+                  ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
+                  : participant.token
+                    ? `/r/${encodeURIComponent(participant.token)}`
+                    : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`
+              }
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >
@@ -443,6 +475,7 @@ const downloadIcsFile = (filename, contents) => {
 
 function AdminResponsesApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
+  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
   const [loading, setLoading] = useState(true);
@@ -452,6 +485,35 @@ function AdminResponsesApp() {
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
   const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
+
+  const participantShareToken = useMemo(() => {
+    const tokenFromState = projectState?.project?.shareTokens?.participant?.token;
+    if (tokenFromState && !shareService.isPlaceholderToken(tokenFromState)) {
+      return String(tokenFromState);
+    }
+    if (
+      initialRouteContext &&
+      initialRouteContext.shareType === "participant" &&
+      initialRouteContext.token &&
+      (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss")
+    ) {
+      return String(initialRouteContext.token);
+    }
+    return "";
+  }, [initialRouteContext, projectState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
+    if (initialRouteContext.kind !== "participant-token") return;
+    if (!participantShareToken) return;
+    const currentUrl = new URL(window.location.href);
+    const desiredPath = `/p/${participantShareToken}`;
+    if (currentUrl.pathname === desiredPath) return;
+    currentUrl.pathname = desiredPath;
+    window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
+    projectStore.resolveProjectIdFromLocation();
+  }, [initialRouteContext, participantShareToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -609,6 +671,7 @@ function AdminResponsesApp() {
                 schedule={schedule}
                 defaultOpen={index === 0}
                 openTrigger={index === 0 ? openFirstScheduleTick : 0}
+                participantShareToken={participantShareToken}
               />
             ))
           ) : (
@@ -636,19 +699,20 @@ function AdminResponsesApp() {
               {participantActionError || participantActionMessage}
             </div>
           )}
-          <div className="space-y-3">
-            {participantSummaries.length ? (
-              participantSummaries.map((participant, index) => (
-                <ParticipantSummary
-                  key={participant.id}
-                  participant={participant}
-                  defaultOpen={index === 0}
-                  scheduleLookup={scheduleLookup}
-                  onRemove={() => handleRemoveParticipant(participant.id, participant.name)}
-                  canRemove={participantSummaries.length > 1}
-                />
-              ))
-            ) : (
+              <div className="space-y-3">
+                {participantSummaries.length ? (
+                  participantSummaries.map((participant, index) => (
+                    <ParticipantSummary
+                      key={participant.id}
+                      participant={participant}
+                      defaultOpen={index === 0}
+                      scheduleLookup={scheduleLookup}
+                      onRemove={() => handleRemoveParticipant(participant.id, participant.name)}
+                      canRemove={participantSummaries.length > 1}
+                      participantShareToken={participantShareToken}
+                    />
+                  ))
+                ) : (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
                 表示できる参加者がありません。
               </div>

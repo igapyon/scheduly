@@ -59,6 +59,7 @@
    - 更新後、`projectStore` の購読機構を通じて React state (`urls`) を書き換え、UI を再レンダリングする。
    - `sessionStorage` 永続化が有効な場合は自動で保存される。
    - 発行済み（プレースホルダーではない）トークンが存在する場合は、「共有URLを生成」ボタンを「再発行」表示に切り替え、押下時に確認ダイアログを出した上で `shareService.rotate(projectId)` を呼び出す。
+   - 管理画面へトークン無しでアクセスされた場合は初回ロード時に自動発行し、同一オリジン内で `/a/{adminToken}` へヒストリ置換する。既に発行済みなら再発行せず、既存 URL へ遷移する。
 
 4. **再発行**
    - `shareService.rotate(projectId)` は新しい管理者トークン・参加者トークンを生成し、`projectStore.updateShareTokens` で置き換える。

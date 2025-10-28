@@ -7,6 +7,7 @@ import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import responseService from "./services/response-service";
+import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
@@ -283,7 +284,35 @@ const ParticipantList = ({ list, label, color }) => (
 
 function SchedulyMock() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
-  const initialParticipantId = useMemo(() => readParticipantIdFromLocation(), []);
+  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const initialParticipantId = useMemo(() => {
+    const fromQuery = readParticipantIdFromLocation();
+    if (fromQuery) return fromQuery;
+    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
+      const match = projectStore.findParticipantByToken(initialRouteContext.token);
+      if (match && match.participant && match.participant.id) {
+        return match.participant.id;
+      }
+    }
+    return null;
+  }, [initialRouteContext]);
+  const participantListUrl = useMemo(() => {
+    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
+      const encodedToken = encodeURIComponent(initialRouteContext.token);
+      if (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss") {
+        return `/p/${encodedToken}`;
+      }
+      if (initialRouteContext.kind === "participant-token" || initialRouteContext.kind === "participant-token-miss") {
+        return `/p/${encodedToken}`;
+      }
+    }
+    return "/user.html";
+  }, [initialRouteContext]);
+  const initialParticipantTokenRef = useRef(
+    initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token
+      ? String(initialRouteContext.token)
+      : ""
+  );
   const requestedParticipantIdRef = useRef(initialParticipantId);
   console.log("[user-edit] projectId", projectId, "initialParticipantId", initialParticipantId);
   const [candidates, setCandidates] = useState([]);
@@ -307,6 +336,30 @@ function SchedulyMock() {
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
+    if (initialRouteContext.kind !== "participant-token") return;
+    const shareTokens = projectStore.getShareTokens(projectId);
+    const participantShareToken = shareTokens?.participant?.token;
+    if (!participantShareToken || shareService.isPlaceholderToken(participantShareToken)) return;
+    const participantId = requestedParticipantIdRef.current || initialParticipantId || "";
+    const currentUrl = new URL(window.location.href);
+    const desiredPath = `/r/${participantShareToken}`;
+    const currentParticipantParam = currentUrl.searchParams.get("participantId") || "";
+    if (currentUrl.pathname === desiredPath && (!participantId || currentParticipantParam === participantId)) {
+      return;
+    }
+    if (participantId) {
+      currentUrl.searchParams.set("participantId", participantId);
+    } else {
+      currentUrl.searchParams.delete("participantId");
+    }
+    currentUrl.pathname = desiredPath;
+    window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
+    projectStore.resolveProjectIdFromLocation();
+  }, [initialRouteContext, projectId, initialParticipantId]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
@@ -315,7 +368,16 @@ function SchedulyMock() {
       console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
 
-      const preferredId = requestedParticipantIdRef.current;
+      let preferredId = requestedParticipantIdRef.current;
+      if (!preferredId && initialParticipantTokenRef.current) {
+        const token = initialParticipantTokenRef.current;
+        const matched = participantList.find((participant) => participant && participant.token === token);
+        if (matched && matched.id) {
+          preferredId = matched.id;
+          requestedParticipantIdRef.current = matched.id;
+          initialParticipantTokenRef.current = "";
+        }
+      }
       const hasPreferredParticipant =
         preferredId && participantList.some((participant) => participant && participant.id === preferredId);
 
@@ -609,7 +671,7 @@ const commitComment = (value) => {
               </span>
               <span>👤 {participantName}</span>
               <a
-                href="./user.html"
+                href={participantListUrl}
                 className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
               >
                 参加者一覧へ

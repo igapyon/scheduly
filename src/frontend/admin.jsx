@@ -494,6 +494,7 @@ function OrganizerApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
   const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
+  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
   const [summary, setSummary] = useState(initialProjectState.project?.name || "");
   const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
@@ -508,6 +509,7 @@ function OrganizerApp() {
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
+  const autoIssueHandledRef = useRef(false);
 
   useEffect(() => {
     setCandidates(initialProjectState.candidates || []);
@@ -798,6 +800,24 @@ function OrganizerApp() {
     }
   };
 
+  const updateLocationToAdminUrl = (entry) => {
+    if (!entry || !isNonEmptyString(entry.url)) return;
+    if (typeof window === "undefined") return;
+    try {
+      const target = new URL(entry.url);
+      const current = new URL(window.location.href);
+      if (target.origin === current.origin) {
+        window.history.replaceState(null, "", target.pathname + target.search + target.hash);
+        projectStore.resolveProjectIdFromLocation();
+      } else {
+        window.location.assign(entry.url);
+      }
+    } catch (error) {
+      console.warn("[Scheduly][admin] Failed to update location to admin URL", error);
+      window.location.assign(entry.url);
+    }
+  };
+
   const handleShareLinkAction = () => {
     const hasIssued = hasIssuedShareTokens;
     if (hasIssued) {
@@ -839,6 +859,36 @@ function OrganizerApp() {
       popToast("URLのコピーに失敗しました");
     }
   };
+
+  useEffect(() => {
+    if (autoIssueHandledRef.current) return;
+    const adminEntry = shareTokens?.admin || null;
+    const hasValidAdminToken =
+      adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
+
+    if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
+      autoIssueHandledRef.current = true;
+      return;
+    }
+
+    if (hasValidAdminToken) {
+      updateLocationToAdminUrl(adminEntry);
+      autoIssueHandledRef.current = true;
+      return;
+    }
+
+    try {
+      const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+      const tokens = refreshShareTokensState({ resetWhenMissing: true });
+      const nextAdmin = tokens.admin || result.admin;
+      updateLocationToAdminUrl(nextAdmin);
+      popToast("共有URLを発行しました。コピーしてください");
+    } catch (error) {
+      console.error("Auto issue share URLs failed", error);
+    } finally {
+      autoIssueHandledRef.current = true;
+    }
+  }, [projectId, baseUrl, shareTokens, initialRouteContext]);
 
   const handleExportProjectInfo = () => {
     try {
@@ -962,12 +1012,37 @@ function OrganizerApp() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href="./user.html"
+            <button
+              type="button"
+              onClick={() => {
+                const entry = shareTokens?.participant;
+                if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
+                  try {
+                    const u = new URL(entry.url, window.location.origin);
+                    if (u.origin === window.location.origin) {
+                      window.location.assign(u.pathname + u.search + u.hash);
+                    } else {
+                      window.open(entry.url, "_blank");
+                    }
+                  } catch (e) {
+                    window.open(entry.url, "_blank");
+                  }
+                } else {
+                  const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+                  const tokens = refreshShareTokensState({ resetWhenMissing: true });
+                  const next = tokens.participant || result.participant;
+                  if (next && next.url) {
+                    window.location.assign(new URL(next.url, window.location.origin).pathname);
+                    popToast("参加者URLを発行して開きました");
+                  } else {
+                    popToast("参加者URLを開けませんでした");
+                  }
+                }
+              }}
               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
             >
               参加者画面を開く
-            </a>
+            </button>
           </div>
         </div>
       </header>
