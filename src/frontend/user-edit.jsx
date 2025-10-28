@@ -11,6 +11,7 @@ import shareService from "./services/share-service";
 import participantService from "./services/participant-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
+import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
@@ -779,10 +780,17 @@ const commitComment = (value) => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
-              <span aria-hidden="true">✏️</span>
-              <span>Scheduly 回答編集</span>
-            </h1>
+            <div className="mt-1 flex items-center gap-2">
+              <h1 className="flex items-center gap-2 text-2xl font-bold">
+                <span aria-hidden="true">✏️</span>
+                <span>Scheduly 回答編集</span>
+              </h1>
+              <InfoBadge
+                ariaLabel="回答編集画面の説明"
+                title="回答編集の使い方"
+                message="参加者自身が各候補に対して〇△×とコメントを入力する画面です。上部の完了数がリアルタイムで更新され、長押しで他参加者の回答を確認できます。"
+              />
+            </div>
             <p className="mt-1 text-xs text-zinc-500">参加者「{participantName}」さんの回答を編集します。</p>
             <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>

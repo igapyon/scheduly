@@ -10,6 +10,7 @@ import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
+import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
@@ -780,7 +781,14 @@ function AdminResponsesApp() {
 
       {activeTab === "schedule" && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-600">日程ごとの回答サマリー</h2>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
+            <span>日程ごとの回答サマリー</span>
+            <InfoBadge
+              ariaLabel="日程サマリーの説明"
+              title="日程サマリー"
+              message="各候補日ごとの〇△×集計と自分の回答を確認できます。候補をタップすると詳細に移動します。"
+            />
+          </div>
           {loading && !schedules.length ? (
             <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center text-xs text-emerald-600">
               日程データを読み込んでいます…
@@ -808,7 +816,14 @@ function AdminResponsesApp() {
 
       {activeTab === "participant" && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
+            <span>参加者ごとの回答サマリー</span>
+            <InfoBadge
+              ariaLabel="参加者サマリーの説明"
+              title="参加者サマリー"
+              message="参加者ごとの回答状況を一覧できます。カードを開いて個別の参加者の回答やコメントを確認し、必要に応じて名前変更や削除を行えます。"
+            />
+          </div>
           {(participantActionMessage || participantActionError) && (
             <div
               className={`rounded-xl border px-3 py-2 text-xs ${
@@ -852,7 +867,14 @@ function AdminResponsesApp() {
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+            <span>回答全体のアクション</span>
+            <InfoBadge
+              ariaLabel="回答アクションの説明"
+              title="回答全体の操作"
+              message="全候補の ICS 出力や回答一覧のエクスポートができます。CSV ダウンロードやクリップボードコピーを使って共有資料を作成してください。"
+            />
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
