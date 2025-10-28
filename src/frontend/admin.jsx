@@ -777,6 +777,26 @@ function OrganizerApp() {
     window.setTimeout(() => setToast(""), 1800);
   };
 
+  const copyTextToClipboard = async (value) => {
+    if (!isNonEmptyString(value)) throw new Error("empty");
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
   const handleShareLinkAction = () => {
     const hasIssued = hasIssuedShareTokens;
     if (hasIssued) {
@@ -800,6 +820,22 @@ function OrganizerApp() {
     } catch (error) {
       console.error("Share link generation error", error);
       popToast("共有URLの生成に失敗しました");
+    }
+  };
+
+  const handleCopyShareUrl = async (type) => {
+    const targetEntry = type === "admin" ? adminShareEntry : participantShareEntry;
+    const canCopy = type === "admin" ? canCopyAdminUrl : canCopyParticipantUrl;
+    if (!targetEntry || !canCopy) {
+      popToast("コピーできるURLがありません");
+      return;
+    }
+    try {
+      await copyTextToClipboard(targetEntry.url);
+      popToast("URLをコピーしました");
+    } catch (error) {
+      console.error("Copy share URL error", error);
+      popToast("URLのコピーに失敗しました");
     }
   };
 
@@ -874,6 +910,12 @@ function OrganizerApp() {
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
   const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
+  const canCopyAdminUrl =
+    adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token) && isNonEmptyString(adminShareEntry.url);
+  const canCopyParticipantUrl =
+    participantShareEntry &&
+    !shareService.isPlaceholderToken(participantShareEntry.token) &&
+    isNonEmptyString(participantShareEntry.url);
 
   const eventPayload = useMemo(() => {
     return {
@@ -1055,13 +1097,40 @@ function OrganizerApp() {
                 発行後に管理者URLを開く
               </label>
             </div>
-            <KeyValueList
-              items={[
-                { key: "管理者URL", value: adminUrlDisplay },
-                { key: "参加者URL", value: participantUrlDisplay },
-                { key: "最終更新", value: issuedAtDisplay }
-              ]}
-            />
+            <div className="space-y-3">
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">管理者URL</span>
+                <div className="mt-1 flex items-start gap-2">
+                  <span className="flex-1 break-words text-sm text-zinc-800">{adminUrlDisplay}</span>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={() => handleCopyShareUrl("admin")}
+                    disabled={!canCopyAdminUrl}
+                  >
+                    コピー
+                  </button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">参加者URL</span>
+                <div className="mt-1 flex items-start gap-2">
+                  <span className="flex-1 break-words text-sm text-zinc-800">{participantUrlDisplay}</span>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-600 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={() => handleCopyShareUrl("participant")}
+                    disabled={!canCopyParticipantUrl}
+                  >
+                    コピー
+                  </button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">最終更新</span>
+                <div className="mt-1 break-words text-sm text-zinc-800">{issuedAtDisplay}</div>
+              </div>
+            </div>
             <p className="text-xs text-zinc-500">
               管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。必要に応じて基準URLを変更し、再発行してください。
             </p>
