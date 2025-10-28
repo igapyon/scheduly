@@ -11,284 +11,251 @@
     </style>
   </head>
   <body class="bg-zinc-100 text-zinc-900">
-    <div id="root">
-      <div class="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
-        <header class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div class="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+      <header class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
+            <h1 class="mt-1 flex items-center gap-2 text-2xl font-bold"><span aria-hidden="true">📋</span><span>Scheduly 参加者</span></h1>
+            <p class="mt-2 text-sm text-zinc-600">プロジェクト「(TEST) 素敵弦楽四重奏団がミューザ旗揚公演」の日程と回答状況です。</p>
+            <p class="mt-1 text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚公演。本番および練習日の確認用。<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</p>
+            <p class="mt-1 text-xs text-zinc-500">締切目安: 2025/05/01 23:59</p>
+            <p class="mt-1 text-xs text-zinc-500">参加者数: 4</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 sm:justify-end"><button type="button" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"><span aria-hidden="true">＋</span><span>参加者を新規登録</span></button></div>
+        </div>
+      </header>
+
+      <nav class="rounded-2xl border border-zinc-200 bg-white/90 p-1 shadow-sm">
+        <div class="flex gap-1">
+          <button type="button" class="flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition text-zinc-700 hover:bg-emerald-50"><span class="inline-flex items-center justify-center gap-2"><span aria-hidden="true">📅</span><span>日程ごと</span></span></button>
+          <button type="button" class="flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition bg-emerald-600 text-white"><span class="inline-flex items-center justify-center gap-2"><span aria-hidden="true">👤</span><span>参加者ごと</span></span></button>
+        </div>
+      </nav>
+
+      <section class="space-y-3">
+        <h2 class="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
+
+        <!-- Vn白髪 -->
+        <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" open>
+          <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Responses</p>
-              <h1 class="mt-1 flex items-center gap-2 text-2xl font-bold">
-                <span aria-hidden="true">📋</span>
-                <span>Scheduly 参加者</span>
-              </h1>
-              <p class="mt-2 text-sm text-zinc-600">プロジェクト「秋の合宿 調整会議」の日程と回答状況です。</p>
-              <p class="mt-1 text-xs text-zinc-500">秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。</p>
+              <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+              <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800"><span>Vn白髪</span><a href="./user-edit.html?participantId=10123751-d92f-4466-9030-d8ed8b8521e4" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a><button type="button" class="inline-flex items-center justify-center rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">削除</button></div>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>最終更新: 2025/10/28 08:07</span><span>(7件のコメントあり)</span></div>
             </div>
-            <div class="flex flex-wrap items-center gap-2 sm:justify-end">
-              <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500">
-                <span aria-hidden="true">＋</span>
-                <span>参加者を新規登録</span>
-              </button>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold"><span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 7</span><span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 0</span><span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 0</span><span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span></div>
+          </summary>
+          <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+            <!-- 初見大会 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (初見大会)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/09/30(火) 10:00 – 19:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />初見大会<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京オペラシティ リサイタルホール, 日本、〒163-1490 東京都新宿区西新宿３丁目２０−２</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 頑張って譜読みします。</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 練馬文化-夜練 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (練馬文化-夜練)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/01(水) 18:00 – 21:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />★リハーサル。練習場所について会場と最終調整中。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>練馬区立練馬文化センター大ホール（こぶしホール）, 日本、〒176-0001 東京都練馬区練馬１丁目１７−３７</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 練文の練習楽しみ</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 東京文化 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (東京文化)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/02(木) 10:00 – 16:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />東京文化で練習<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京文化会館, 日本、〒110-8716 東京都台東区上野公園５−４５</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: リニューアルの東京文化楽しみ</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 前日リハ -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 前日リハ (芸劇)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/03(金) 14:00 – 17:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />前日リハ。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京芸術劇場, 日本、〒171-0021 東京都豊島区西池袋１丁目８−１</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 入力なし</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 当日GP -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 当日GP</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 10:00 – 12:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />当日GP。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>ミューザ川崎, 日本、〒212-8554 神奈川県川崎市幸区大宮町１３１０</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 入力なし</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 本番 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 14:00 – 16:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />13:30 会場。14:00 開演。<br />演目: Mozart ハイドンセット全曲<br />演奏: 素敵弦楽四重奏団<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>ミューザ川崎シンフォニーホール, 日本、〒212-8557 神奈川県川崎市幸区大宮町１３１０</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 本番！</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 打ち上げ -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演 - 打ち上げ</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 17:30 – 20:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />本番後の打ち上げ<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>川崎のどこかいいところ</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: のむどー</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+          </ul>
+        </details>
+
+        <!-- Vnかはし -->
+        <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+              <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800"><span>Vnかはし</span><a href="./user-edit.html?participantId=e060eeec-1a0a-42f9-9461-5b7880a470de" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a><button type="button" class="inline-flex items-center justify-center rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">削除</button></div>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>最終更新: 2025/10/28 08:07</span><span>(2件のコメントあり)</span></div>
             </div>
-          </div>
-        </header>
-
-        <nav class="rounded-2xl border border-zinc-200 bg-white/90 p-1 shadow-sm">
-          <div class="flex gap-1">
-            <button type="button" class="flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition text-zinc-700 hover:bg-emerald-50">
-              <span class="inline-flex items-center justify-center gap-2">
-                <span aria-hidden="true">📅</span>
-                <span>日程ごと</span>
-              </span>
-            </button>
-            <button type="button" class="flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition bg-emerald-600 text-white">
-              <span class="inline-flex items-center justify-center gap-2">
-                <span aria-hidden="true">👤</span>
-                <span>参加者ごと</span>
-              </span>
-            </button>
-          </div>
-        </nav>
-
-        <section class="space-y-3">
-          <h2 class="text-sm font-semibold text-zinc-600">参加者ごとの回答サマリー</h2>
-          <div class="space-y-3">
-            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm" open>
-              <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
-                  <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
-                    <span>佐藤 太郎</span>
-                    <a href="./user-edit.html" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a>
-                  </div>
-                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                    <span>最終更新: 2025/04/12 17:42</span>
-                    <span>コメント記入: Day2</span>
-                  </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold"><span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 5</span><span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span><span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 1</span><span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span></div>
+          </summary>
+          <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+            <!-- 初見大会 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (初見大会)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/09/30(火) 10:00 – 19:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />初見大会<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京オペラシティ リサイタルホール, 日本、〒163-1490 東京都新宿区西新宿３丁目２０−２</span></div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 3</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 0</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span>
+                <div class="text-xs text-zinc-500">コメント: 入力なし</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
+            </li>
+            <!-- 練馬文化-夜練（未定） -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-dashed border-zinc-300">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (練馬文化-夜練)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/01(水) 18:00 – 21:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />★リハーサル。練習場所について会場と最終調整中。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>練馬区立練馬文化センター大ホール（こぶしホール）, 日本、〒176-0001 東京都練馬区練馬１丁目１７−３７</span></div>
                 </div>
-              </summary>
-              <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day1</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/26(日) 13:00 – 17:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">初日: キックオフと全体ミーティング</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール 大ホール（2046席）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: オフィス参加可</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day2</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/27(月) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">2日目: 平日夕方のフォローアップ</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ（小ホール）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: オンラインなら参加可能</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 h-6 min-w-[1.5rem] text-xs font-semibold">△</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day3</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/28(火) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">3日目: オンライン併催の調整</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 特になし</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 予備日</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/11/03(月) 10:00 – 12:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">予備日: 参加しやすい午前帯</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 終日参加可能</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-              </ul>
-            </details>
+                <div class="text-xs text-zinc-600">コメント: 予定が未定</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600 h-6 min-w-[1.5rem] text-xs font-semibold">—</span>
+            </li>
+            <!-- 東京文化 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent">
+              <div class="flex-1 space-y-1">
+                <div class="space-y-1">
+                  <div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (東京文化)</div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/02(木) 10:00 – 16:00 (Asia/Tokyo)</span></div>
+                  <div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />東京文化で練習<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div>
+                  <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京文化会館, 日本、〒110-8716 東京都台東区上野公園５−４５</span></div>
+                </div>
+                <div class="text-xs text-zinc-500">コメント: 遅れて参加します。</div>
+              </div>
+              <span class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 h-6 min-w-[1.5rem] text-xs font-semibold">△</span>
+            </li>
+            <!-- 前日リハ・当日GP・本番・打ち上げ（略） -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 前日リハ (芸劇)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/03(金) 14:00 – 17:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />前日リハ。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 当日GP</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 10:00 – 12:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />当日GP。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 14:00 – 16:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />13:30 会場。14:00 開演。<br />演目: Mozart ハイドンセット全曲<br />演奏: 素敵弦楽四重奏団<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演 - 打ち上げ</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 17:30 – 20:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />本番後の打ち上げ<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+          </ul>
+        </details>
 
-            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-              <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
-                  <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
-                    <span>鈴木 花子</span>
-                    <a href="./user-edit.html" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a>
-                  </div>
-                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                    <span>最終更新: 2025/04/10 09:15</span>
-                    <span>コメント記入: Day1 / Day3</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 2</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 1</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span>
-                </div>
-              </summary>
-              <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day1</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/26(日) 13:00 – 17:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">初日: キックオフと全体ミーティング</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール 大ホール（2046席）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 子どものお迎えがあるため 16:30 まで</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 h-6 min-w-[1.5rem] text-xs font-semibold">△</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day2</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/27(月) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">2日目: 平日夕方のフォローアップ</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ（小ホール）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 開始時間を 19:00 にできれば参加可</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700 h-6 min-w-[1.5rem] text-xs font-semibold">×</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day3</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/28(火) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">3日目: オンライン併催の調整</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 20:00 までなら参加可</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 予備日</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/11/03(月) 10:00 – 12:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">予備日: 参加しやすい午前帯</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 午前は在宅参加になります</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-              </ul>
-            </details>
-
-            <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-              <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
-                  <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
-                    <span>田中 一郎</span>
-                    <a href="./user-edit.html" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a>
-                  </div>
-                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                    <span>最終更新: 2025/04/05 21:03</span>
-                    <span>コメント記入: Day2 / Day3</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 1</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 0</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 2</span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 1</span>
-                </div>
-              </summary>
-              <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day1</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/26(日) 13:00 – 17:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">初日: キックオフと全体ミーティング</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール 大ホール（2046席）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 自家用車で参加予定</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day2</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/27(月) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">2日目: 平日夕方のフォローアップ</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ（小ホール）</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 平日は別件の会議があり難しい</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700 h-6 min-w-[1.5rem] text-xs font-semibold">×</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 Day3</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/28(火) 18:00 – 21:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">3日目: オンライン併催の調整</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール ブルーローズ</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-500">コメント: 他プロジェクトとバッティング</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-rose-100 text-rose-700 h-6 min-w-[1.5rem] text-xs font-semibold">×</span>
-                </li>
-                <li class="flex items-start justify-between gap-3 rounded-lg border border-dashed border-zinc-300 px-3 py-2">
-                  <div class="flex-1 space-y-1">
-                    <div class="space-y-1">
-                      <div class="text-sm font-semibold text-zinc-800">秋の合宿 調整会議 予備日</div>
-                      <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/11/03(月) 10:00 – 12:00 (Asia/Tokyo)</span></div>
-                      <div class="text-xs text-zinc-500">予備日: 参加しやすい午前帯</div>
-                      <div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>サントリーホール</span></div>
-                    </div>
-                    <div class="text-xs text-zinc-600">コメント: 未回答（フォロー待ち）</div>
-                  </div>
-                  <span class="inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600 h-6 min-w-[1.5rem] text-xs font-semibold">—</span>
-                </li>
-              </ul>
-            </details>
-          </div>
-
-          <div class="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
-            <p class="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
-            <ul class="mt-2 list-disc space-y-1 pl-5">
-              <li>未回答者を抽出して個別フォローしましょう。</li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
-            <div class="flex flex-wrap gap-2">
-              <button type="button" class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-emerald-600 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">日程をICSに一括エクスポート</button>
-              <button class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">全回答を CSV でダウンロード</button>
-              <button class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">サマリーをコピー（仮）</button>
+        <!-- Vlaひげ -->
+        <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+              <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800"><span>Vlaひげ</span><a href="./user-edit.html?participantId=c90014d8-fa53-467b-bbb2-541633cec134" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a><button type="button" class="inline-flex items-center justify-center rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">削除</button></div>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>最終更新: 2025/10/28 08:07</span><span>(2件のコメントあり)</span></div>
             </div>
-          </div>
-        </section>
-      </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold"><span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 5</span><span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 1</span><span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 0</span><span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 1</span></div>
+          </summary>
+          <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (初見大会)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/09/30(火) 10:00 – 19:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />初見大会<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京オペラシティ リサイタルホール, 日本、〒163-1490 東京都新宿区西新宿３丁目２０−２</span></div></div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (練馬文化-夜練)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/01(水) 18:00 – 21:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />★リハーサル。練習場所について会場と最終調整中。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>練馬区立練馬文化センター大ホール（こぶしホール）, 日本、〒176-0001 東京都練馬区練馬１丁目１７−３７</span></div></div><div class="text-xs text-zinc-500">コメント: 予定が未定</div></div><span class="inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600 h-6 min-w-[1.5rem] text-xs font-semibold">—</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (東京文化)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/02(木) 10:00 – 16:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />東京文化で練習<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京文化会館, 日本、〒110-8716 東京都台東区上野公園５−４５</span></div></div><div class="text-xs text-zinc-500">コメント: 遅れて参加します。</div></div><span class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 h-6 min-w-[1.5rem] text-xs font-semibold">△</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 前日リハ (芸劇)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/03(金) 14:00 – 17:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />前日リハ。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 当日GP</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 10:00 – 12:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />当日GP。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 14:00 – 16:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />13:30 会場。14:00 開演。<br />演目: Mozart ハイドンセット全曲<br />演奏: 素敵弦楽四重奏団<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演 - 打ち上げ</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 17:30 – 20:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />本番後の打ち上げ<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+          </ul>
+        </details>
+
+        <!-- Vcどら -->
+        <details class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <summary class="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
+              <div class="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800"><span>Vcどら</span><a href="./user-edit.html?participantId=ee25f324-711a-43ed-953f-bb086a302d10" class="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800">回答</a><button type="button" class="inline-flex items-center justify-center rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">削除</button></div>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>最終更新: 2025/10/28 08:07</span><span>(1件のコメントあり)</span></div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold"><span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">○ 6</span><span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-amber-700">△ 0</span><span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-rose-700">× 1</span><span class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 0</span></div>
+          </summary>
+          <ul class="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
+            <!-- 同内容: 省略せず全件反映 -->
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (初見大会)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/09/30(火) 10:00 – 19:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />初見大会<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京オペラシティ リサイタルホール, 日本、〒163-1490 東京都新宿区西新宿３丁目２０−２</span></div></div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (練馬文化-夜練)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/01(水) 18:00 – 21:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />★リハーサル。練習場所について会場と最終調整中。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>練馬区立練馬文化センター大ホール（こぶしホール）, 日本、〒176-0001 東京都練馬区練馬１丁目１７−３７</span></div></div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 練習 (東京文化)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/02(木) 10:00 – 16:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />東京文化で練習<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="flex items-center gap-1 text-xs text-zinc-500"><span class="inline-flex items-center gap-1"><span aria-hidden="true">📍</span>東京文化会館, 日本、〒110-8716 東京都台東区上野公園５−４５</span></div></div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 前日リハ (芸劇)</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/03(金) 14:00 – 17:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />前日リハ。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - 当日GP</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 10:00 – 12:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団ミューザ旗揚公演の練習<br />当日GP。<br />練習曲目: Mozart ハイドンセット全曲<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 14:00 – 16:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />13:30 会場。14:00 開演。<br />演目: Mozart ハイドンセット全曲<br />演奏: 素敵弦楽四重奏団<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+            <li class="flex items-start justify-between gap-3 rounded-lg border px-3 py-2 border-transparent"><div class="flex-1 space-y-1"><div class="space-y-1"><div class="text-sm font-semibold text-zinc-800">(TEST) 素敵弦楽四重奏団 - ミューザ旗揚公演 - 打ち上げ</div><div class="flex flex-wrap items-center gap-1 text-xs text-zinc-600"><span>2025/10/04(土) 17:30 – 20:00 (Asia/Tokyo)</span></div><div class="text-xs text-zinc-500">(TEST) 素敵弦楽四重奏団がミューザ旗揚げ公演。<br />本番後の打ち上げ<br />※このカレンダーはフィクションです。テストデータとしてのみ存在します。</div><div class="text-xs text-zinc-500">コメント: 入力なし</div></div><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 h-6 min-w-[1.5rem] text-xs font-semibold">○</span></li>
+          </ul>
+        </details>
+
+        <div class="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
+          <p class="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
+          <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li>未回答者を抽出して個別フォローしましょう。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-sm font-semibold text-zinc-700">回答全体のアクション</div>
+          <div class="flex flex-wrap gap-2"><button type="button" class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-emerald-600 hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">日程をICSに一括エクスポート</button><button class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">全回答を CSV でダウンロード</button><button class="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">サマリーをコピー（仮）</button></div>
+        </div>
+      </section>
     </div>
   </body>
-</html>
+  </html>

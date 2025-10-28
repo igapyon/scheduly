@@ -5,12 +5,33 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 > ⚠ **匿名アクセスの注意**  
 > 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
 
+## Documentation Index
+
+- [docs/DEVELOPMENT_JOURNEY.md](docs/DEVELOPMENT_JOURNEY.md): ローカルモックから現在までの開発プロセスを俯瞰
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): 画面構成とバンドル構造
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md): オンメモリ前提のデータモデル整理
+- [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md): in-memory サービスと API 草案
+- [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md): 画面役割と回答管理 UI の詳細
+- [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md): ICS 連携の運用メモ
+- [docs/VERIFY_CHECKLIST.md](docs/VERIFY_CHECKLIST.md): QA・目視確認の手順
+- [docs/DEVELOPER_NOTES.md](docs/DEVELOPER_NOTES.md): 作業メモと TODO の整理
+- [docs/SERVER_INTEGRATION.md](docs/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
+- [docs/DISCLAIMER.md](docs/DISCLAIMER.md): 免責事項と利用時の注意点
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): コントリビューション手引き
+- [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md): コントリビューター一覧
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): 変更履歴のメモ
+
 | 種別 | 主な用途 | 配置 | 起動方法 |
 | ---- | -------- | ---- | -------- |
 | React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
 | レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
 
 どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
+
+### Sample Data
+
+- ICS: `public/ics/scheduly-ics-sampledata-001.ics`
+- Project JSON: `public/proj/scheduly-project-sampledata-001.json`
 
 ## React / webpack 版（`src/frontend/`）
 

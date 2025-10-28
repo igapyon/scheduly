@@ -83,12 +83,15 @@ const createScheduleSummaries = (candidates, participants, responses) => {
       else counts.pending += 1;
       const participantEntry = participantMap.get(response.participantId);
       const participant = participantEntry?.participant;
+      const hasComment = typeof response.comment === "string" && response.comment.trim().length > 0;
+      const commentText = hasComment ? response.comment.trim() : "";
       detailed.push({
         participantId: response.participantId,
         name: participant?.displayName || "参加者",
         order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
-        comment: response.comment || "コメントなし"
+        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし",
+        hasComment
       });
       respondedIds.add(response.participantId);
     });
@@ -101,7 +104,8 @@ const createScheduleSummaries = (candidates, participants, responses) => {
         name: participant.displayName || "参加者",
         order: index,
         mark: "pending",
-        comment: "未回答"
+        comment: "コメント: 入力なし",
+        hasComment: false
       });
     });
 
@@ -168,21 +172,20 @@ const createParticipantSummaries = (participants, candidates, responses) => {
     const responsesForParticipant = (candidates || []).map((candidate) => {
       const found = candidateMap.get(candidate.id);
       const mark = normalizeMark(found?.mark);
-      const comment = found?.comment ? `コメント: ${found.comment}` : "コメント: 未入力";
+      const hasComment = typeof found?.comment === "string" && found.comment.trim().length > 0;
+      const commentText = hasComment ? found.comment.trim() : "";
       return {
         scheduleId: candidate.id,
         datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
         mark,
-        comment
+        hasComment,
+        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし"
       };
     });
 
-    const commentHighlights = [];
-    responsesForParticipant.forEach((item) => {
-      if (item.comment && item.comment !== "コメント: 未入力") {
-        commentHighlights.push(`コメント記入: ${candidateLookup.get(item.scheduleId)?.summary || "候補"}`);
-      }
-    });
+    const commentCount = responsesForParticipant.reduce((acc, item) => (item.hasComment ? acc + 1 : acc), 0);
+    const commentHighlights =
+      commentCount > 0 ? [`(${commentCount}件のコメントあり)`] : ["(コメントなし)"];
 
     return {
       id: participant.id,
