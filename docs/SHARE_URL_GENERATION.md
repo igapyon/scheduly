@@ -14,7 +14,7 @@
 - プロジェクトごとに一意な管理者トークンと参加者トークン（`participantToken`）を生成し、それぞれの URL として表示できるようにする。
 - 各プロジェクトは管理者向け URL・参加者向け URL をそれぞれ 1 つだけ保持し、常に最新の値を参照する。
 - トークンは sessionStorage に保存され、ページリロード後も値が維持される。
-- トークンを一度発行したら同セッションで再発行できないよう UI をロックする（ボタンを `disabled` にする）。
+- 再発行を行った場合は新しいトークンを保存し、既存の URL を即座に廃棄する。
 - UI からコピー・共有しやすい形で提示する（トークン値が空の場合はプレースホルダー表示）。
 - 実装を `shareService` / `projectStore` に寄せ、React コンポーネント側の責務を軽くする。
 
@@ -22,7 +22,7 @@
 - 参加者個別トークン（`/p/{token}` や `/r/{token}`）の発行は本仕様の対象外（別途 Participant 管理で扱う）。
 - アクセストークンの永続化（DB 保存）や失効 API の提供は後日検討とする。
 - 招待メール送信や QR コード生成など、共有手段の自動化は今回のスコープ外。
-- 発行済みトークンの再発行・無効化 UI は今回は扱わない（必要になったときに別途仕様化する）。
+- 個々の旧トークンへのアクセス制御ロジックはバックエンド導入時に検討する。
 
 ## 3. Terminology
 
@@ -37,8 +37,8 @@
 
 1. 管理者はプロジェクト準備が整ったタイミングで「共有URLを生成」をクリックする。新しい管理者 URL と参加者 URL が表示され、トーストで発行完了が通知される。
 2. トークン未発行状態で画面を開いた場合は、URL 欄に「未発行」表示を出す。生成後は値が即座に更新される。
-3. 発行済みの場合はボタンが `disabled` となり、同一セッションでは再度クリックできない。
-4. 他のブラウザ／タブで同じプロジェクトを開いていても、初回発行後の値が画面上に反映される（`projectStore` の購読で同期）。
+3. 発行済みの場合は「再発行」操作を提供し、確認後に新しいトークンへ更新する（旧 URL は即時無効）。
+4. 他のブラウザ／タブで同じプロジェクトを開いていても、発行・再発行後の最新値が画面上に反映される（`projectStore` の購読で同期）。
 
 ## 5. Functional Requirements
 
@@ -52,20 +52,24 @@
    - 管理者 URL 形式: `https://scheduly.app/a/{adminToken}`
    - 参加者 URL 形式: `https://scheduly.app/p/{participantToken}`（プロジェクト単位で 1 つ、回答画面へ遷移）
    - 生成時に `issuedAt` と `lastGeneratedBy`（将来のユーザー識別向け）を記録できるよう、オブジェクト構造を採用する。
-   - 既存の実トークンがある場合は再生成せず同値を返し、常に 1 プロジェクトにつき 1 トークンを維持する。
 
 3. **状態更新**
    - `shareService.generate(projectId)` → `projectStore.updateShareTokens(projectId, nextTokens)` を呼び出す、もしくは同等のロジックを実装する。
    - 更新後、`projectStore` の購読機構を通じて React state (`urls`) を書き換え、UI を再レンダリングする。
    - `sessionStorage` 永続化が有効な場合は自動で保存される。
-   - 発行済み（プレースホルダーではない）トークンが `projectStore` に存在する場合のみ、React 側で「共有URLを生成」ボタンを `disabled` 状態にする。未発行とみなす場合は常にクリック可能とする。
+   - 発行済み（プレースホルダーではない）トークンが存在する場合は、「共有URLを生成」ボタンを「再発行」表示に切り替え、押下時に確認ダイアログを出した上で `shareService.rotate(projectId)` を呼び出す。
 
-4. **UI 連携**
-   - URL は `KeyValueList` にテキストで表示。未発行時は `–– 未発行 ––` を表示する。
+4. **再発行**
+   - `shareService.rotate(projectId)` は新しい管理者トークン・参加者トークンを生成し、`projectStore.updateShareTokens` で置き換える。
+   - 旧トークンは返却しない。必要であれば `revokedAt` に記録しておくが、`shareTokens` には保持しない。
+   - 再発行成功後にトーストで「共有URLを再発行しました（以前のリンクは無効です）」などの文言を表示する。
+
+5. **UI 連携**
+   - URL は `KeyValueList` にテキストで表示。未発行時は `–– 未発行 ––` を表示し、発行済み時は「再発行」ボタンにラベルを切り替える。
    - クリック 1 回でクリップボードへコピーする補助ボタンの有無は後日検討。今回は表示のみでも可。
-   - トースト文言: 初回発行は「共有URLを発行しました」。発行済みでボタンが無効化された際はサブテキストで「再発行する場合は運用で解決」の旨を表示するかは任意。
+   - トースト文言: 初回発行は「共有URLを発行しました」、再発行時は「共有URLを再発行しました（以前のリンクは無効です）」とする。
 
-5. **エラー処理**
+6. **エラー処理**
    - 生成処理中に例外が発生した場合は `console.error` と「共有URLの生成に失敗しました」というトーストを表示。既存トークンは破壊しない。
 
 ## 6. Data Model
@@ -111,11 +115,17 @@ shareService.get(projectId: string): {
   participant?: ShareTokenEntry;
 };
 
+shareService.rotate(projectId: string, options?: { confirm?: boolean }): {
+  admin: ShareTokenEntry;
+  participant: ShareTokenEntry;
+};
+
 shareService.invalidate(projectId: string, type: 'admin' | 'participant'): void;
 ```
 
-- `generate` は未発行の場合にトークンを生成し、既に実トークンが存在する場合は同値を返す（UI 側では呼び出さない設計だが、二重発行の防御として idempotent にする）。
-- `invalidate` は今後の実装余地として定義。現時点では呼び出さず、再発行もサポートしない。
+- `generate` は未発行の場合にトークンを生成し、既存値がある場合はそのまま返す。
+- `rotate` は明示的な再発行操作用。新しいトークンを生成し、旧値を破棄する。
+- `invalidate` は手動で特定種別だけを無効化したい場合の将来用 API（今回のフロントからは呼び出さない）。
 - `ShareTokenEntry` 型は前述のデータモデルを再利用する。
 
 ## 8. UI 状態遷移
@@ -126,7 +136,7 @@ shareService.invalidate(projectId: string, type: 'admin' | 'participant'): void;
 
 2. **発行済み**
    - `urls.admin.url` / `urls.participant.url` を表示。
-   - ボタンは `disabled`（`disabled` 属性と視覚的な無効化スタイルを適用）。
+   - ボタンは「再発行」ラベルの有効状態で表示し、押下時に確認ダイアログ → `shareService.rotate` を呼び出す。
 
 3. **発行失敗**
    - URL は更新せず現状維持。
@@ -163,6 +173,7 @@ DELETE /projects/:projectId/share-links/:type   // type = admin | participant
 | 参加者向け URL をプロジェクト固有トークンにする？ | 現状は 1 プロジェクトにつき共通の参加者トークン。個別回答リンクは参加者管理で実装する。 |
 | 共有 URL を無効化する UI が必要か | 今後、誤配布時の対処として検討。仕様上は `invalidate` を用意しておく。 |
 | プレースホルダートークン（`demo-admin` など）が残っている | `shareService.isPlaceholderToken` で検知し、「未発行」扱いとする。実トークン発行後は無効化ボタンをロック。 |
+| 再発行後に旧 URL へアクセスされた場合 | サーバー側で無効扱いとし、適切なエラー画面を返す（将来のバックエンド実装で定義）。 |
 
 ---
 
