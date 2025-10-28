@@ -8,7 +8,6 @@ import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
-import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import { ClipboardIcon } from "@heroicons/react/24/outline";
@@ -496,15 +495,8 @@ function OrganizerApp() {
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
   const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
-  const routeError = useMemo(() => {
-    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "admin") {
-      return {
-        title: "管理者用の共有URLが無効です",
-        description: "リンクに含まれる鍵が見つかりません。URLが正しいか確認し、管理者で新しい共有URLを発行してください。"
-      };
-    }
-    return null;
-  }, [initialRouteContext]);
+  const isAdminShareMiss =
+    initialRouteContext?.kind === "share-miss" && initialRouteContext?.shareType === "admin";
   const [summary, setSummary] = useState(initialProjectState.project?.name || "");
   const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
@@ -522,7 +514,6 @@ function OrganizerApp() {
   const autoIssueHandledRef = useRef(false);
 
   useEffect(() => {
-    if (routeError) return undefined;
     setCandidates(initialProjectState.candidates || []);
     const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
       if (!nextState) return;
@@ -535,15 +526,13 @@ function OrganizerApp() {
       setShareTokens(shareService.get(projectId));
     });
     return unsubscribe;
-  }, [projectId, initialProjectState, routeError]);
+  }, [projectId, initialProjectState]);
 
   useEffect(() => {
-    if (routeError) return;
     projectStore.updateProjectMeta(projectId, { name: summary, description });
-  }, [projectId, summary, description, routeError]);
+  }, [projectId, summary, description]);
 
   useEffect(() => {
-    if (routeError) return;
     let cancelled = false;
     setInitialDataLoaded(false);
 
@@ -560,7 +549,7 @@ function OrganizerApp() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, routeError]);
+  }, [projectId]);
 
   const downloadTextFile = (filename, text, mimeType = "text/plain;charset=utf-8") => {
     const blob = new Blob([text], { type: mimeType });
@@ -874,7 +863,6 @@ function OrganizerApp() {
   };
 
   useEffect(() => {
-    if (routeError) return;
     if (autoIssueHandledRef.current) return;
     const adminEntry = shareTokens?.admin || null;
     const hasValidAdminToken =
@@ -902,7 +890,7 @@ function OrganizerApp() {
     } finally {
       autoIssueHandledRef.current = true;
     }
-  }, [projectId, baseUrl, shareTokens, initialRouteContext, routeError]);
+  }, [projectId, baseUrl, shareTokens, initialRouteContext]);
 
   const handleExportProjectInfo = () => {
     try {
@@ -1011,19 +999,6 @@ function OrganizerApp() {
     };
   }, [summary, description, responseOptions, candidates]);
 
-  if (routeError) {
-    return (
-      <ErrorScreen
-        title={routeError.title}
-        description={routeError.description}
-        actions={[
-          { label: "Scheduly トップへ戻る", href: "/" },
-          { label: "参加者ビューを見る", href: "/user.html", variant: "ghost" }
-        ]}
-      />
-    );
-  }
-
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -1037,6 +1012,11 @@ function OrganizerApp() {
             <p className="mt-2 text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
+            {isAdminShareMiss && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                指定された管理者用URLは無効になっています。新しい共有URLを再発行すると、正しいリンクを参加者と共有できます。
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
