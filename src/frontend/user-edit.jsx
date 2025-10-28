@@ -11,6 +11,7 @@ import shareService from "./services/share-service";
 import participantService from "./services/participant-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
+import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
@@ -779,17 +780,24 @@ const commitComment = (value) => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Participant Response</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
-              <span aria-hidden="true">✏️</span>
-              <span>Scheduly 回答編集</span>
-            </h1>
+            <div className="mt-1 flex items-center gap-2">
+              <h1 className="flex items-center gap-2 text-2xl font-bold">
+                <span aria-hidden="true">✏️</span>
+                <span>Scheduly 回答編集</span>
+              </h1>
+              <InfoBadge
+                ariaLabel="回答編集画面の説明"
+                title="回答編集の使い方"
+                message="日程に対して参加者の〇△×選択およびコメントを入力する画面です。上部の完了数がリアルタイムで更新されます。"
+              />
+            </div>
             <p className="mt-1 text-xs text-zinc-500">参加者「{participantName}」さんの回答を編集します。</p>
             <p className="mt-1 text-xs text-zinc-500">{PROJECT_DESCRIPTION}</p>
           </div>
           <div className="flex flex-col items-end gap-2 text-xs text-zinc-500">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 日完了
+                <span aria-hidden="true">✓</span> {completeCount}/{candidates.length} 回答済
               </span>
               <span>👤 {participantName}</span>
               <a

@@ -8,6 +8,7 @@ import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import { ClipboardIcon } from "@heroicons/react/24/outline";
@@ -172,15 +173,20 @@ const exportCandidateToICal = (candidate) => {
   };
 };
 
-function SectionCard({ title, description, action, children }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
   return (
     <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
-            <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
-            <span>{title}</span>
-          </h2>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+              <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
+              <span>{title}</span>
+            </h2>
+            {infoMessage && (
+              <InfoBadge ariaLabel={`${title} の説明`} title={infoTitle || title} message={infoMessage} />
+            )}
+          </div>
           {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
         </div>
         {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
@@ -1119,6 +1125,7 @@ function OrganizerApp() {
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
+            infoMessage="日程調整プロジェクトの情報を設定します。プロジェクトの目的を設定します。"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -1145,6 +1152,7 @@ function OrganizerApp() {
           <SectionCard
             title="日程"
             description="候補日や確定日を管理できます。カードを開いて詳細を編集してください。"
+            infoMessage="日程を設定します。ICS を利用することにより日程を他サービスと同期することができます。ICSからのインポートではプレビューで必要な日程だけ選ぶことができます。"
             action={
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1207,6 +1215,7 @@ function OrganizerApp() {
           <SectionCard
             title="共有URL"
             description="参加者へ共有するリンクと管理者リンクを確認できます。"
+            infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
             action={
               <button
                 type="button"
@@ -1290,7 +1299,10 @@ function OrganizerApp() {
             </p>
           </SectionCard>
 
-          <SectionCard title="管理アクション">
+          <SectionCard
+            title="管理アクション"
+            infoMessage="プロジェクト全体のバックアップや初期化をおこなうことができます。こまめにプロジェクトをエクスポートしてバックアップしておくと安心です。インポートや削除を行う前に、現在のデータを事前にエクスポートしておくと安心です。"
+          >
             <div className="grid gap-2">
               <button
                 type="button"
