@@ -7,6 +7,71 @@ const DEFAULT_PROJECT_NAME = "";
 const DEFAULT_PROJECT_DESCRIPTION = "";
 const DEMO_ADMIN_TOKEN = "demo-admin";
 const PROJECT_EXPORT_VERSION = 1;
+const SHARE_TOKEN_TYPES = ["admin", "participant"];
+
+const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+
+const sanitizeShareTokenEntry = (input) => {
+  if (!input) return null;
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    return {
+      token: trimmed,
+      url: "",
+      issuedAt: ""
+    };
+  }
+  if (typeof input !== "object") return null;
+  const token = isNonEmptyString(input.token) ? input.token.trim() : "";
+  if (!token) return null;
+  const entry = {
+    token,
+    url: isNonEmptyString(input.url) ? input.url.trim() : "",
+    issuedAt: isNonEmptyString(input.issuedAt) ? input.issuedAt : ""
+  };
+  if (isNonEmptyString(input.revokedAt)) {
+    entry.revokedAt = input.revokedAt;
+  }
+  if (isNonEmptyString(input.lastGeneratedBy)) {
+    entry.lastGeneratedBy = input.lastGeneratedBy;
+  }
+  return entry;
+};
+
+const normalizeShareTokens = (raw, { includeDemo = false } = {}) => {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const next = {};
+  const adminSource =
+    source.admin !== undefined
+      ? source.admin
+      : includeDemo
+        ? DEMO_ADMIN_TOKEN
+        : null;
+  const participantSource = source.participant ?? source.guest ?? null;
+
+  const adminEntry = sanitizeShareTokenEntry(adminSource);
+  if (adminEntry) {
+    next.admin = adminEntry;
+  }
+  const participantEntry = sanitizeShareTokenEntry(participantSource);
+  if (participantEntry) {
+    next.participant = participantEntry;
+  }
+  return next;
+};
+
+const cloneShareTokens = (shareTokens) => {
+  if (!shareTokens || typeof shareTokens !== "object") return {};
+  const next = {};
+  SHARE_TOKEN_TYPES.forEach((type) => {
+    const entry = shareTokens[type];
+    if (entry && typeof entry === "object") {
+      next[type] = { ...entry };
+    }
+  });
+  return next;
+};
 
 const projectStore = new Map();
 const listeners = new Map();
@@ -36,7 +101,8 @@ const loadFromStorage = () => {
     const payload = JSON.parse(raw);
     Object.entries(payload).forEach(([projectId, state]) => {
       if (!state || typeof state !== "object") return;
-      projectStore.set(projectId, state);
+      const sanitized = ensureProjectStateShape(projectId, state, { includeDemoToken: true });
+      projectStore.set(projectId, sanitized);
       rebuildParticipantTokenIndex(projectId);
     });
   } catch (error) {
@@ -55,7 +121,7 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
       name,
       description,
       defaultTzid: DEFAULT_TZID,
-      shareTokens: { admin: DEMO_ADMIN_TOKEN },
+      shareTokens: normalizeShareTokens({ admin: DEMO_ADMIN_TOKEN }, { includeDemo: true }),
       createdAt: timestamp,
       updatedAt: timestamp,
       demoSeedOptOut
@@ -65,6 +131,18 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
     participants: [],
     responses: []
   };
+};
+
+const ensureProjectStateShape = (projectId, rawState, { includeDemoToken = false } = {}) => {
+  if (!rawState || typeof rawState !== "object") {
+    return createInitialProjectState(projectId);
+  }
+  const nextState = { ...rawState };
+  const project = rawState.project && typeof rawState.project === "object" ? { ...rawState.project } : {};
+  project.id = isNonEmptyString(project.id) ? project.id : projectId;
+  project.shareTokens = normalizeShareTokens(project.shareTokens, { includeDemo: includeDemoToken });
+  nextState.project = project;
+  return nextState;
 };
 
 const notify = (projectId) => {
@@ -155,7 +233,8 @@ const getCandidates = (projectId = DEFAULT_PROJECT_ID) => {
 };
 
 const setProjectState = (projectId, nextState) => {
-  projectStore.set(projectId, nextState);
+  const sanitized = ensureProjectStateShape(projectId, nextState, { includeDemoToken: false });
+  projectStore.set(projectId, sanitized);
   rebuildParticipantTokenIndex(projectId);
   persistToStorage();
   notify(projectId);
@@ -183,6 +262,30 @@ const getIcsText = (projectId = DEFAULT_PROJECT_ID) => {
 const getParticipants = (projectId = DEFAULT_PROJECT_ID) => {
   const state = ensureProjectEntry(projectId);
   return cloneParticipants(state.participants || []);
+};
+
+const getShareTokens = (projectId = DEFAULT_PROJECT_ID) => {
+  const state = ensureProjectEntry(projectId);
+  return cloneShareTokens(state.project?.shareTokens);
+};
+
+const updateShareTokens = (projectId, updater) => {
+  const state = ensureProjectEntry(projectId);
+  const currentTokens = cloneShareTokens(state.project?.shareTokens);
+  const nextInput =
+    typeof updater === "function" ? updater(currentTokens) ?? currentTokens : updater ?? {};
+  const nextTokens = normalizeShareTokens(nextInput);
+  const nextProject = {
+    ...state.project,
+    shareTokens: nextTokens,
+    updatedAt: new Date().toISOString()
+  };
+  const nextState = {
+    ...state,
+    project: nextProject
+  };
+  setProjectState(projectId, nextState);
+  return cloneShareTokens(nextTokens);
 };
 
 const replaceParticipants = (projectId, nextParticipants) => {
@@ -336,10 +439,7 @@ const getDemoAdminToken = () => DEMO_ADMIN_TOKEN;
 
 const resetProject = (projectId = DEFAULT_PROJECT_ID) => {
   const nextState = createInitialProjectState(projectId, { name: "", description: "", demoSeedOptOut: true });
-  projectStore.set(projectId, nextState);
-  rebuildParticipantTokenIndex(projectId);
-  persistToStorage();
-  notify(projectId);
+  setProjectState(projectId, nextState);
   return getProjectStateSnapshot(projectId);
 };
 
@@ -418,8 +518,11 @@ const sanitizeProjectForImport = (projectId, project, defaultProject) => {
     if (typeof project.defaultTzid === "string" && project.defaultTzid.trim()) {
       nextProject.defaultTzid = project.defaultTzid;
     }
-    if (project.shareTokens && typeof project.shareTokens === "object") {
-      nextProject.shareTokens = { ...defaultProject.shareTokens, ...project.shareTokens };
+    const importedShareTokens = normalizeShareTokens(project.shareTokens);
+    if (Object.keys(importedShareTokens).length > 0) {
+      nextProject.shareTokens = importedShareTokens;
+    } else {
+      nextProject.shareTokens = normalizeShareTokens(defaultProject.shareTokens, { includeDemo: true });
     }
     if (typeof project.createdAt === "string") nextProject.createdAt = project.createdAt;
     if (typeof project.updatedAt === "string") nextProject.updatedAt = project.updatedAt;
@@ -476,10 +579,7 @@ const importProjectState = (projectId = DEFAULT_PROJECT_ID, payload = null) => {
   }
 
   const sanitized = sanitizeImportedState(projectId, rawState);
-  projectStore.set(projectId, sanitized);
-  rebuildParticipantTokenIndex(projectId);
-  persistToStorage();
-  notify(projectId);
+  setProjectState(projectId, sanitized);
   return getProjectStateSnapshot(projectId);
 };
 
@@ -495,6 +595,8 @@ module.exports = {
   getIcsText,
   getDefaultProjectId,
   getDemoAdminToken,
+  getShareTokens,
+  updateShareTokens,
   getParticipants,
   replaceParticipants,
   upsertParticipant,

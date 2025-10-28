@@ -6,6 +6,7 @@ import ReactDOM from "react-dom/client";
 import sharedIcalUtils from "./shared/ical-utils";
 import projectStore from "./store/project-store";
 import scheduleService from "./services/schedule-service";
+import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
@@ -435,15 +436,73 @@ function candidateToDisplayMeta(candidate) {
   return formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
 }
 
+const SHARE_LINK_PLACEHOLDER = "–– 未発行 ––";
+
+const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+
+const resolveDefaultBaseUrl = () => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "https://scheduly.app";
+};
+
+const deriveBaseUrlFromAdminEntry = (entry) => {
+  if (!entry || !isNonEmptyString(entry.url)) return null;
+  const match = entry.url.match(/^(.*)\/a\/[^/]+$/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  try {
+    const parsed = new URL(entry.url);
+    parsed.hash = "";
+    parsed.search = "";
+    return parsed.origin;
+  } catch (error) {
+    console.warn("[Scheduly][admin] Failed to derive base URL from admin entry", error);
+    return null;
+  }
+};
+
+const formatShareUrlDisplay = (entry) => {
+  if (!entry || !isNonEmptyString(entry.url) || shareService.isPlaceholderToken(entry.token)) {
+    return SHARE_LINK_PLACEHOLDER;
+  }
+  return entry.url;
+};
+
+const formatShareIssuedAtDisplay = (entry) => {
+  if (!entry || !isNonEmptyString(entry.issuedAt) || shareService.isPlaceholderToken(entry.token)) {
+    return SHARE_LINK_PLACEHOLDER;
+  }
+  const date = new Date(entry.issuedAt);
+  if (Number.isNaN(date.getTime())) {
+    return entry.issuedAt;
+  }
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
+};
+
 function OrganizerApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
+  const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
   const [summary, setSummary] = useState(initialProjectState.project?.name || "");
   const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
   const [candidates, setCandidates] = useState(initialProjectState.candidates || []);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [urls, setUrls] = useState({ admin: "", guest: "" });
+  const [shareTokens, setShareTokens] = useState(initialShareTokens);
+  const [baseUrl, setBaseUrl] = useState(
+    () => deriveBaseUrlFromAdminEntry(initialShareTokens.admin) ?? resolveDefaultBaseUrl()
+  );
+  const [navigateAfterGenerate, setNavigateAfterGenerate] = useState(false);
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
@@ -459,6 +518,7 @@ function OrganizerApp() {
         nextProject.description !== undefined && nextProject.description !== prev ? nextProject.description : prev
       );
       setCandidates(nextState.candidates || []);
+      setShareTokens(shareService.get(projectId));
     });
     return unsubscribe;
   }, [projectId, initialProjectState]);
@@ -693,18 +753,54 @@ function OrganizerApp() {
     event.target.value = "";
   };
 
+  const refreshShareTokensState = (options = {}) => {
+    const tokens = shareService.get(projectId);
+    setShareTokens(tokens);
+    const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
+    if (derived) {
+      setBaseUrl(derived);
+    } else if (options.resetWhenMissing) {
+      setBaseUrl(resolveDefaultBaseUrl());
+    }
+    return tokens;
+  };
+
+  const handleBaseUrlBlur = () => {
+    setBaseUrl((prev) => {
+      const value = typeof prev === "string" ? prev.trim() : "";
+      return value.replace(/\/+$/, "");
+    });
+  };
+
   const popToast = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 1800);
   };
 
-  const generateUrls = () => {
-    const randomToken = () => Math.random().toString(36).slice(2, 10);
-    setUrls({
-      admin: `https://scheduly.app/event/${randomToken()}?admin=${randomToken()}`,
-      guest: `https://scheduly.app/event/${randomToken()}`
-    });
-    popToast("管理者URL／参加者URLを発行しました（モック）");
+  const handleShareLinkAction = () => {
+    const hasIssued = hasIssuedShareTokens;
+    if (hasIssued) {
+      const confirmed = window.confirm("共有URLを再発行します。以前のリンクは無効になります。続行しますか？");
+      if (!confirmed) return;
+    }
+    try {
+      const action = hasIssued ? shareService.rotate : shareService.generate;
+      const result = action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
+      refreshShareTokensState({ resetWhenMissing: true });
+      const notices = [];
+      if (hasIssued) {
+        notices.push("以前のリンクは無効です");
+      }
+      if (result.navigation?.attempted && result.navigation.blocked) {
+        notices.push("管理者URLへの自動遷移はブロックされました");
+      }
+      const baseMessage = hasIssued ? "共有URLを再発行しました" : "共有URLを発行しました";
+      const message = notices.length ? `${baseMessage}（${notices.join("／")}）` : baseMessage;
+      popToast(message);
+    } catch (error) {
+      console.error("Share link generation error", error);
+      popToast("共有URLの生成に失敗しました");
+    }
   };
 
   const handleExportProjectInfo = () => {
@@ -744,7 +840,7 @@ function OrganizerApp() {
       setSummary(snapshot.project?.name || "");
       setDescription(snapshot.project?.description || "");
       setCandidates(snapshot.candidates || []);
-      setUrls({ admin: "", guest: "" });
+      refreshShareTokensState({ resetWhenMissing: true });
       setImportPreview(null);
       setInitialDataLoaded(true);
       popToast("プロジェクト情報をインポートしました");
@@ -763,11 +859,21 @@ function OrganizerApp() {
     setSummary(fresh.project?.name || "");
     setDescription(fresh.project?.description || "");
     setCandidates(fresh.candidates || []);
-    setUrls({ admin: "", guest: "" });
+    refreshShareTokensState({ resetWhenMissing: true });
     setImportPreview(null);
     setInitialDataLoaded(true);
     popToast("プロジェクトを削除し初期状態に戻しました");
   };
+
+  const adminShareEntry = shareTokens?.admin || null;
+  const participantShareEntry = shareTokens?.participant || null;
+  const hasIssuedShareTokens =
+    (adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token)) ||
+    (participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token));
+  const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを生成";
+  const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
+  const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
+  const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
 
   const eventPayload = useMemo(() => {
     return {
@@ -921,21 +1027,43 @@ function OrganizerApp() {
               <button
                 type="button"
                 className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                onClick={generateUrls}
+                onClick={handleShareLinkAction}
               >
-                共有URLを生成
+                {shareActionLabel}
               </button>
             }
           >
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs font-semibold text-zinc-500">基準URL</span>
+                <input
+                  type="url"
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                  onBlur={handleBaseUrlBlur}
+                  placeholder="https://scheduly.app"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-zinc-600">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={navigateAfterGenerate}
+                  onChange={(event) => setNavigateAfterGenerate(event.target.checked)}
+                />
+                発行後に管理者URLを開く
+              </label>
+            </div>
             <KeyValueList
               items={[
-                { key: "管理者URL", value: urls.admin },
-                { key: "参加者URL", value: urls.guest },
-                { key: "最終更新", value: "2024/05/01 10:00 更新済み" }
+                { key: "管理者URL", value: adminUrlDisplay },
+                { key: "参加者URL", value: participantUrlDisplay },
+                { key: "最終更新", value: issuedAtDisplay }
               ]}
             />
             <p className="text-xs text-zinc-500">
-              管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。
+              管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。必要に応じて基準URLを変更し、再発行してください。
             </p>
           </SectionCard>
 
