@@ -256,7 +256,7 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0 }) {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="font-semibold text-zinc-800">{response.name}</div>
                 <a
-                  href={response.participantId ? `./user-edit.html?participantId=${encodeURIComponent(response.participantId)}` : "./user-edit.html"}
+                  href={response.participantId ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}` : "/user-edit.html"}
                   className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                 >
                   回答
@@ -310,7 +310,7 @@ function ParticipantSummary({ participant, defaultOpen, scheduleLookup, onRemove
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
             <a
-              href={`./user-edit.html?participantId=${encodeURIComponent(participant.id)}`}
+              href={`/user-edit.html?participantId=${encodeURIComponent(participant.id)}`}
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >

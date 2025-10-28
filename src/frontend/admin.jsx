@@ -1012,12 +1012,37 @@ function OrganizerApp() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href="./user.html"
+            <button
+              type="button"
+              onClick={() => {
+                const entry = shareTokens?.participant;
+                if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
+                  try {
+                    const u = new URL(entry.url, window.location.origin);
+                    if (u.origin === window.location.origin) {
+                      window.location.assign(u.pathname + u.search + u.hash);
+                    } else {
+                      window.open(entry.url, "_blank");
+                    }
+                  } catch (e) {
+                    window.open(entry.url, "_blank");
+                  }
+                } else {
+                  const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+                  const tokens = refreshShareTokensState({ resetWhenMissing: true });
+                  const next = tokens.participant || result.participant;
+                  if (next && next.url) {
+                    window.location.assign(new URL(next.url, window.location.origin).pathname);
+                    popToast("参加者URLを発行して開きました");
+                  } else {
+                    popToast("参加者URLを開けませんでした");
+                  }
+                }
+              }}
               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
             >
               参加者画面を開く
-            </a>
+            </button>
           </div>
         </div>
       </header>
