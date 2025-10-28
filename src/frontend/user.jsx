@@ -9,6 +9,7 @@ import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
@@ -476,6 +477,21 @@ const downloadIcsFile = (filename, contents) => {
 function AdminResponsesApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const routeError = useMemo(() => {
+    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+      return {
+        title: "参加者用の共有URLが無効です",
+        description: "リンクに含まれる鍵が見つかりません。共有されたURLが最新かを確認し、必要であれば管理者に再発行を依頼してください。"
+      };
+    }
+    if (initialRouteContext?.kind === "participant-token-miss") {
+      return {
+        title: "回答用リンクが見つかりません",
+        description: "この回答用URLは無効になっています。最新の参加者用リンクからアクセスし直してください。"
+      };
+    }
+    return null;
+  }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
   const [loading, setLoading] = useState(true);
@@ -487,6 +503,7 @@ function AdminResponsesApp() {
   const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
 
   const participantShareToken = useMemo(() => {
+    if (routeError) return "";
     const tokenFromState = projectState?.project?.shareTokens?.participant?.token;
     if (tokenFromState && !shareService.isPlaceholderToken(tokenFromState)) {
       return String(tokenFromState);
@@ -500,9 +517,10 @@ function AdminResponsesApp() {
       return String(initialRouteContext.token);
     }
     return "";
-  }, [initialRouteContext, projectState]);
+  }, [initialRouteContext, projectState, routeError]);
 
   useEffect(() => {
+    if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
@@ -513,9 +531,10 @@ function AdminResponsesApp() {
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
     projectStore.resolveProjectIdFromLocation();
-  }, [initialRouteContext, participantShareToken]);
+  }, [initialRouteContext, participantShareToken, routeError]);
 
   useEffect(() => {
+    if (routeError) return;
     let cancelled = false;
     const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
       if (!cancelled && nextState) {
@@ -541,7 +560,7 @@ function AdminResponsesApp() {
       cancelled = true;
       unsubscribe();
     };
-  }, [projectId]);
+  }, [projectId, routeError]);
 
   const candidates = projectState.candidates || [];
   const participants = projectState.participants || [];
@@ -623,6 +642,16 @@ function AdminResponsesApp() {
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [participantActionMessage, participantActionError]);
+
+  if (routeError) {
+    return (
+      <ErrorScreen
+        title={routeError.title}
+        description={routeError.description}
+        actions={[{ label: "Scheduly トップへ戻る", href: "/user.html" }, { label: "管理者に共有URLを再確認する", href: "/", variant: "ghost" }]}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">

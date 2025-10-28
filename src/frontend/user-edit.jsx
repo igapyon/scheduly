@@ -9,6 +9,7 @@ import { ensureDemoProjectData } from "./shared/demo-data";
 import responseService from "./services/response-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
@@ -285,6 +286,21 @@ const ParticipantList = ({ list, label, color }) => (
 function SchedulyMock() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const routeError = useMemo(() => {
+    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+      return {
+        title: "参加者用の共有URLが無効です",
+        description: "リンクに含まれる鍵が見つかりません。共有された最新のURLを確認し、管理者に再発行を依頼してください。"
+      };
+    }
+    if (initialRouteContext?.kind === "participant-token-miss") {
+      return {
+        title: "回答用リンクが見つかりません",
+        description: "この回答用URLは無効になっています。最新の参加者用リンクからアクセスし直してください。"
+      };
+    }
+    return null;
+  }, [initialRouteContext]);
   const initialParticipantId = useMemo(() => {
     const fromQuery = readParticipantIdFromLocation();
     if (fromQuery) return fromQuery;
@@ -336,6 +352,7 @@ function SchedulyMock() {
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
   useEffect(() => {
+    if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
@@ -357,9 +374,10 @@ function SchedulyMock() {
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
     projectStore.resolveProjectIdFromLocation();
-  }, [initialRouteContext, projectId, initialParticipantId]);
+  }, [initialRouteContext, projectId, initialParticipantId, routeError]);
 
   useEffect(() => {
+    if (routeError) return undefined;
     let cancelled = false;
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
@@ -455,7 +473,7 @@ function SchedulyMock() {
       cancelled = true;
       unsubscribe();
     };
-  }, [projectId, selectedParticipantId]);
+  }, [projectId, selectedParticipantId, routeError]);
 
   const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
   const currentCandidate = candidates.length ? candidates[safeIndex] : null;
@@ -633,6 +651,19 @@ const commitComment = (value) => {
   };
 
   const participantsFor = (candidate, markType) => (candidate?.responses || []).filter((participant) => participant.mark === markType);
+
+  if (routeError) {
+    return (
+      <ErrorScreen
+        title={routeError.title}
+        description={routeError.description}
+        actions={[
+          { label: "参加者ビューに戻る", href: "/user.html" },
+          { label: "Scheduly トップ", href: "/", variant: "ghost" }
+        ]}
+      />
+    );
+  }
 
   if (!currentCandidate) {
     return (
