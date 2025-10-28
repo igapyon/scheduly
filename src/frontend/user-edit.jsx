@@ -290,13 +290,13 @@ function SchedulyMock() {
     if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
       return {
         title: "参加者用の共有URLが無効です",
-        description: "リンクに含まれる鍵が見つかりません。共有された最新のURLを確認し、管理者に再発行を依頼してください。"
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     if (initialRouteContext?.kind === "participant-token-miss") {
       return {
-        title: "回答用リンクが見つかりません",
-        description: "この回答用URLは無効になっています。最新の参加者用リンクからアクセスし直してください。"
+        title: "回答用リンクが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     return null;
@@ -657,10 +657,6 @@ const commitComment = (value) => {
       <ErrorScreen
         title={routeError.title}
         description={routeError.description}
-        actions={[
-          { label: "参加者ビューに戻る", href: "/user.html" },
-          { label: "Scheduly トップ", href: "/", variant: "ghost" }
-        ]}
       />
     );
   }

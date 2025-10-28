@@ -481,13 +481,13 @@ function AdminResponsesApp() {
     if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
       return {
         title: "参加者用の共有URLが無効です",
-        description: "リンクに含まれる鍵が見つかりません。共有されたURLが最新かを確認し、必要であれば管理者に再発行を依頼してください。"
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     if (initialRouteContext?.kind === "participant-token-miss") {
       return {
-        title: "回答用リンクが見つかりません",
-        description: "この回答用URLは無効になっています。最新の参加者用リンクからアクセスし直してください。"
+        title: "回答用リンクが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     return null;
@@ -648,7 +648,6 @@ function AdminResponsesApp() {
       <ErrorScreen
         title={routeError.title}
         description={routeError.description}
-        actions={[{ label: "Scheduly トップへ戻る", href: "/user.html" }, { label: "管理者に共有URLを再確認する", href: "/", variant: "ghost" }]}
       />
     );
   }
