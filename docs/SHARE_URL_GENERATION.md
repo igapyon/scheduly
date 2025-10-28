@@ -49,8 +49,9 @@
 
 2. **トークン生成**
    - ブラウザの `crypto.getRandomValues` を使い、32 文字の Base62（`[0-9a-zA-Z]`）トークンを生成する。
-   - 管理者 URL 形式: `https://scheduly.app/a/{adminToken}`
-   - 参加者 URL 形式: `https://scheduly.app/p/{participantToken}`（プロジェクト単位で 1 つ、回答画面へ遷移）
+   - 管理者 URL は「基準 URL（baseUrl）+ `/a/{adminToken}`」、参加者 URL は「基準 URL + `/p/{participantToken}`」で生成する。
+   - `baseUrl` は UI 上に入力欄を用意し、初期値として `window.location.origin` をセットするが、ユーザーが適宜書き換えられるようにする。
+   - サーバー（またはビルド設定）では `baseUrl` をホワイトリスト検証し、許可されたドメイン以外は拒否する。
    - 生成時に `issuedAt` と `lastGeneratedBy`（将来のユーザー識別向け）を記録できるよう、オブジェクト構造を採用する。
 
 3. **状態更新**
@@ -68,6 +69,7 @@
    - URL は `KeyValueList` にテキストで表示。未発行時は `–– 未発行 ––` を表示し、発行済み時は「再発行」ボタンにラベルを切り替える。
    - クリック 1 回でクリップボードへコピーする補助ボタンの有無は後日検討。今回は表示のみでも可。
    - トースト文言: 初回発行は「共有URLを発行しました」、再発行時は「共有URLを再発行しました（以前のリンクは無効です）」とする。
+   - 基準 URL の入力欄（プレースホルダー: `https://scheduly.app`）を用意し、初期値には `window.location.origin` をセットする。入力値はトークン生成・再発行時に送信する。
 
 6. **エラー処理**
    - 生成処理中に例外が発生した場合は `console.error` と「共有URLの生成に失敗しました」というトーストを表示。既存トークンは破壊しない。
@@ -122,7 +124,7 @@ shareService.get(projectId: string): {
   participant?: ShareTokenEntry;
 };
 
-shareService.rotate(projectId: string, options?: { confirm?: boolean }): {
+shareService.rotate(projectId: string, options?: { confirm?: boolean; baseUrl: string }): {
   admin: ShareTokenEntry;
   participant: ShareTokenEntry;
 };
@@ -130,8 +132,8 @@ shareService.rotate(projectId: string, options?: { confirm?: boolean }): {
 shareService.invalidate(projectId: string, type: 'admin' | 'participant'): void;
 ```
 
-- `generate` は未発行の場合にトークンを生成し、既存値がある場合はそのまま返す。
-- `rotate` は明示的な再発行操作用。新しいトークンを生成し、旧値を破棄する。
+- `generate` は未発行の場合にトークンを生成し、既存値がある場合はそのまま返す。`baseUrl` が入力された場合はバリデーションを通してから保存する。
+- `rotate` は明示的な再発行操作用。新しいトークンを生成し、旧値を破棄する。`baseUrl` を指定した場合は同様に検証する。
 - `invalidate` は手動で特定種別だけを無効化したい場合の将来用 API（今回のフロントからは呼び出さない）。
 - `ShareTokenEntry` 型は前述のデータモデルを再利用する。
 
