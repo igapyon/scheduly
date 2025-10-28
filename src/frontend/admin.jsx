@@ -704,7 +704,7 @@ function OrganizerApp() {
       admin: `https://scheduly.app/event/${randomToken()}?admin=${randomToken()}`,
       guest: `https://scheduly.app/event/${randomToken()}`
     });
-    popToast("編集URL／閲覧URLを発行しました（モック）");
+    popToast("管理者URL／参加者URLを発行しました（モック）");
   };
 
   const handleExportProjectInfo = () => {
@@ -916,7 +916,7 @@ function OrganizerApp() {
         <aside className="space-y-5">
           <SectionCard
             title="共有URL"
-            description="参加者へ共有するリンクと編集リンクを確認できます。"
+            description="参加者へ共有するリンクと管理者リンクを確認できます。"
             action={
               <button
                 type="button"
@@ -929,13 +929,13 @@ function OrganizerApp() {
           >
             <KeyValueList
               items={[
-                { key: "編集用URL（管理者）", value: urls.admin },
-                { key: "閲覧用URL（参加者）", value: urls.guest },
+                { key: "管理者URL", value: urls.admin },
+                { key: "参加者URL", value: urls.guest },
                 { key: "最終更新", value: "2024/05/01 10:00 更新済み" }
               ]}
             />
             <p className="text-xs text-zinc-500">
-              管理者URLを知っている人だけがプロジェクト内容を更新できます。閲覧URLは参加者に共有します。
+              管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。
             </p>
           </SectionCard>
 
