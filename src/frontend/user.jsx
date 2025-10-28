@@ -278,7 +278,7 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
                     href={editLink}
                     className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                   >
-                    回答
+                    <span aria-hidden="true" className="mr-1">📝</span>回答
                   </a>
                 </div>
                 <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
@@ -348,7 +348,7 @@ function ParticipantSummary({
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >
-              回答
+              <span aria-hidden="true" className="mr-1">📝</span>回答
             </a>
             {onRename && (
               <button
