@@ -8,7 +8,9 @@ import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import responseService from "./services/response-service";
 import shareService from "./services/share-service";
+import participantService from "./services/participant-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
@@ -285,6 +287,21 @@ const ParticipantList = ({ list, label, color }) => (
 function SchedulyMock() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const routeError = useMemo(() => {
+    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+      return {
+        title: "参加者用の共有URLが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    if (initialRouteContext?.kind === "participant-token-miss") {
+      return {
+        title: "回答用リンクが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    return null;
+  }, [initialRouteContext]);
   const initialParticipantId = useMemo(() => {
     const fromQuery = readParticipantIdFromLocation();
     if (fromQuery) return fromQuery;
@@ -326,6 +343,10 @@ function SchedulyMock() {
   const [detailCandidateId, setDetailCandidateId] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [selectedParticipantId, setSelectedParticipantId] = useState(initialParticipantId);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [removeConfirmText, setRemoveConfirmText] = useState("");
+  const [removeInProgress, setRemoveInProgress] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState(null);
 
   const itemRefs = useRef({});
   const lastFocusedCandidateIdRef = useRef(null);
@@ -336,6 +357,7 @@ function SchedulyMock() {
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
   useEffect(() => {
+    if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
@@ -357,9 +379,10 @@ function SchedulyMock() {
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
     projectStore.resolveProjectIdFromLocation();
-  }, [initialRouteContext, projectId, initialParticipantId]);
+  }, [initialRouteContext, projectId, initialParticipantId, routeError]);
 
   useEffect(() => {
+    if (routeError) return undefined;
     let cancelled = false;
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
@@ -455,7 +478,7 @@ function SchedulyMock() {
       cancelled = true;
       unsubscribe();
     };
-  }, [projectId, selectedParticipantId]);
+  }, [projectId, selectedParticipantId, routeError]);
 
   const safeIndex = candidates.length ? Math.min(index, candidates.length - 1) : 0;
   const currentCandidate = candidates.length ? candidates[safeIndex] : null;
@@ -605,6 +628,48 @@ const commitComment = (value) => {
     setTimeout(() => setToast(""), 1800);
   };
 
+  const openRemoveParticipantDialog = () => {
+    if (!selectedParticipantId) {
+      showToast("削除できる参加者が見つかりません");
+      return;
+    }
+    const target = participants.find((participant) => participant && participant.id === selectedParticipantId);
+    if (!target) {
+      showToast("削除できる参加者が見つかりません");
+      return;
+    }
+    setRemoveTarget(target);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+    setRemoveDialogOpen(true);
+  };
+
+  const closeRemoveParticipantDialog = () => {
+    if (removeInProgress) return;
+    setRemoveDialogOpen(false);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+    setRemoveTarget(null);
+  };
+
+  const confirmRemoveParticipant = () => {
+    if (!removeTarget) return;
+    if (removeConfirmText.trim() !== "DELETE") return;
+    setRemoveInProgress(true);
+    try {
+      participantService.removeParticipant(projectId, removeTarget.id);
+      showToast(`参加者「${removeTarget.displayName || removeTarget.id}」を削除しました。`);
+      setRemoveDialogOpen(false);
+      setRemoveTarget(null);
+      setRemoveConfirmText("");
+    } catch (error) {
+      console.error("[Scheduly][user-edit] participant removal failed", error);
+      showToast("参加者の削除に失敗しました。もう一度お試しください。");
+    } finally {
+      setRemoveInProgress(false);
+    }
+  };
+
   const openDetail = (candidateId) => setDetailCandidateId(candidateId);
   const closeDetail = () => setDetailCandidateId(null);
 
@@ -633,6 +698,15 @@ const commitComment = (value) => {
   };
 
   const participantsFor = (candidate, markType) => (candidate?.responses || []).filter((participant) => participant.mark === markType);
+
+  if (routeError) {
+    return (
+      <ErrorScreen
+        title={routeError.title}
+        description={routeError.description}
+      />
+    );
+  }
 
   if (!currentCandidate) {
     return (
@@ -688,7 +762,7 @@ const commitComment = (value) => {
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:border-rose-400 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
-                onClick={() => showToast("参加者を削除しました（モック）")}
+                onClick={openRemoveParticipantDialog}
               >
                 参加者を削除
               </button>
@@ -888,6 +962,55 @@ const commitComment = (value) => {
             <ParticipantList label="△ 未定" color="text-amber-600" list={participantsFor(detailCandidate, "d")} />
             <ParticipantList label="× 欠席" color="text-rose-600" list={participantsFor(detailCandidate, "x")} />
           </>
+        )}
+      </Modal>
+
+      <Modal open={removeDialogOpen} title="参加者を削除" onClose={closeRemoveParticipantDialog}>
+        {removeTarget ? (
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmRemoveParticipant();
+            }}
+          >
+            <p className="text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-700">{removeTarget.displayName || "参加者"}</span>
+              を削除するには、確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+            <label className="block text-xs text-zinc-500">
+              確認ワード
+              <input
+                type="text"
+                value={removeConfirmText}
+                onChange={(event) => setRemoveConfirmText(event.target.value.toUpperCase())}
+                placeholder="DELETE"
+                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                autoFocus
+                autoComplete="off"
+                disabled={removeInProgress}
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={closeRemoveParticipantDialog}
+                disabled={removeInProgress}
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={removeInProgress || removeConfirmText.trim() !== "DELETE"}
+              >
+                {removeInProgress ? "削除中…" : "削除"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="text-xs text-zinc-500">削除対象の参加者が見つかりません。</p>
         )}
       </Modal>
 

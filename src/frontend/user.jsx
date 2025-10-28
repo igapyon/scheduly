@@ -9,6 +9,7 @@ import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
+import ErrorScreen from "./shared/ErrorScreen.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
@@ -353,6 +354,7 @@ function ParticipantSummary({
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (!canRemove) return;
                   onRemove();
                 }}
                 disabled={!canRemove}
@@ -476,6 +478,21 @@ const downloadIcsFile = (filename, contents) => {
 function AdminResponsesApp() {
   const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const routeError = useMemo(() => {
+    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+      return {
+        title: "参加者用の共有URLが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    if (initialRouteContext?.kind === "participant-token-miss") {
+      return {
+        title: "回答用リンクが無効です",
+        description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
+      };
+    }
+    return null;
+  }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
   const [loading, setLoading] = useState(true);
@@ -485,8 +502,12 @@ function AdminResponsesApp() {
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
   const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
+  const [removeDialogParticipant, setRemoveDialogParticipant] = useState(null);
+  const [removeConfirmText, setRemoveConfirmText] = useState("");
+  const [removeInProgress, setRemoveInProgress] = useState(false);
 
   const participantShareToken = useMemo(() => {
+    if (routeError) return "";
     const tokenFromState = projectState?.project?.shareTokens?.participant?.token;
     if (tokenFromState && !shareService.isPlaceholderToken(tokenFromState)) {
       return String(tokenFromState);
@@ -500,9 +521,10 @@ function AdminResponsesApp() {
       return String(initialRouteContext.token);
     }
     return "";
-  }, [initialRouteContext, projectState]);
+  }, [initialRouteContext, projectState, routeError]);
 
   useEffect(() => {
+    if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
@@ -513,9 +535,10 @@ function AdminResponsesApp() {
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
     projectStore.resolveProjectIdFromLocation();
-  }, [initialRouteContext, participantShareToken]);
+  }, [initialRouteContext, participantShareToken, routeError]);
 
   useEffect(() => {
+    if (routeError) return;
     let cancelled = false;
     const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
       if (!cancelled && nextState) {
@@ -541,7 +564,7 @@ function AdminResponsesApp() {
       cancelled = true;
       unsubscribe();
     };
-  }, [projectId]);
+  }, [projectId, routeError]);
 
   const candidates = projectState.candidates || [];
   const participants = projectState.participants || [];
@@ -607,9 +630,41 @@ function AdminResponsesApp() {
     }
   };
 
+  const openRemoveParticipantDialog = (participant) => {
+    if (!participant || !participant.id) return;
+    setRemoveDialogParticipant(participant);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+    setParticipantActionError("");
+  };
+
+  const closeRemoveParticipantDialog = () => {
+    setRemoveDialogParticipant(null);
+    setRemoveConfirmText("");
+    setRemoveInProgress(false);
+  };
+
+  const confirmRemoveParticipant = () => {
+    if (!removeDialogParticipant) return;
+    if (removeConfirmText.trim() !== "DELETE") return;
+    const targetParticipant = removeDialogParticipant;
+    setRemoveInProgress(true);
+    try {
+      handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
+      closeRemoveParticipantDialog();
+    } catch (error) {
+      console.error("[Scheduly] failed to remove participant", error);
+      setParticipantActionError(
+        error instanceof Error ? error.message : "参加者の削除に失敗しました。しばらく待ってから再度お試しください。"
+      );
+      setParticipantActionMessage("");
+    } finally {
+      setRemoveInProgress(false);
+    }
+  };
+
   const handleRemoveParticipant = (participantId, displayName) => {
     const summaryName = displayName || "参加者";
-    if (!window.confirm(`${summaryName} を削除しますか？`)) return;
     participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
@@ -623,6 +678,15 @@ function AdminResponsesApp() {
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [participantActionMessage, participantActionError]);
+
+  if (routeError) {
+    return (
+      <ErrorScreen
+        title={routeError.title}
+        description={routeError.description}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -707,7 +771,7 @@ function AdminResponsesApp() {
                       participant={participant}
                       defaultOpen={index === 0}
                       scheduleLookup={scheduleLookup}
-                      onRemove={() => handleRemoveParticipant(participant.id, participant.name)}
+                      onRemove={() => openRemoveParticipantDialog(participant)}
                       canRemove={participantSummaries.length > 1}
                       participantShareToken={participantShareToken}
                     />
@@ -810,6 +874,71 @@ function AdminResponsesApp() {
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
                   追加
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {removeDialogParticipant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={closeRemoveParticipantDialog}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="参加者を削除"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">参加者を削除</h2>
+              <button className="text-xs text-zinc-500" onClick={closeRemoveParticipantDialog} disabled={removeInProgress}>
+                閉じる
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmRemoveParticipant();
+              }}
+            >
+              <p className="text-xs text-zinc-500">
+                <span className="font-semibold text-zinc-700">
+                  {removeDialogParticipant.name || "参加者"}
+                </span>
+                を削除するには、確認のため「DELETE」と入力してください。
+              </p>
+              <label className="block text-xs text-zinc-500">
+                確認ワード
+                <input
+                  type="text"
+                  value={removeConfirmText}
+                  onChange={(event) => setRemoveConfirmText(event.target.value.toUpperCase())}
+                  placeholder="DELETE"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  autoFocus
+                  autoComplete="off"
+                  disabled={removeInProgress}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
+                  onClick={closeRemoveParticipantDialog}
+                  disabled={removeInProgress}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={removeInProgress || removeConfirmText.trim() !== "DELETE"}
+                >
+                  {removeInProgress ? "削除中…" : "削除"}
                 </button>
               </div>
             </form>

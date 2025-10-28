@@ -495,6 +495,8 @@ function OrganizerApp() {
   const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
   const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
   const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const isAdminShareMiss =
+    initialRouteContext?.kind === "share-miss" && initialRouteContext?.shareType === "admin";
   const [summary, setSummary] = useState(initialProjectState.project?.name || "");
   const [description, setDescription] = useState(initialProjectState.project?.description || "");
   const responseOptions = ["○", "△", "×"];
@@ -510,6 +512,12 @@ function OrganizerApp() {
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
   const autoIssueHandledRef = useRef(false);
+  const [projectDeleteDialogOpen, setProjectDeleteDialogOpen] = useState(false);
+  const [projectDeleteConfirm, setProjectDeleteConfirm] = useState("");
+  const [projectDeleteInProgress, setProjectDeleteInProgress] = useState(false);
+  const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
+  const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
+  const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
 
   useEffect(() => {
     setCandidates(initialProjectState.candidates || []);
@@ -607,6 +615,71 @@ function OrganizerApp() {
       console.error("ICS export error", error);
       popToast("ICSの生成に失敗しました: " + (error && error.message ? error.message : "不明なエラー"));
       return;
+    }
+  };
+
+  const openCandidateDeleteDialog = (candidate) => {
+    if (!candidate || !candidate.id) return;
+    setCandidateDeleteDialog(candidate);
+    setCandidateDeleteConfirm("");
+    setCandidateDeleteInProgress(false);
+  };
+
+  const closeCandidateDeleteDialog = () => {
+    if (candidateDeleteInProgress) return;
+    setCandidateDeleteDialog(null);
+    setCandidateDeleteConfirm("");
+    setCandidateDeleteInProgress(false);
+  };
+
+  const confirmCandidateDelete = () => {
+    if (!candidateDeleteDialog) return;
+    if (candidateDeleteConfirm.trim() !== "DELETE") return;
+    setCandidateDeleteInProgress(true);
+    try {
+      removeCandidate(candidateDeleteDialog.id);
+      popToast(`日程「${candidateDeleteDialog.summary || candidateDeleteDialog.id}」を削除しました`);
+      closeCandidateDeleteDialog();
+    } catch (error) {
+      console.error("Candidate removal failed", error);
+      popToast("日程の削除に失敗しました。時間を置いて再度お試しください。");
+    } finally {
+      setCandidateDeleteInProgress(false);
+    }
+  };
+
+  const openProjectDeleteDialog = () => {
+    setProjectDeleteDialogOpen(true);
+    setProjectDeleteConfirm("");
+    setProjectDeleteInProgress(false);
+  };
+
+  const closeProjectDeleteDialog = () => {
+    if (projectDeleteInProgress) return;
+    setProjectDeleteDialogOpen(false);
+    setProjectDeleteConfirm("");
+    setProjectDeleteInProgress(false);
+  };
+
+  const handleDeleteProject = () => {
+    const fresh = projectStore.resetProject(projectId);
+    setSummary(fresh.project?.name || "");
+    setDescription(fresh.project?.description || "");
+    setCandidates(fresh.candidates || []);
+    refreshShareTokensState({ resetWhenMissing: true });
+    setImportPreview(null);
+    setInitialDataLoaded(true);
+    popToast("プロジェクトを削除し初期状態に戻しました");
+  };
+
+  const confirmProjectDelete = () => {
+    if (projectDeleteConfirm.trim() !== "DELETE") return;
+    setProjectDeleteInProgress(true);
+    try {
+      handleDeleteProject();
+      closeProjectDeleteDialog();
+    } finally {
+      setProjectDeleteInProgress(false);
     }
   };
 
@@ -939,18 +1012,6 @@ function OrganizerApp() {
     }
   };
 
-  const handleDeleteProject = () => {
-    const confirmed = window.confirm("このプロジェクトの候補・参加者・回答データをすべて削除します。よろしいですか？");
-    if (!confirmed) return;
-    const fresh = projectStore.resetProject(projectId);
-    setSummary(fresh.project?.name || "");
-    setDescription(fresh.project?.description || "");
-    setCandidates(fresh.candidates || []);
-    refreshShareTokensState({ resetWhenMissing: true });
-    setImportPreview(null);
-    setInitialDataLoaded(true);
-    popToast("プロジェクトを削除し初期状態に戻しました");
-  };
 
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
@@ -1010,6 +1071,11 @@ function OrganizerApp() {
             <p className="mt-2 text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
+            {isAdminShareMiss && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                指定された管理者用URLは無効になっています。新しい共有URLを再発行すると、正しいリンクを参加者と共有できます。
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -1128,7 +1194,7 @@ function OrganizerApp() {
                   key={candidate.id}
                   value={candidate}
                   onChange={(next) => updateCandidate(candidate.id, next)}
-                  onRemove={() => removeCandidate(candidate.id)}
+                  onRemove={() => openCandidateDeleteDialog(candidate)}
                   onExport={() => handleExportCandidate(candidate.id)}
                   disableRemove={candidates.length === 1}
                 />
@@ -1243,7 +1309,7 @@ function OrganizerApp() {
               <button
                 type="button"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-rose-500 hover:border-rose-400"
-                onClick={handleDeleteProject}
+                onClick={openProjectDeleteDialog}
               >
                 プロジェクトを削除
               </button>
@@ -1358,6 +1424,146 @@ function OrganizerApp() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {candidateDeleteDialog && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            onClick={closeCandidateDeleteDialog}
+          >
+            <div
+              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="日程を削除"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-zinc-800">日程を削除</h2>
+                <button
+                  type="button"
+                  className="text-xs text-zinc-500"
+                  onClick={closeCandidateDeleteDialog}
+                  disabled={candidateDeleteInProgress}
+                >
+                  閉じる
+                </button>
+              </div>
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  confirmCandidateDelete();
+                }}
+              >
+                <p className="text-xs text-zinc-500">
+                  <span className="font-semibold text-zinc-700">
+                    {candidateDeleteDialog.summary || candidateDeleteDialog.id}
+                  </span>
+                  を削除するには、確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+                </p>
+                <label className="block text-xs text-zinc-500">
+                  確認ワード
+                  <input
+                    type="text"
+                    value={candidateDeleteConfirm}
+                    onChange={(event) => setCandidateDeleteConfirm(event.target.value.toUpperCase())}
+                    placeholder="DELETE"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    autoFocus
+                    autoComplete="off"
+                    disabled={candidateDeleteInProgress}
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={closeCandidateDeleteDialog}
+                    disabled={candidateDeleteInProgress}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={candidateDeleteInProgress || candidateDeleteConfirm.trim() !== "DELETE"}
+                  >
+                    {candidateDeleteInProgress ? "削除中…" : "削除"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {projectDeleteDialogOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            onClick={closeProjectDeleteDialog}
+          >
+            <div
+              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="プロジェクトを削除"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-zinc-800">プロジェクトを削除</h2>
+                <button
+                  type="button"
+                  className="text-xs text-zinc-500"
+                  onClick={closeProjectDeleteDialog}
+                  disabled={projectDeleteInProgress}
+                >
+                  閉じる
+                </button>
+              </div>
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  confirmProjectDelete();
+                }}
+              >
+                <p className="text-xs text-zinc-500">
+                  プロジェクトの候補・参加者・回答データをすべて削除します。確認のため{" "}
+                  <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+                </p>
+                <label className="block text-xs text-zinc-500">
+                  確認ワード
+                  <input
+                    type="text"
+                    value={projectDeleteConfirm}
+                    onChange={(event) => setProjectDeleteConfirm(event.target.value.toUpperCase())}
+                    placeholder="DELETE"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    autoFocus
+                    autoComplete="off"
+                    disabled={projectDeleteInProgress}
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={closeProjectDeleteDialog}
+                    disabled={projectDeleteInProgress}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={projectDeleteInProgress || projectDeleteConfirm.trim() !== "DELETE"}
+                  >
+                    {projectDeleteInProgress ? "削除中…" : "削除"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
