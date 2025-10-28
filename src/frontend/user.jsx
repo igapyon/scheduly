@@ -251,6 +251,9 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
           <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-rose-100 px-3 font-semibold text-rose-700">
             × {schedule.counts.x}
           </span>
+          <span className="inline-flex h-7 min-w-[50px] items-center justify-center rounded-full bg-zinc-200 px-3 font-semibold text-zinc-600">
+            未回答 {schedule.counts.pending}
+          </span>
         </div>
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
@@ -278,7 +281,7 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
                     href={editLink}
                     className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                   >
-                    回答
+                    <span aria-hidden="true" className="mr-1">📝</span>回答
                   </a>
                 </div>
                 <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
@@ -315,6 +318,7 @@ function ParticipantSummary({
   defaultOpen,
   scheduleLookup,
   onRemove,
+  onRename,
   canRemove = true,
   participantShareToken = ""
 }) {
@@ -347,8 +351,20 @@ function ParticipantSummary({
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
             >
-              回答
+              <span aria-hidden="true" className="mr-1">📝</span>回答
             </a>
+            {onRename && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRename();
+                }}
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              >
+                名前変更
+              </button>
+            )}
             {onRemove && (
               <button
                 type="button"
@@ -505,6 +521,10 @@ function AdminResponsesApp() {
   const [removeDialogParticipant, setRemoveDialogParticipant] = useState(null);
   const [removeConfirmText, setRemoveConfirmText] = useState("");
   const [removeInProgress, setRemoveInProgress] = useState(false);
+  const [renameDialogParticipant, setRenameDialogParticipant] = useState(null);
+  const [renameName, setRenameName] = useState("");
+  const [renameInProgress, setRenameInProgress] = useState(false);
+  const [renameError, setRenameError] = useState("");
 
   const participantShareToken = useMemo(() => {
     if (routeError) return "";
@@ -663,6 +683,43 @@ function AdminResponsesApp() {
     }
   };
 
+  const openRenameParticipantDialog = (participantSummary) => {
+    if (!participantSummary || !participantSummary.id) return;
+    setRenameDialogParticipant(participantSummary);
+    setRenameName(participantSummary.name || "");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const closeRenameParticipantDialog = () => {
+    if (renameInProgress) return;
+    setRenameDialogParticipant(null);
+    setRenameName("");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const confirmRenameParticipant = () => {
+    if (!renameDialogParticipant || !renameDialogParticipant.id) return;
+    const trimmed = renameName.trim();
+    if (!trimmed) {
+      setRenameError("参加者名を入力してください");
+      return;
+    }
+    setRenameInProgress(true);
+    try {
+      participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
+      setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
+      setParticipantActionError("");
+      closeRenameParticipantDialog();
+    } catch (error) {
+      console.error("[Scheduly] failed to rename participant", error);
+      setRenameError(error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。");
+    } finally {
+      setRenameInProgress(false);
+    }
+  };
+
   const handleRemoveParticipant = (participantId, displayName) => {
     const summaryName = displayName || "参加者";
     participantService.removeParticipant(projectId, participantId);
@@ -772,6 +829,7 @@ function AdminResponsesApp() {
                       defaultOpen={index === 0}
                       scheduleLookup={scheduleLookup}
                       onRemove={() => openRemoveParticipantDialog(participant)}
+                      onRename={() => openRenameParticipantDialog(participant)}
                       canRemove={participantSummaries.length > 1}
                       participantShareToken={participantShareToken}
                     />
@@ -939,6 +997,75 @@ function AdminResponsesApp() {
                   disabled={removeInProgress || removeConfirmText.trim() !== "DELETE"}
                 >
                   {removeInProgress ? "削除中…" : "削除"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {renameDialogParticipant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={closeRenameParticipantDialog}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="参加者名を変更"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">参加者名を変更</h2>
+              <button className="text-xs text-zinc-500" onClick={closeRenameParticipantDialog} disabled={renameInProgress}>
+                閉じる
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmRenameParticipant();
+              }}
+            >
+              <p className="text-xs text-zinc-500">
+                <span className="font-semibold text-zinc-700">{renameDialogParticipant.name || "参加者"}</span>
+                の表示名を変更します。
+              </p>
+              <label className="block text-xs text-zinc-500">
+                新しい参加者名
+                <input
+                  type="text"
+                  value={renameName}
+                  onChange={(event) => {
+                    setRenameName(event.target.value);
+                    if (renameError) setRenameError("");
+                  }}
+                  placeholder="参加者名"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  autoFocus
+                  autoComplete="off"
+                  disabled={renameInProgress}
+                />
+              </label>
+              {renameError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">{renameError}</div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={closeRenameParticipantDialog}
+                  disabled={renameInProgress}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={renameInProgress || !renameName.trim()}
+                >
+                  {renameInProgress ? "保存中…" : "更新"}
                 </button>
               </div>
             </form>

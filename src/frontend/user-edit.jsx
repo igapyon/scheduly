@@ -347,6 +347,10 @@ function SchedulyMock() {
   const [removeConfirmText, setRemoveConfirmText] = useState("");
   const [removeInProgress, setRemoveInProgress] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renameInProgress, setRenameInProgress] = useState(false);
+  const [renameError, setRenameError] = useState("");
 
   const itemRefs = useRef({});
   const lastFocusedCandidateIdRef = useRef(null);
@@ -670,6 +674,50 @@ const commitComment = (value) => {
     }
   };
 
+  const openRenameParticipantDialog = () => {
+    if (!selectedParticipantId) {
+      showToast("変更できる参加者が見つかりません");
+      return;
+    }
+    const target = participants.find((participant) => participant && participant.id === selectedParticipantId);
+    if (!target) {
+      showToast("変更できる参加者が見つかりません");
+      return;
+    }
+    setRenameDialogOpen(true);
+    setRenameName(target.displayName || "");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const closeRenameParticipantDialog = () => {
+    if (renameInProgress) return;
+    setRenameDialogOpen(false);
+    setRenameName("");
+    setRenameError("");
+    setRenameInProgress(false);
+  };
+
+  const confirmRenameParticipant = () => {
+    const trimmed = renameName.trim();
+    if (!selectedParticipantId) return;
+    if (!trimmed) {
+      setRenameError("参加者名を入力してください");
+      return;
+    }
+    setRenameInProgress(true);
+    try {
+      participantService.updateParticipant(projectId, selectedParticipantId, { displayName: trimmed });
+      showToast("参加者名を変更しました");
+      closeRenameParticipantDialog();
+    } catch (error) {
+      console.error("[Scheduly][user-edit] participant rename failed", error);
+      setRenameError(error instanceof Error ? error.message : "参加者名の変更に失敗しました。もう一度お試しください。");
+    } finally {
+      setRenameInProgress(false);
+    }
+  };
+
   const openDetail = (candidateId) => setDetailCandidateId(candidateId);
   const closeDetail = () => setDetailCandidateId(null);
 
@@ -755,9 +803,9 @@ const commitComment = (value) => {
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300"
-                onClick={() => showToast("参加者名の変更モーダル（モック）")}
+                onClick={openRenameParticipantDialog}
               >
-                名前を変更
+                名前変更
               </button>
               <button
                 type="button"
@@ -1012,6 +1060,53 @@ const commitComment = (value) => {
         ) : (
           <p className="text-xs text-zinc-500">削除対象の参加者が見つかりません。</p>
         )}
+      </Modal>
+
+      <Modal open={renameDialogOpen} title="参加者名を変更" onClose={closeRenameParticipantDialog}>
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            confirmRenameParticipant();
+          }}
+        >
+          <label className="block text-xs text-zinc-500">
+            新しい参加者名
+            <input
+              type="text"
+              value={renameName}
+              onChange={(event) => {
+                setRenameName(event.target.value);
+                if (renameError) setRenameError("");
+              }}
+              placeholder="参加者名"
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              autoFocus
+              autoComplete="off"
+              disabled={renameInProgress}
+            />
+          </label>
+          {renameError && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">{renameError}</div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={closeRenameParticipantDialog}
+              disabled={renameInProgress}
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={renameInProgress || !renameName.trim()}
+            >
+              {renameInProgress ? "更新中…" : "更新"}
+            </button>
+          </div>
+        </form>
       </Modal>
 
       {toast && (

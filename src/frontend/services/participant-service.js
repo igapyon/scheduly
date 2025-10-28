@@ -18,6 +18,8 @@ const generateToken = () => {
   return token;
 };
 
+const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+
 const ensureUniqueToken = (preferredToken, projectId, allowParticipantId = null) => {
   let candidate = preferredToken ? String(preferredToken).toLowerCase() : "";
   const maxAttempts = 10;
@@ -52,17 +54,32 @@ const doesParticipantExist = (projectId, participantId) => {
   return participants.some((participant) => participant && participant.id === participantId);
 };
 
+const isDuplicateDisplayName = (projectId, name, ignoreParticipantId = null) => {
+  if (!isNonEmptyString(name)) return false;
+  const normalized = name.trim().toLowerCase();
+  const participants = projectStore.getParticipants(projectId);
+  return participants.some((participant) => {
+    if (!participant || !isNonEmptyString(participant.displayName)) return false;
+    if (ignoreParticipantId && participant.id === ignoreParticipantId) return false;
+    return participant.displayName.trim().toLowerCase() === normalized;
+  });
+};
+
 const addParticipant = (projectId, payload) => {
   const timestamp = new Date().toISOString();
   const preferredId = payload?.id;
   const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
+  const displayName = payload?.displayName || "";
+  if (isDuplicateDisplayName(projectId, displayName)) {
+    throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
+  }
   const token = ensureUniqueToken(payload?.token, projectId, id);
   const createdAt = payload?.createdAt || timestamp;
   const updatedAt = payload?.updatedAt || timestamp;
   const participant = {
     id,
     token,
-    displayName: payload?.displayName || "",
+    displayName,
     email: payload?.email || "",
     comment: payload?.comment || "",
     createdAt,
@@ -77,12 +94,16 @@ const updateParticipant = (projectId, participantId, changes) => {
   if (!existing) {
     throw new Error("Participant not found");
   }
+  const nextDisplayName = changes?.displayName ?? existing.displayName;
+  if (isDuplicateDisplayName(projectId, nextDisplayName, participantId)) {
+    throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
+  }
   const nextToken = changes?.token
     ? ensureUniqueToken(changes.token, projectId, participantId)
     : existing.token;
   const nextParticipant = {
     ...existing,
-    displayName: changes?.displayName ?? existing.displayName,
+    displayName: nextDisplayName,
     email: changes?.email ?? existing.email,
     comment: changes?.comment ?? existing.comment,
     token: nextToken,
