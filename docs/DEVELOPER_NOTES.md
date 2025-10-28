@@ -69,7 +69,6 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectStore` / `scheduleService` / `participantService` / `responseService` / `summaryService`）を実装し、React 3 画面から呼び出す。スコープ外の画面からは読み取り専用 API のみ公開する。
 - 管理者用 URL（例: `/a/{adminToken}`）と参加者用 URL（`/p/{participantToken}` / `/r/{participantToken}`）を発行し、匿名アクセスでも画面単位で動作が混ざらないようにする。必要に応じて `demo-admin` / `demo-participant-001` のような固定トークンも用意する。
 
-- `summaryService.buildScheduleView` / `buildParticipantView` に対応するタブ表示を `user.jsx` に実装し、レスポンス更新時に再計算する。
 - `responseService.upsert` の結果を使って `tallyService.recalculate` を反映するホットリロードループを `user-edit.jsx` から組み込み、○△× 更新とコメント保存がリアルタイムで一覧に反映されるよう整える。
 - 参加者側 (`user.jsx` / `user-edit.jsx`) でも `projectStore` と `scheduleService` を利用して候補データを取得し、管理画面との表示差分をなくす（サマリー表示と回答編集の両方）。
 - ICS インポートプレビューから選択した候補のみをストアへ適用できるようにし、未選択候補のスキップ理由を含めたログ／トースト表示を整える。
