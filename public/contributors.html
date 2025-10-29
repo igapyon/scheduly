@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scheduly | コントリビューター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #f4f4f5;
+        color: #111827;
+      }
+      a { text-decoration: none; }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <header class="border-b border-zinc-200 bg-white">
+      <div class="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-5">
+        <div class="flex flex-col">
+          <span class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-500">Scheduly</span>
+          <h1 class="text-2xl font-bold text-zinc-900">コントリビューター</h1>
+        </div>
+        <div class="hidden" aria-hidden="true"></div>
+      </div>
+    </header>
+
+    <main class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-8">
+      <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 class="text-lg font-semibold text-zinc-800">チームと貢献について</h2>
+        <p class="mt-3 text-sm leading-relaxed text-zinc-600">
+          Scheduly はコミュニティ主導のモックプロジェクトです。コントリビューターは、計画立案・UI 改善・ドキュメント整備・バグ修正など多岐にわたって協力しています。プロジェクトの進捗は GitHub のリポジトリで公開されているため、誰でも履歴を追いながら参加できます。
+        </p>
+      </section>
+
+      <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 class="text-lg font-semibold text-zinc-800">コントリビュートの始め方</h2>
+        <ol class="mt-3 space-y-2 text-sm leading-relaxed text-zinc-600 list-decimal pl-5">
+          <li>リポジトリをフォークし、ローカル環境にクローンします。</li>
+          <li><a class="text-emerald-600 hover:text-emerald-700" href="https://github.com/igapyon/scheduly/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">docs/CONTRIBUTING.md</a> に目を通し、スタイルガイドや開発フローを確認します。</li>
+          <li>Issue から着手可能なタスクを探す、もしくは新しい提案を行います。</li>
+          <li>変更を加えたら Pull Request を作成し、背景や意図を説明してください。</li>
+        </ol>
+        <p class="mt-3 text-xs text-zinc-500">GitHub Issues / Pull Requests の公開チャネルでは、機密情報を含めないようご注意ください。</p>
+      </section>
+
+      <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 class="text-lg font-semibold text-zinc-800">コントリビューター一覧</h2>
+        <p class="mt-3 text-sm leading-relaxed text-zinc-600">
+          最新のコントリビューターはリポジトリ内の <a class="text-emerald-600 hover:text-emerald-700" href="https://github.com/igapyon/scheduly/blob/main/docs/CONTRIBUTORS.md" target="_blank" rel="noopener noreferrer">docs/CONTRIBUTORS.md</a> に掲載しています。コミット履歴からも貢献状況を確認できます。
+        </p>
+      </section>
+
+      <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 class="text-lg font-semibold text-zinc-800">連絡とサポート</h2>
+        <p class="mt-3 text-sm leading-relaxed text-zinc-600">
+          プロジェクトに関する質問や提案は <a class="text-emerald-600 hover:text-emerald-700" href="https://github.com/igapyon/scheduly/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a> を活用してください。Apache License 2.0 のもと、対応はベストエフォートで行われるため、必ずしも応答や修正を保証するものではありません。
+        </p>
+      </section>
+    </main>
+
+    <footer class="border-t border-zinc-200 bg-white">
+      <div class="mx-auto flex w-full max-w-4xl flex-col gap-1 px-5 py-4 text-xs text-zinc-500">
+        <span>© Toshiki Iga.</span>
+        <span>Scheduly project — Apache License 2.0.</span>
+      </div>
+    </footer>
+  </body>
+</html>
