@@ -17,7 +17,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - スタイルは Tailwind CDN と最小限のインライン CSS に依存。  
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
-- 既存 HTML から React への移行は、共通関数を `src/frontend/utils/` へ切り出しつつ、小さなコンポーネント単位で JSX へ置き換え、UI 差異が出ないよう段階的に実施する。
+- **Lint**: UI / ロジック変更時は `npm run lint` をこまめに実行し、共有のコード規約と静的解析の結果を即時フィードバックする。
 
 ### 1.2 レガシーモック（HTML 版 / アプリスナップショット）
 - 位置: `public/legacy/*.html`
