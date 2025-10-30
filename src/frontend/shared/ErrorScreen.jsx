@@ -1,5 +1,3 @@
-import React from "react";
-
 function ErrorScreen({ title, description, actions = [] }) {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-zinc-50 px-4 py-12 text-zinc-800">
@@ -42,4 +40,3 @@ function ErrorScreen({ title, description, actions = [] }) {
 }
 
 export default ErrorScreen;
-

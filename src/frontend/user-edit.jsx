@@ -1,20 +1,24 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
-import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import responseService from "./services/response-service";
 import shareService from "./services/share-service";
 import participantService from "./services/participant-service";
+import projectService from "./services/project-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
+
+void EventMeta;
+void ErrorScreen;
+void InfoBadge;
 
 const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
 
@@ -36,20 +40,6 @@ const normalizeResponseMark = (mark) => {
   return "pending";
 };
 
-const formatTimestampForDisplay = (isoString) => {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).format(date);
-};
-
 const readParticipantIdFromLocation = () => {
   if (typeof window === "undefined") return null;
   try {
@@ -57,6 +47,7 @@ const readParticipantIdFromLocation = () => {
     const participantId = params.get("participantId");
     if (participantId) return participantId;
   } catch (error) {
+    void error;
     // ignore malformed query
   }
   return null;
@@ -187,37 +178,6 @@ const formatCandidateDateLabel = (candidate) => {
   return `${month}/${dayNum}（${weekday}）`;
 };
 
-const formatCandidateTimeRange = (candidate) => {
-  const zone = sanitizeTzid(candidate.tzid);
-  const start = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: zone
-  }).format(new Date(candidate.dtstart));
-  const end = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: zone
-  }).format(new Date(candidate.dtend));
-  return `${start}〜${end}`;
-};
-
-const formatIcalDateTimeWithZone = (iso, tz) => {
-  const zone = sanitizeTzid(tz);
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: zone,
-    hour12: false
-  }).format(new Date(iso));
-};
-
 const StatRow = ({ candidate, maxO, onOpenDetail }) => {
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
@@ -286,60 +246,51 @@ const ParticipantList = ({ list, label, color }) => (
 );
 
 function SchedulyMock() {
-  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
-  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const [projectId, setProjectId] = useState(null);
+  const [routeContext, setRouteContext] = useState(null);
+  const [initialRouteContext, setInitialRouteContext] = useState(null);
+  const [initialParticipantId, setInitialParticipantId] = useState(null);
+
   const routeError = useMemo(() => {
-    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+    const ctx = routeContext || initialRouteContext;
+    if (ctx?.kind === "share-miss" && ctx.shareType === "participant") {
       return {
         title: "参加者用の共有URLが無効です",
         description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
-    if (initialRouteContext?.kind === "participant-token-miss") {
+    if (ctx?.kind === "participant-token-miss") {
       return {
         title: "回答用リンクが無効です",
         description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     return null;
-  }, [initialRouteContext]);
-  const initialParticipantId = useMemo(() => {
-    const fromQuery = readParticipantIdFromLocation();
-    if (fromQuery) return fromQuery;
-    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
-      const match = projectStore.findParticipantByToken(initialRouteContext.token);
-      if (match && match.participant && match.participant.id) {
-        return match.participant.id;
-      }
-    }
-    return null;
-  }, [initialRouteContext]);
+  }, [routeContext, initialRouteContext]);
+
   const participantListUrl = useMemo(() => {
-    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
-      const encodedToken = encodeURIComponent(initialRouteContext.token);
-      if (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss") {
+    const ctx = routeContext || initialRouteContext;
+    if (ctx && ctx.shareType === "participant" && ctx.token) {
+      const encodedToken = encodeURIComponent(ctx.token);
+      if (ctx.kind === "share" || ctx.kind === "share-miss") {
         return `/p/${encodedToken}`;
       }
-      if (initialRouteContext.kind === "participant-token" || initialRouteContext.kind === "participant-token-miss") {
+      if (ctx.kind === "participant-token" || ctx.kind === "participant-token-miss") {
         return `/p/${encodedToken}`;
       }
     }
     return "/user.html";
-  }, [initialRouteContext]);
-  const initialParticipantTokenRef = useRef(
-    initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token
-      ? String(initialRouteContext.token)
-      : ""
-  );
-  const requestedParticipantIdRef = useRef(initialParticipantId);
-  console.log("[user-edit] projectId", projectId, "initialParticipantId", initialParticipantId);
+  }, [routeContext, initialRouteContext]);
+
+  const initialParticipantTokenRef = useRef("");
+  const requestedParticipantIdRef = useRef(null);
+  const lastSelectedParticipantIdRef = useRef(initialParticipantId || null);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const answersRef = useRef(answers);
-  const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -362,11 +313,72 @@ function SchedulyMock() {
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
   useEffect(() => {
+    let cancelled = false;
+    const bootstrap = async () => {
+      const resolved = projectService.resolveProjectFromLocation();
+      if (cancelled) return;
+      setProjectId(resolved.projectId);
+      setRouteContext(resolved.routeContext);
+      setInitialRouteContext(resolved.routeContext);
+      // Debug log: keep permanently to help trace participant handoff issues.
+      console.log("[user-edit] bootstrap", {
+        projectId: resolved.projectId,
+        routeContext: resolved.routeContext,
+        location: typeof window !== "undefined" ? window.location.href : "server"
+      });
+      const token =
+        resolved.routeContext?.shareType === "participant" && resolved.routeContext.token
+          ? String(resolved.routeContext.token)
+          : "";
+      initialParticipantTokenRef.current = token;
+      let initialParticipant = readParticipantIdFromLocation();
+      if (!initialParticipant && token) {
+        const match = participantService.resolveByToken(token);
+        if (match && match.participantId) {
+          initialParticipant = match.participantId;
+        }
+      }
+      // Debug log: keep permanently to help trace participant handoff issues.
+      console.log("[user-edit] initial participant resolved", {
+        token,
+        initialParticipant
+      });
+      setInitialParticipantId(initialParticipant);
+      requestedParticipantIdRef.current = initialParticipant;
+    };
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!initialParticipantId || selectedParticipantId) return;
+    // Debug log: keep permanently to help trace participant handoff issues.
+    console.log("[user-edit] sync initial participantId", {
+      initialParticipantId,
+      selectedParticipantId
+    });
+    requestedParticipantIdRef.current = initialParticipantId;
+    lastSelectedParticipantIdRef.current = initialParticipantId;
+    setSelectedParticipantId(initialParticipantId);
+  }, [initialParticipantId, selectedParticipantId]);
+
+  useEffect(() => {
+    if (selectedParticipantId) {
+      lastSelectedParticipantIdRef.current = selectedParticipantId;
+    }
+  }, [selectedParticipantId]);
+
+  useEffect(() => {
     if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
-    const shareTokens = projectStore.getShareTokens(projectId);
+    if (!projectId) return;
+    const shareTokens = shareService.get(projectId);
     const participantShareToken = shareTokens?.participant?.token;
     if (!participantShareToken || shareService.isPlaceholderToken(participantShareToken)) return;
     const participantId = requestedParticipantIdRef.current || initialParticipantId || "";
@@ -383,20 +395,22 @@ function SchedulyMock() {
     }
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
-    projectStore.resolveProjectIdFromLocation();
+    const resolved = projectService.resolveProjectFromLocation();
+    setRouteContext(resolved.routeContext);
   }, [initialRouteContext, projectId, initialParticipantId, routeError]);
 
   useEffect(() => {
-    if (routeError) return undefined;
+    if (routeError || !projectId) return undefined;
     let cancelled = false;
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
       const participantList = nextState.participants || [];
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
 
-      let preferredId = requestedParticipantIdRef.current;
+      let preferredId = requestedParticipantIdRef.current || lastSelectedParticipantIdRef.current;
       if (!preferredId && initialParticipantTokenRef.current) {
         const token = initialParticipantTokenRef.current;
         const matched = participantList.find((participant) => participant && participant.token === token);
@@ -410,17 +424,20 @@ function SchedulyMock() {
         preferredId && participantList.some((participant) => participant && participant.id === preferredId);
 
       let editingId = selectedParticipantId;
-      const hasEditingParticipant =
+      let hasEditingParticipant =
         editingId && participantList.some((participant) => participant && participant.id === editingId);
 
       if (hasPreferredParticipant && editingId !== preferredId) {
         editingId = preferredId;
         if (editingId !== selectedParticipantId) {
+          // Debug log: keep permanently to help trace participant handoff issues.
           console.log("[user-edit] switch to preferred participant", editingId);
+          lastSelectedParticipantIdRef.current = editingId;
           setSelectedParticipantId(editingId);
         }
         resetAnswers = true;
         requestedParticipantIdRef.current = null;
+        hasEditingParticipant = true;
       } else if (hasPreferredParticipant) {
         requestedParticipantIdRef.current = null;
       }
@@ -429,8 +446,10 @@ function SchedulyMock() {
         if (participantList.length) {
           editingId = participantList[0]?.id || null;
           if (editingId !== selectedParticipantId) {
-            setSelectedParticipantId(editingId);
+            // Debug log: keep permanently to help trace participant handoff issues.
             console.log("[user-edit] fallback editingId", editingId);
+            lastSelectedParticipantIdRef.current = editingId;
+            setSelectedParticipantId(editingId);
           }
           resetAnswers = true;
         } else {
@@ -438,6 +457,7 @@ function SchedulyMock() {
         }
       }
 
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] editingId after check", editingId, "resetAnswers", resetAnswers);
       const candidateViews = buildCandidateViews(nextState);
       setCandidates(candidateViews);
@@ -446,17 +466,16 @@ function SchedulyMock() {
         if (editingId) {
           setAnswers(buildAnswersForParticipant(nextState, editingId));
           const participant = participantList.find((item) => item && item.id === editingId);
+          // Debug log: keep permanently to help trace participant handoff issues.
           console.log("[user-edit] answers loaded for", editingId, participant);
-          setSavedAt(formatTimestampForDisplay(participant?.updatedAt));
         } else {
           setAnswers({});
-          setSavedAt("");
         }
         setIndex(0);
       }
     };
 
-    const initialSnapshot = projectStore.getProjectStateSnapshot(projectId);
+    const initialSnapshot = projectService.getState(projectId);
     syncFromState(initialSnapshot, { resetAnswers: true });
 
     setLoading(true);
@@ -464,7 +483,7 @@ function SchedulyMock() {
       .then(() => {
         if (cancelled) return;
         setLoadError("");
-        const snapshot = projectStore.getProjectStateSnapshot(projectId);
+        const snapshot = projectService.getState(projectId);
         syncFromState(snapshot, { resetAnswers: true });
       })
       .catch((error) => {
@@ -475,13 +494,17 @@ function SchedulyMock() {
         if (!cancelled) setLoading(false);
       });
 
-    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
-      if (!cancelled) syncFromState(nextState);
+    const unsubscribe = projectService.subscribe(projectId, (nextState) => {
+      if (cancelled || !nextState) return;
+      syncFromState(nextState);
+      setRouteContext(projectService.getRouteContext());
     });
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
     };
   }, [projectId, selectedParticipantId, routeError]);
 
@@ -509,10 +532,6 @@ function SchedulyMock() {
     answersRef.current = answers;
   }, [answers]);
 
-  const touchSavedAt = () => {
-    setSavedAt(formatTimestampForDisplay(new Date().toISOString()));
-  };
-
   useEffect(() => {
     if (!detailCandidate) return undefined;
     const prev = document.body.style.overflow;
@@ -537,7 +556,7 @@ function SchedulyMock() {
   }, [currentCandidate, shouldScrollToCurrent]);
 
   const setMark = (markKey) => {
-    if (!currentCandidate || !selectedParticipantId) return;
+    if (!currentCandidate || !selectedParticipantId || !projectId) return;
     setAnswers((prev) => {
       const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
       const nextMark = prevEntry.mark === markKey ? null : markKey;
@@ -556,7 +575,6 @@ function SchedulyMock() {
       });
       return nextAnswers;
     });
-    touchSavedAt();
   };
 
 const handleCommentChange = (value) => {
@@ -574,9 +592,10 @@ const handleCommentChange = (value) => {
   };
 
 const commitComment = (value) => {
-  if (!currentCandidate || !selectedParticipantId) return;
+  if (!currentCandidate || !selectedParticipantId || !projectId) return;
   const currentEntry = answersRef.current[currentCandidate.id] || { mark: null, comment: "" };
-  const participantsResponses = projectStore.getResponses(projectId) || [];
+  const state = projectService.getState(projectId);
+  const participantsResponses = (state && state.responses) || [];
   const existing = participantsResponses.find(
     (response) => response && response.participantId === selectedParticipantId && response.candidateId === currentCandidate.id
   );
@@ -591,7 +610,6 @@ const commitComment = (value) => {
     mark: currentMark || "pending",
     comment: value
   });
-  touchSavedAt();
 };
 
   const go = (dir) => {
@@ -660,6 +678,10 @@ const commitComment = (value) => {
   const confirmRemoveParticipant = () => {
     if (!removeTarget) return;
     if (removeConfirmText.trim() !== "DELETE") return;
+    if (!projectId) {
+      showToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
     setRemoveInProgress(true);
     try {
       participantService.removeParticipant(projectId, removeTarget.id);
@@ -704,6 +726,10 @@ const commitComment = (value) => {
     if (!selectedParticipantId) return;
     if (!trimmed) {
       setRenameError("参加者名を入力してください");
+      return;
+    }
+    if (!projectId) {
+      setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       return;
     }
     setRenameInProgress(true);
@@ -1126,7 +1152,13 @@ const commitComment = (value) => {
   );
 }
 
+StatRow.displayName = "StatRow";
+Modal.displayName = "Modal";
+ParticipantList.displayName = "ParticipantList";
+SchedulyMock.displayName = "SchedulyMock";
+
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
 root.render(<SchedulyMock />);
+export default SchedulyMock;
