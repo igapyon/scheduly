@@ -284,6 +284,7 @@ function SchedulyMock() {
 
   const initialParticipantTokenRef = useRef("");
   const requestedParticipantIdRef = useRef(null);
+  const lastSelectedParticipantIdRef = useRef(initialParticipantId || null);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -319,6 +320,7 @@ function SchedulyMock() {
       setProjectId(resolved.projectId);
       setRouteContext(resolved.routeContext);
       setInitialRouteContext(resolved.routeContext);
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] bootstrap", {
         projectId: resolved.projectId,
         routeContext: resolved.routeContext,
@@ -336,6 +338,7 @@ function SchedulyMock() {
           initialParticipant = match.participantId;
         }
       }
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] initial participant resolved", {
         token,
         initialParticipant
@@ -353,13 +356,21 @@ function SchedulyMock() {
 
   useEffect(() => {
     if (!initialParticipantId || selectedParticipantId) return;
+    // Debug log: keep permanently to help trace participant handoff issues.
     console.log("[user-edit] sync initial participantId", {
       initialParticipantId,
       selectedParticipantId
     });
     requestedParticipantIdRef.current = initialParticipantId;
+    lastSelectedParticipantIdRef.current = initialParticipantId;
     setSelectedParticipantId(initialParticipantId);
   }, [initialParticipantId, selectedParticipantId]);
+
+  useEffect(() => {
+    if (selectedParticipantId) {
+      lastSelectedParticipantIdRef.current = selectedParticipantId;
+    }
+  }, [selectedParticipantId]);
 
   useEffect(() => {
     if (routeError) return;
@@ -395,10 +406,11 @@ function SchedulyMock() {
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
       const participantList = nextState.participants || [];
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
 
-      let preferredId = requestedParticipantIdRef.current;
+      let preferredId = requestedParticipantIdRef.current || lastSelectedParticipantIdRef.current;
       if (!preferredId && initialParticipantTokenRef.current) {
         const token = initialParticipantTokenRef.current;
         const matched = participantList.find((participant) => participant && participant.token === token);
@@ -418,7 +430,9 @@ function SchedulyMock() {
       if (hasPreferredParticipant && editingId !== preferredId) {
         editingId = preferredId;
         if (editingId !== selectedParticipantId) {
+          // Debug log: keep permanently to help trace participant handoff issues.
           console.log("[user-edit] switch to preferred participant", editingId);
+          lastSelectedParticipantIdRef.current = editingId;
           setSelectedParticipantId(editingId);
         }
         resetAnswers = true;
@@ -432,8 +446,10 @@ function SchedulyMock() {
         if (participantList.length) {
           editingId = participantList[0]?.id || null;
           if (editingId !== selectedParticipantId) {
-            setSelectedParticipantId(editingId);
+            // Debug log: keep permanently to help trace participant handoff issues.
             console.log("[user-edit] fallback editingId", editingId);
+            lastSelectedParticipantIdRef.current = editingId;
+            setSelectedParticipantId(editingId);
           }
           resetAnswers = true;
         } else {
@@ -441,6 +457,7 @@ function SchedulyMock() {
         }
       }
 
+      // Debug log: keep permanently to help trace participant handoff issues.
       console.log("[user-edit] editingId after check", editingId, "resetAnswers", resetAnswers);
       const candidateViews = buildCandidateViews(nextState);
       setCandidates(candidateViews);
@@ -449,6 +466,7 @@ function SchedulyMock() {
         if (editingId) {
           setAnswers(buildAnswersForParticipant(nextState, editingId));
           const participant = participantList.find((item) => item && item.id === editingId);
+          // Debug log: keep permanently to help trace participant handoff issues.
           console.log("[user-edit] answers loaded for", editingId, participant);
         } else {
           setAnswers({});

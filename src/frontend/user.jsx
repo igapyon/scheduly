@@ -127,6 +127,7 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
               ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
               : "/user-edit.html";
           const editLink = sharePath || fallbackPath;
+          // Debug log: keep permanently to help trace participant handoff issues.
           const logPayload = {
             source: "schedule-summary",
             scheduleId: schedule.id,
@@ -222,6 +223,7 @@ function ParticipantSummary({
                 <a
                   href={editHref}
                   onClick={(event) => {
+                    // Debug log: keep permanently to help trace participant handoff issues.
                     console.log("[user] navigate to answer", {
                       source: "participant-summary",
                       participantId: participant.id,
