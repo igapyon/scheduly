@@ -63,19 +63,16 @@ function formatStatusBadge(status) {
   };
 }
 
-function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, projectId, inlineEditorTarget, onToggleInlineEdit }) {
-  const [open, setOpen] = useState(Boolean(defaultOpen));
+function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInlineEdit }) {
+  const [open, setOpen] = useState(false);
   const activeInlineParticipantId =
     inlineEditorTarget && inlineEditorTarget.scheduleId === schedule.id ? inlineEditorTarget.participantId : null;
 
   useEffect(() => {
-    setOpen(Boolean(defaultOpen));
-  }, [defaultOpen]);
-  useEffect(() => {
-    if (defaultOpen) {
+    if (!open && activeInlineParticipantId) {
       setOpen(true);
     }
-  }, [defaultOpen, openTrigger]);
+  }, [activeInlineParticipantId, open]);
 
   const status = formatStatusBadge(schedule.status);
 
@@ -347,7 +344,6 @@ void InlineResponseEditor;
 
 function ParticipantSummary({
   participant,
-  defaultOpen,
   scheduleLookup,
   onRemove,
   onRename,
@@ -357,13 +353,15 @@ function ParticipantSummary({
   onToggleInlineEdit
 }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
-  const [open, setOpen] = useState(Boolean(defaultOpen));
+  const [open, setOpen] = useState(false);
   const activeInlineScheduleId =
     inlineEditorTarget && inlineEditorTarget.participantId === participant.id ? inlineEditorTarget.scheduleId : null;
 
   useEffect(() => {
-    setOpen(Boolean(defaultOpen));
-  }, [defaultOpen]);
+    if (!open && activeInlineScheduleId) {
+      setOpen(true);
+    }
+  }, [activeInlineScheduleId, open]);
 
   return (
     <details
@@ -575,7 +573,6 @@ function AdminResponsesApp() {
   const [newParticipantName, setNewParticipantName] = useState("");
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
-  const [openFirstScheduleTick, setOpenFirstScheduleTick] = useState(0);
   const [removeDialogParticipant, setRemoveDialogParticipant] = useState(null);
   const [removeConfirmText, setRemoveConfirmText] = useState("");
   const [removeInProgress, setRemoveInProgress] = useState(false);
@@ -751,7 +748,6 @@ function AdminResponsesApp() {
       setParticipantActionError("");
       setNewParticipantName("");
       setParticipantDialogOpen(false);
-      setOpenFirstScheduleTick((tick) => tick + 1);
     } catch (error) {
       setParticipantActionError(error instanceof Error ? error.message : String(error));
       setParticipantActionMessage("");
@@ -910,12 +906,10 @@ function AdminResponsesApp() {
               日程データを読み込んでいます…
             </div>
           ) : schedules.length ? (
-            schedules.map((schedule, index) => (
+            schedules.map((schedule) => (
               <ScheduleSummary
                 key={schedule.id}
                 schedule={schedule}
-                defaultOpen={index === 0}
-                openTrigger={index === 0 ? openFirstScheduleTick : 0}
                 projectId={projectId}
                 inlineEditorTarget={inlineEditorTarget}
                 onToggleInlineEdit={toggleInlineEditor}
@@ -955,16 +949,15 @@ function AdminResponsesApp() {
           )}
           <div className="space-y-3">
             {participantSummaries.length ? (
-              participantSummaries.map((participant, index) => (
+              participantSummaries.map((participant) => (
                 <ParticipantSummary
                   key={participant.id}
                   participant={participant}
-                  defaultOpen={index === 0}
-                scheduleLookup={scheduleLookup}
-                onRemove={() => openRemoveParticipantDialog(participant)}
-                onRename={() => openRenameParticipantDialog(participant)}
-                canRemove={participantSummaries.length > 1}
-                projectId={projectId}
+                  scheduleLookup={scheduleLookup}
+                  onRemove={() => openRemoveParticipantDialog(participant)}
+                  onRename={() => openRenameParticipantDialog(participant)}
+                  canRemove={participantSummaries.length > 1}
+                  projectId={projectId}
                 inlineEditorTarget={inlineEditorTarget}
                 onToggleInlineEdit={toggleInlineEditor}
               />
