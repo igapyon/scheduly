@@ -4,11 +4,11 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
-import projectStore from "./store/project-store";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import responseService from "./services/response-service";
 import shareService from "./services/share-service";
 import participantService from "./services/participant-service";
+import projectService from "./services/project-service";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
@@ -286,53 +286,45 @@ const ParticipantList = ({ list, label, color }) => (
 );
 
 function SchedulyMock() {
-  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
-  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const [projectId, setProjectId] = useState(null);
+  const [routeContext, setRouteContext] = useState(null);
+  const [initialRouteContext, setInitialRouteContext] = useState(null);
+  const [initialParticipantId, setInitialParticipantId] = useState(null);
+  const [projectState, setProjectState] = useState(null);
+
   const routeError = useMemo(() => {
-    if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
+    const ctx = routeContext || initialRouteContext;
+    if (ctx?.kind === "share-miss" && ctx.shareType === "participant") {
       return {
         title: "参加者用の共有URLが無効です",
         description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
-    if (initialRouteContext?.kind === "participant-token-miss") {
+    if (ctx?.kind === "participant-token-miss") {
       return {
         title: "回答用リンクが無効です",
         description: "このリンクは無効になっています。管理者に連絡し、最新の参加者用URLを教えてもらってください。"
       };
     }
     return null;
-  }, [initialRouteContext]);
-  const initialParticipantId = useMemo(() => {
-    const fromQuery = readParticipantIdFromLocation();
-    if (fromQuery) return fromQuery;
-    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
-      const match = projectStore.findParticipantByToken(initialRouteContext.token);
-      if (match && match.participant && match.participant.id) {
-        return match.participant.id;
-      }
-    }
-    return null;
-  }, [initialRouteContext]);
+  }, [routeContext, initialRouteContext]);
+
   const participantListUrl = useMemo(() => {
-    if (initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token) {
-      const encodedToken = encodeURIComponent(initialRouteContext.token);
-      if (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss") {
+    const ctx = routeContext || initialRouteContext;
+    if (ctx && ctx.shareType === "participant" && ctx.token) {
+      const encodedToken = encodeURIComponent(ctx.token);
+      if (ctx.kind === "share" || ctx.kind === "share-miss") {
         return `/p/${encodedToken}`;
       }
-      if (initialRouteContext.kind === "participant-token" || initialRouteContext.kind === "participant-token-miss") {
+      if (ctx.kind === "participant-token" || ctx.kind === "participant-token-miss") {
         return `/p/${encodedToken}`;
       }
     }
     return "/user.html";
-  }, [initialRouteContext]);
-  const initialParticipantTokenRef = useRef(
-    initialRouteContext && initialRouteContext.shareType === "participant" && initialRouteContext.token
-      ? String(initialRouteContext.token)
-      : ""
-  );
-  const requestedParticipantIdRef = useRef(initialParticipantId);
-  console.log("[user-edit] projectId", projectId, "initialParticipantId", initialParticipantId);
+  }, [routeContext, initialRouteContext]);
+
+  const initialParticipantTokenRef = useRef("");
+  const requestedParticipantIdRef = useRef(null);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -362,11 +354,44 @@ function SchedulyMock() {
   const pressStart = useRef({ x: 0, y: 0, moved: false });
 
   useEffect(() => {
+    let cancelled = false;
+    const bootstrap = async () => {
+      const resolved = projectService.resolveProjectFromLocation();
+      if (cancelled) return;
+      setProjectId(resolved.projectId);
+      setRouteContext(resolved.routeContext);
+      setInitialRouteContext(resolved.routeContext);
+      const token =
+        resolved.routeContext?.shareType === "participant" && resolved.routeContext.token
+          ? String(resolved.routeContext.token)
+          : "";
+      initialParticipantTokenRef.current = token;
+      let initialParticipant = readParticipantIdFromLocation();
+      if (!initialParticipant && token) {
+        const match = participantService.resolveByToken(token);
+        if (match && match.participantId) {
+          initialParticipant = match.participantId;
+        }
+      }
+      setInitialParticipantId(initialParticipant);
+      requestedParticipantIdRef.current = initialParticipant;
+      setProjectState(resolved.state || {});
+    };
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (routeError) return;
     if (typeof window === "undefined") return;
     if (!initialRouteContext || initialRouteContext.shareType !== "participant") return;
     if (initialRouteContext.kind !== "participant-token") return;
-    const shareTokens = projectStore.getShareTokens(projectId);
+    if (!projectId) return;
+    const shareTokens = shareService.get(projectId);
     const participantShareToken = shareTokens?.participant?.token;
     if (!participantShareToken || shareService.isPlaceholderToken(participantShareToken)) return;
     const participantId = requestedParticipantIdRef.current || initialParticipantId || "";
@@ -383,15 +408,17 @@ function SchedulyMock() {
     }
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
-    projectStore.resolveProjectIdFromLocation();
+    const resolved = projectService.resolveProjectFromLocation();
+    setRouteContext(resolved.routeContext);
   }, [initialRouteContext, projectId, initialParticipantId, routeError]);
 
   useEffect(() => {
-    if (routeError) return undefined;
+    if (routeError || !projectId) return undefined;
     let cancelled = false;
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
+      setProjectState(nextState);
       const participantList = nextState.participants || [];
       console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
@@ -456,7 +483,7 @@ function SchedulyMock() {
       }
     };
 
-    const initialSnapshot = projectStore.getProjectStateSnapshot(projectId);
+    const initialSnapshot = projectService.getState(projectId);
     syncFromState(initialSnapshot, { resetAnswers: true });
 
     setLoading(true);
@@ -464,7 +491,7 @@ function SchedulyMock() {
       .then(() => {
         if (cancelled) return;
         setLoadError("");
-        const snapshot = projectStore.getProjectStateSnapshot(projectId);
+        const snapshot = projectService.getState(projectId);
         syncFromState(snapshot, { resetAnswers: true });
       })
       .catch((error) => {
@@ -475,13 +502,17 @@ function SchedulyMock() {
         if (!cancelled) setLoading(false);
       });
 
-    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
-      if (!cancelled) syncFromState(nextState);
+    const unsubscribe = projectService.subscribe(projectId, (nextState) => {
+      if (cancelled || !nextState) return;
+      syncFromState(nextState);
+      setRouteContext(projectService.getRouteContext());
     });
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
     };
   }, [projectId, selectedParticipantId, routeError]);
 
@@ -537,7 +568,7 @@ function SchedulyMock() {
   }, [currentCandidate, shouldScrollToCurrent]);
 
   const setMark = (markKey) => {
-    if (!currentCandidate || !selectedParticipantId) return;
+    if (!currentCandidate || !selectedParticipantId || !projectId) return;
     setAnswers((prev) => {
       const prevEntry = prev[currentCandidate.id] || { mark: null, comment: "" };
       const nextMark = prevEntry.mark === markKey ? null : markKey;
@@ -574,9 +605,10 @@ const handleCommentChange = (value) => {
   };
 
 const commitComment = (value) => {
-  if (!currentCandidate || !selectedParticipantId) return;
+  if (!currentCandidate || !selectedParticipantId || !projectId) return;
   const currentEntry = answersRef.current[currentCandidate.id] || { mark: null, comment: "" };
-  const participantsResponses = projectStore.getResponses(projectId) || [];
+  const state = projectService.getState(projectId);
+  const participantsResponses = (state && state.responses) || [];
   const existing = participantsResponses.find(
     (response) => response && response.participantId === selectedParticipantId && response.candidateId === currentCandidate.id
   );
@@ -660,6 +692,10 @@ const commitComment = (value) => {
   const confirmRemoveParticipant = () => {
     if (!removeTarget) return;
     if (removeConfirmText.trim() !== "DELETE") return;
+    if (!projectId) {
+      showToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
     setRemoveInProgress(true);
     try {
       participantService.removeParticipant(projectId, removeTarget.id);
@@ -704,6 +740,10 @@ const commitComment = (value) => {
     if (!selectedParticipantId) return;
     if (!trimmed) {
       setRenameError("参加者名を入力してください");
+      return;
+    }
+    if (!projectId) {
+      setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       return;
     }
     setRenameInProgress(true);

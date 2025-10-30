@@ -101,6 +101,11 @@ const importState = (projectId, payload) => {
   return projectStore.importProjectState(projectId, payload);
 };
 
+const reset = (projectId) => {
+  if (!projectId) throw new Error("projectId is required");
+  return projectStore.resetProject(projectId);
+};
+
 const subscribe = (projectId, callback) => {
   if (!projectId || typeof callback !== "function") return () => {};
   return projectStore.subscribeProjectState(projectId, callback);
@@ -124,6 +129,7 @@ module.exports = {
   updateMeta,
   exportState,
   importState,
+  reset,
   subscribe,
   resolveProjectFromLocation,
   getRouteContext,
