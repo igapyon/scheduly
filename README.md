@@ -24,7 +24,7 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
-| React / webpack 版 | 本番想定のアプリ実装（共有トークンで `/a/{token}` / `/p/{token}` / `/r/{token}` へリダイレクト） | `src/frontend/` | `npm run dev` / `npm run build` |
+| React / webpack 版 | 本番想定のアプリ実装（共有トークンで `/a/{token}` / `/p/{token}` へリダイレクト。`/r/{token}` は後方互換で `/p/{token}` に転送） | `src/frontend/` | `npm run dev` / `npm run build` |
 | レガシーモック | 最新アプリ UI のスナップショット確認用静的コンテンツ | `public/legacy/` | ブラウザで直接開くだけ |
 
 どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
@@ -37,13 +37,12 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 ## React / webpack 版（`src/frontend/`）
 
 - `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者向けアプリ。候補編集・ICS 入出力・プロジェクト JSON 入出力を備え、`public/index.html` から共有トークン発行後は `/a/{token}` へリダイレクトされます。
-- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者回答一覧。日程別／参加者別タブやサマリー表示があり、`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。
-- `user-edit.jsx`（ビルド後は `userEdit.bundle.js`）: 参加者自身の回答編集 UI。○△× 選択やコメント入力を備え、`public/user-edit.html` から共有トークン利用時は `/r/{token}` へ遷移します。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者の回答閲覧・編集を一画面で提供する UI。日程別／参加者別タブのほか、カード内で直接 ○△× とコメントを更新できます。`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
-    - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く
+    - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者 UI）を必要に応じて開く
      - Console の警告・エラーを節目ごとに確認
     - **Lint**: コード変更後は `npm run lint` をこまめに実行し、スタイルガイドと静的解析の結果を即時に確認する
   3. 本番ビルド: `npm run build`
@@ -68,7 +67,7 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 - React 18（UMD 版）・Tailwind CDN・Babel Standalone による静的モック。ビルドやサーバーなしでブラウザから直接開けますが、**動作は「見栄え再現」が主目的**であり、React 版と同等の機能は搭載していません。
 - 主なファイル
   - `scheduly-user-mock.html`: 参加者回答一覧ビュー（タブ切り替え含む）のワイヤーフレーム。表示のみで実データ連携は行いません。
-  - `scheduly-user-edit-mock.html`: 個別参加者の回答編集画面を再現したモック。○△× の選択やサマリーは見た目確認のみで、操作は反映されません。
+- `scheduly-user-edit-mock.html`: 旧・個別回答編集画面のスナップショット。現行アプリではカード内インライン編集へ移行済みのため、参考用途のみで利用してください。
 - 使い方
   1. 対象の HTML をブラウザで直接開く
   2. レイアウトやスタイル差分を確認する（挙動は React 版を参照）

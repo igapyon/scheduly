@@ -162,9 +162,9 @@ DELETE /projects/:projectId/share-links/:type   // type = admin | participant
 
 ## 12. Routing Notes
 
-- `npm run dev` 時は webpack-dev-server の `historyApiFallback` で `/a/*` → `index.html`、`/p/*` → `user.html`、`/r/*` → `user-edit.html` へリライトする。
-- 本番静的ホスティングでも同様のリダイレクト設定を行い、トークン付きパスを 404 にしない（例: Netlify `_redirects`、Firebase rewrites）。
-- クライアント側では `projectStore.resolveProjectIdFromLocation()` が `/a/{adminToken}` / `/p/{participantToken}` / `/r/{participantToken}` を解析し、対応するプロジェクトをロードする。
+- `npm run dev` 時は webpack-dev-server の `historyApiFallback` で `/a/*` → `index.html`、`/p/*` → `user.html`、`/r/*` → `user.html` へリライトする（`/r` は後方互換用）。
+- 本番静的ホスティングでも同様のリダイレクト設定を行い、トークン付きパスを 404 にしない（例: Netlify `_redirects`、Firebase rewrites）。`/r/*` は互換目的で `/p/*` と同じ画面に飛ばす。
+- クライアント側では `projectStore.resolveProjectIdFromLocation()` が `/a/{adminToken}` / `/p/{participantToken}` / `/r/{participantToken}` を解析し、対応するプロジェクトをロードする（`/r` は参加者 UI へフォールバック）。
 
 ---
 
