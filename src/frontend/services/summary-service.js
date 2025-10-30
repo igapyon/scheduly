@@ -159,13 +159,24 @@ const participantViewFromState = (state) => {
     const responsesForParticipant = candidates.map((candidate) => {
       const response = candidateMap.get(candidate.id);
       const mark = normalizeMark(response?.mark);
-      const hasComment = typeof response?.comment === "string" && response.comment.trim().length > 0;
+      const rawComment = typeof response?.comment === "string" ? response.comment : "";
+      const trimmedComment = rawComment.trim();
+      const hasComment = trimmedComment.length > 0;
       return {
         scheduleId: candidate.id,
         datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
         mark,
         hasComment,
-        comment: hasComment ? `コメント: ${response.comment.trim()}` : "コメント: 入力なし"
+        comment: hasComment ? `コメント: ${trimmedComment}` : "コメント: 入力なし",
+        commentRaw: rawComment,
+        dtstart: candidate.dtstart,
+        dtend: candidate.dtend,
+        tzid: candidate.tzid || DEFAULT_TZID,
+        summary: candidate.summary || candidate.label || "タイトル未設定",
+        location: candidate.location || "",
+        description: candidate.description || "",
+        status: candidate.status || "TENTATIVE",
+        updatedAt: response?.updatedAt || ""
       };
     });
     const commentCount = responsesForParticipant.reduce((acc, item) => (item.hasComment ? acc + 1 : acc), 0);

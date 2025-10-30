@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -9,6 +9,7 @@ import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import summaryService from "./services/summary-service";
+import responseService from "./services/response-service";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
@@ -183,6 +184,153 @@ function participantTotals(participant) {
   );
 }
 
+function InlineResponseEditor({
+  projectId,
+  participantId,
+  schedule,
+  initialMark,
+  initialComment,
+  fallbackHref = "",
+  onClose
+}) {
+  const [currentMark, setCurrentMark] = useState(initialMark && initialMark !== "pending" ? initialMark : null);
+  const [currentComment, setCurrentComment] = useState(initialComment || "");
+  const [statusMessage, setStatusMessage] = useState("");
+  const statusTimerRef = useRef(null);
+
+  useEffect(() => {
+    setCurrentMark(initialMark && initialMark !== "pending" ? initialMark : null);
+  }, [initialMark]);
+
+  useEffect(() => {
+    setCurrentComment(initialComment || "");
+  }, [initialComment]);
+
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current) {
+        window.clearTimeout(statusTimerRef.current);
+        statusTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const commitUpdate = (nextMark, nextComment) => {
+    if (!projectId || !participantId || !schedule?.id) return;
+    try {
+      responseService.upsertResponse(projectId, {
+        participantId,
+        candidateId: schedule.id,
+        mark: nextMark || "pending",
+        comment: nextComment || ""
+      });
+      if (statusTimerRef.current) {
+        window.clearTimeout(statusTimerRef.current);
+      }
+      setStatusMessage("保存しました");
+      statusTimerRef.current = window.setTimeout(() => {
+        setStatusMessage("");
+        statusTimerRef.current = null;
+      }, 1800);
+    } catch (error) {
+      console.error("[user] inline response update failed", error);
+      if (statusTimerRef.current) {
+        window.clearTimeout(statusTimerRef.current);
+        statusTimerRef.current = null;
+      }
+      setStatusMessage("保存に失敗しました");
+    }
+  };
+
+  const handleSelectMark = (markKey) => {
+    setCurrentMark((prev) => {
+      const next = prev === markKey ? null : markKey;
+      commitUpdate(next, currentComment);
+      return next;
+    });
+  };
+
+  const handleCommentChange = (value) => {
+    setCurrentComment(value);
+  };
+
+  const handleCommentBlur = (value) => {
+    commitUpdate(currentMark, value);
+  };
+
+  const markButtonClass = (markKey, pressed) => {
+    if (markKey === "o") {
+      return pressed ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 text-emerald-700 border-emerald-300";
+    }
+    if (markKey === "d") {
+      return pressed ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-300";
+    }
+    return pressed ? "bg-rose-500 text-white border-rose-500" : "bg-rose-50 text-rose-700 border-rose-300";
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-zinc-700">
+      <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-700">
+        <span>この日程の回答を編集</span>
+        {onClose && (
+          <button
+            type="button"
+            className="rounded-lg border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100/60"
+            onClick={onClose}
+          >
+            閉じる
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {["o", "d", "x"].map((markKey) => {
+          const pressed = currentMark === markKey;
+          return (
+            <button
+              key={markKey}
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => handleSelectMark(markKey)}
+              className={`h-12 rounded-xl border text-xl font-bold transition-colors ${markButtonClass(markKey, pressed)}`}
+            >
+              {markKey === "o" ? "○" : markKey === "d" ? "△" : "×"}
+            </button>
+          );
+        })}
+      </div>
+
+      <label className="mt-3 block text-[11px] text-zinc-600">
+        コメント（任意）
+        <textarea
+          className="mt-1 w-full resize-y rounded-xl border border-zinc-200 px-3 py-2 text-sm leading-relaxed focus:border-emerald-400 focus:outline-none focus:ring focus:ring-emerald-100"
+          rows={3}
+          placeholder="この日程について共有したいことがあれば入力してください…"
+          value={currentComment}
+          onChange={(event) => handleCommentChange(event.target.value)}
+          onBlur={(event) => handleCommentBlur(event.target.value)}
+        />
+      </label>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-emerald-700">
+        <span>{statusMessage || "入力内容は自動保存されます"}</span>
+        {fallbackHref ? (
+          <a
+            className="rounded-lg border border-transparent px-2 py-1 text-[10px] font-semibold text-emerald-700 underline decoration-emerald-400"
+            href={fallbackHref}
+            target="_blank"
+            rel="noreferrer"
+          >
+            別画面で回答
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+void InlineResponseEditor;
+
 function ParticipantSummary({
   participant,
   defaultOpen,
@@ -190,10 +338,23 @@ function ParticipantSummary({
   onRemove,
   onRename,
   canRemove = true,
-  participantShareToken = ""
+  participantShareToken = "",
+  projectId,
+  inlineEditorTarget,
+  onToggleInlineEdit
 }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(Boolean(defaultOpen));
+  const activeInlineScheduleId =
+    inlineEditorTarget && inlineEditorTarget.participantId === participant.id ? inlineEditorTarget.scheduleId : null;
+  const participantShareHref =
+    participantShareToken && participant.id
+      ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
+      : "";
+  const fallbackHref = participant.token
+    ? `/r/${encodeURIComponent(participant.token)}`
+    : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`;
+  const externalEditHref = participantShareHref || fallbackHref;
 
   useEffect(() => {
     setOpen(Boolean(defaultOpen));
@@ -210,38 +371,26 @@ function ParticipantSummary({
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
-            {(() => {
-              const participantShareHref =
-                participantShareToken && participant.id
-                  ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
-                  : null;
-              const fallbackHref = participant.token
-                ? `/r/${encodeURIComponent(participant.token)}`
-                : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`;
-              const editHref = participantShareHref || fallbackHref;
-              return (
-                <a
-                  href={editHref}
-                  onClick={(event) => {
-                    // Debug log: keep permanently to help trace participant handoff issues.
-                    console.log("[user] navigate to answer", {
-                      source: "participant-summary",
-                      participantId: participant.id,
-                      participantToken: participant.token,
-                      shareToken: participantShareToken,
-                      href: editHref,
-                      shiftKey: event.shiftKey,
-                      metaKey: event.metaKey,
-                      ctrlKey: event.ctrlKey
-                    });
-                    event.stopPropagation();
-                  }}
-                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                >
-                  <span aria-hidden="true" className="mr-1">📝</span>回答
-                </a>
-              );
-            })()}
+            <a
+              href={externalEditHref}
+              onClick={(event) => {
+                // Debug log: keep permanently to help trace participant handoff issues.
+                console.log("[user] navigate to answer", {
+                  source: "participant-summary",
+                  participantId: participant.id,
+                  participantToken: participant.token,
+                  shareToken: participantShareToken,
+                  href: externalEditHref,
+                  shiftKey: event.shiftKey,
+                  metaKey: event.metaKey,
+                  ctrlKey: event.ctrlKey
+                });
+                event.stopPropagation();
+              }}
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+            >
+              <span aria-hidden="true" className="mr-1">📝</span>別画面で回答
+            </a>
             {onRename && (
               <button
                 type="button"
@@ -293,12 +442,13 @@ function ParticipantSummary({
           const location = schedule?.location;
           const description = schedule?.description;
           const timezone = schedule?.tzid;
+          const isEditing = activeInlineScheduleId === response.scheduleId;
 
           return (
             <li
               key={`${participant.id}-${response.scheduleId}`}
               className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
-                response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
+                isEditing ? "border-emerald-300 bg-emerald-50/40" : response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
               }`}
             >
               <div className="flex-1 space-y-1">
@@ -316,13 +466,45 @@ function ParticipantSummary({
                   statusText={null}
                   statusPrefix=""
                 />
-                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+                {isEditing ? (
+                  <InlineResponseEditor
+                    projectId={projectId}
+                    participantId={participant.id}
+                    schedule={schedule ? { id: schedule.id } : { id: response.scheduleId }}
+                    initialMark={response.mark}
+                    initialComment={response.commentRaw || ""}
+                    fallbackHref={externalEditHref}
+                    onClose={() => onToggleInlineEdit?.(participant.id, response.scheduleId)}
+                  />
+                ) : (
+                  <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+                )}
               </div>
-              <span
-                className={`${markBadgeClass(response.mark)} h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
-              >
-                {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
-              </span>
+              <div className="flex flex-col items-end gap-2">
+                <span
+                  className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+                >
+                  {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+                </span>
+                <button
+                  type="button"
+                  className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
+                    isEditing
+                      ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
+                      : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700"
+                  }`}
+                  onClick={() => {
+                    console.log("[user] inline answer toggle", {
+                      participantId: participant.id,
+                      scheduleId: response.scheduleId,
+                      editing: !isEditing
+                    });
+                    onToggleInlineEdit?.(participant.id, response.scheduleId);
+                  }}
+                >
+                  {isEditing ? "閉じる" : "回答"}
+                </button>
+              </div>
             </li>
           );
         })}
@@ -417,6 +599,7 @@ function AdminResponsesApp() {
   const [renameName, setRenameName] = useState("");
   const [renameInProgress, setRenameInProgress] = useState(false);
   const [renameError, setRenameError] = useState("");
+  const [inlineEditorTarget, setInlineEditorTarget] = useState(null);
 
   const participantShareToken = useMemo(() => {
     if (routeError) return "";
@@ -506,6 +689,43 @@ function AdminResponsesApp() {
     schedules.forEach((schedule) => map.set(schedule.id, schedule));
     return map;
   }, [schedules]);
+
+  const toggleInlineEditor = (participantId, scheduleId) => {
+    if (!participantId || !scheduleId) {
+      setInlineEditorTarget(null);
+      return;
+    }
+    setInlineEditorTarget((prev) => {
+      if (prev && prev.participantId === participantId && prev.scheduleId === scheduleId) {
+        return null;
+      }
+      return { participantId, scheduleId };
+    });
+  };
+
+  useEffect(() => {
+    if (!inlineEditorTarget) return;
+    const participantExists = participantSummaries.some((participant) => participant.id === inlineEditorTarget.participantId);
+    if (!participantExists) {
+      setInlineEditorTarget(null);
+      return;
+    }
+    const participant = participantSummaries.find((item) => item.id === inlineEditorTarget.participantId);
+    if (!participant) {
+      setInlineEditorTarget(null);
+      return;
+    }
+    const scheduleExists = participant.responses.some((response) => response.scheduleId === inlineEditorTarget.scheduleId);
+    if (!scheduleExists) {
+      setInlineEditorTarget(null);
+    }
+  }, [inlineEditorTarget, participantSummaries]);
+
+  useEffect(() => {
+    if (activeTab !== "participant" && inlineEditorTarget) {
+      setInlineEditorTarget(null);
+    }
+  }, [activeTab, inlineEditorTarget]);
 
   const handleDownloadAllIcs = () => {
     if (!projectId) {
@@ -752,21 +972,24 @@ function AdminResponsesApp() {
               {participantActionError || participantActionMessage}
             </div>
           )}
-              <div className="space-y-3">
-                {participantSummaries.length ? (
-                  participantSummaries.map((participant, index) => (
-                    <ParticipantSummary
-                      key={participant.id}
-                      participant={participant}
-                      defaultOpen={index === 0}
-                      scheduleLookup={scheduleLookup}
-                      onRemove={() => openRemoveParticipantDialog(participant)}
-                      onRename={() => openRenameParticipantDialog(participant)}
-                      canRemove={participantSummaries.length > 1}
-                      participantShareToken={participantShareToken}
-                    />
-                  ))
-                ) : (
+          <div className="space-y-3">
+            {participantSummaries.length ? (
+              participantSummaries.map((participant, index) => (
+                <ParticipantSummary
+                  key={participant.id}
+                  participant={participant}
+                  defaultOpen={index === 0}
+                  scheduleLookup={scheduleLookup}
+                  onRemove={() => openRemoveParticipantDialog(participant)}
+                  onRename={() => openRenameParticipantDialog(participant)}
+                  canRemove={participantSummaries.length > 1}
+                  participantShareToken={participantShareToken}
+                  projectId={projectId}
+                  inlineEditorTarget={inlineEditorTarget}
+                  onToggleInlineEdit={toggleInlineEditor}
+                />
+              ))
+            ) : (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
                 表示できる参加者がありません。
               </div>
