@@ -135,6 +135,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 **Testing**
 
+必要に応じて都度 lint でチェックすること。
+
 ```
 - `npm run lint`
 ```
