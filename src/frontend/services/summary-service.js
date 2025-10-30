@@ -87,14 +87,17 @@ const scheduleViewFromState = (state, tallies) => {
       const mark = normalizeMark(response.mark);
       const participantEntry = participantLookup.get(response.participantId);
       const participant = participantEntry?.participant;
-      const hasComment = typeof response.comment === "string" && response.comment.trim().length > 0;
+      const rawComment = typeof response.comment === "string" ? response.comment : "";
+      const trimmedComment = rawComment.trim();
+      const hasComment = trimmedComment.length > 0;
       detailed.push({
         participantId: response.participantId,
         participantToken: participant?.token ? String(participant.token) : "",
         name: participant?.displayName || "参加者",
         order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
         mark,
-        comment: hasComment ? `コメント: ${response.comment.trim()}` : "コメント: 入力なし",
+        comment: hasComment ? `コメント: ${trimmedComment}` : "コメント: 入力なし",
+        commentRaw: rawComment,
         hasComment,
         updatedAt: response.updatedAt || ""
       });
@@ -110,6 +113,7 @@ const scheduleViewFromState = (state, tallies) => {
         order: index,
         mark: "pending",
         comment: "コメント: 入力なし",
+        commentRaw: "",
         hasComment: false,
         updatedAt: ""
       });

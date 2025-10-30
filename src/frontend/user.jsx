@@ -63,8 +63,18 @@ function formatStatusBadge(status) {
   };
 }
 
-function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, participantShareToken = "" }) {
+function ScheduleSummary({
+  schedule,
+  defaultOpen = false,
+  openTrigger = 0,
+  participantShareToken = "",
+  projectId,
+  inlineEditorTarget,
+  onToggleInlineEdit
+}) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
+  const activeInlineParticipantId =
+    inlineEditorTarget && inlineEditorTarget.scheduleId === schedule.id ? inlineEditorTarget.participantId : null;
 
   useEffect(() => {
     setOpen(Boolean(defaultOpen));
@@ -128,6 +138,10 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
               ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
               : "/user-edit.html";
           const editLink = sharePath || fallbackPath;
+          const isEditing = Boolean(
+            activeInlineParticipantId && response.participantId && activeInlineParticipantId === response.participantId
+          );
+          const canInlineEdit = Boolean(projectId && response.participantId);
           // Debug log: keep permanently to help trace participant handoff issues.
           const logPayload = {
             source: "schedule-summary",
@@ -140,28 +154,73 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
           return (
             <li
               key={response.participantId || `${schedule.id}-resp-${index}`}
-              className="flex items-start justify-between rounded-lg bg-white px-3 py-2 shadow-sm"
+              className={`rounded-lg bg-white px-3 py-2 shadow-sm ${
+                isEditing ? "border border-emerald-300 bg-emerald-50/50" : "border border-transparent"
+              }`}
             >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-semibold text-zinc-800">{response.name}</div>
-                  <a
-                    href={editLink}
-                    onClick={(event) => {
-                      console.log("[user] navigate to answer", { ...logPayload, eventType: "click", shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey });
-                    }}
-                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                  >
-                    <span aria-hidden="true" className="mr-1">📝</span>回答
-                  </a>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-semibold text-zinc-800">{response.name}</div>
+                    <a
+                      href={editLink}
+                      onClick={(event) => {
+                        console.log("[user] navigate to answer", {
+                          ...logPayload,
+                          eventType: "click",
+                          shiftKey: event.shiftKey,
+                          metaKey: event.metaKey,
+                          ctrlKey: event.ctrlKey
+                        });
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                    >
+                      <span aria-hidden="true" className="mr-1">📝</span>別画面で回答
+                    </a>
+                  </div>
+                  {isEditing ? (
+                    <InlineResponseEditor
+                      projectId={projectId}
+                      participantId={response.participantId}
+                      schedule={{ id: schedule.id }}
+                      initialMark={response.mark}
+                      initialComment={response.commentRaw || ""}
+                      fallbackHref={editLink}
+                      onClose={() => onToggleInlineEdit?.(response.participantId, schedule.id)}
+                    />
+                  ) : (
+                    <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
+                      {response.comment}
+                    </div>
+                  )}
                 </div>
-                <div className={`text-xs ${response.mark === "pending" ? "text-zinc-400" : "text-zinc-500"}`}>
-                  {response.comment}
+                <div className="flex items-center justify-end gap-2">
+                  <span className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}>
+                    {MARK_SYMBOL[response.mark] ?? "？"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!canInlineEdit}
+                    onClick={() => {
+                      if (!canInlineEdit) return;
+                      console.log("[user] inline answer toggle", {
+                        source: "schedule-summary",
+                        participantId: response.participantId,
+                        scheduleId: schedule.id,
+                        editing: !isEditing
+                      });
+                      onToggleInlineEdit?.(response.participantId, schedule.id);
+                    }}
+                    className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
+                      isEditing
+                        ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
+                        : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    }`}
+                  >
+                    {isEditing ? "閉じる" : "回答"}
+                  </button>
                 </div>
               </div>
-              <span className={`${markBadgeClass(response.mark)} h-6 w-6 text-xs font-semibold`}>
-                {MARK_SYMBOL[response.mark] ?? "？"}
-              </span>
             </li>
           );
         })}
@@ -705,27 +764,22 @@ function AdminResponsesApp() {
 
   useEffect(() => {
     if (!inlineEditorTarget) return;
-    const participantExists = participantSummaries.some((participant) => participant.id === inlineEditorTarget.participantId);
-    if (!participantExists) {
-      setInlineEditorTarget(null);
-      return;
-    }
-    const participant = participantSummaries.find((item) => item.id === inlineEditorTarget.participantId);
-    if (!participant) {
-      setInlineEditorTarget(null);
-      return;
-    }
-    const scheduleExists = participant.responses.some((response) => response.scheduleId === inlineEditorTarget.scheduleId);
-    if (!scheduleExists) {
+    const participantExists = participantSummaries.some(
+      (participant) => participant.id === inlineEditorTarget.participantId
+    );
+    const scheduleExists = schedules.some(
+      (schedule) =>
+        schedule.id === inlineEditorTarget.scheduleId &&
+        schedule.responses.some((response) => response.participantId === inlineEditorTarget.participantId)
+    );
+    if (!participantExists && !scheduleExists) {
       setInlineEditorTarget(null);
     }
-  }, [inlineEditorTarget, participantSummaries]);
+  }, [inlineEditorTarget, participantSummaries, schedules]);
 
   useEffect(() => {
-    if (activeTab !== "participant" && inlineEditorTarget) {
-      setInlineEditorTarget(null);
-    }
-  }, [activeTab, inlineEditorTarget]);
+    setInlineEditorTarget(null);
+  }, [activeTab]);
 
   const handleDownloadAllIcs = () => {
     if (!projectId) {
@@ -938,6 +992,9 @@ function AdminResponsesApp() {
                 defaultOpen={index === 0}
                 openTrigger={index === 0 ? openFirstScheduleTick : 0}
                 participantShareToken={participantShareToken}
+                projectId={projectId}
+                inlineEditorTarget={inlineEditorTarget}
+                onToggleInlineEdit={toggleInlineEditor}
               />
             ))
           ) : (
