@@ -4,14 +4,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
-import projectStore from "./store/project-store";
+import projectService from "./services/project-service";
 import scheduleService from "./services/schedule-service";
 import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
+import summaryService from "./services/summary-service";
+import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
-import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
@@ -56,154 +57,6 @@ function formatStatusBadge(status) {
     className: `inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold ${info.badgeClass}`
   };
 }
-
-const normalizeMark = (mark) => {
-  const value = typeof mark === "string" ? mark.trim().toLowerCase() : "";
-  if (value === "o" || value === "d" || value === "x") return value;
-  return "pending";
-};
-
-const createScheduleSummaries = (candidates, participants, responses) => {
-  const participantMap = new Map((participants || []).map((participant, index) => [participant.id, { participant, index }]));
-  const responseMap = new Map();
-  (responses || []).forEach((response) => {
-    if (!response || !response.candidateId) return;
-    const list = responseMap.get(response.candidateId) || [];
-    list.push(response);
-    responseMap.set(response.candidateId, list);
-  });
-
-  const summaries = (candidates || []).map((candidate) => {
-    const rangeLabel = formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
-    const counts = { o: 0, d: 0, x: 0, pending: 0 };
-    const detailed = [];
-    const respondedIds = new Set();
-
-    const candidateResponses = responseMap.get(candidate.id) || [];
-    candidateResponses.forEach((response) => {
-      const mark = normalizeMark(response.mark);
-      if (counts[mark] !== undefined) counts[mark] += 1;
-      else counts.pending += 1;
-      const participantEntry = participantMap.get(response.participantId);
-      const participant = participantEntry?.participant;
-      const hasComment = typeof response.comment === "string" && response.comment.trim().length > 0;
-      const commentText = hasComment ? response.comment.trim() : "";
-      const participantToken = participant?.token ? String(participant.token) : "";
-      detailed.push({
-        participantId: response.participantId,
-        participantToken,
-        name: participant?.displayName || "参加者",
-        order: participantEntry?.index ?? Number.MAX_SAFE_INTEGER,
-        mark,
-        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし",
-        hasComment
-      });
-      respondedIds.add(response.participantId);
-    });
-
-    (participants || []).forEach((participant, index) => {
-      if (!participant || respondedIds.has(participant.id)) return;
-      counts.pending += 1;
-      const participantToken = participant?.token ? String(participant.token) : "";
-      detailed.push({
-        participantId: participant.id,
-        participantToken,
-        name: participant.displayName || "参加者",
-        order: index,
-        mark: "pending",
-        comment: "コメント: 入力なし",
-        hasComment: false
-      });
-    });
-
-    detailed.sort((a, b) => a.order - b.order);
-
-    return {
-      id: candidate.id,
-      uid: candidate.uid,
-      label: candidate.summary || "タイトル未設定",
-      summary: candidate.summary || "タイトル未設定",
-      rangeLabel,
-      dtstart: candidate.dtstart,
-      dtend: candidate.dtend,
-      location: candidate.location || "",
-      description: candidate.description || "",
-      status: candidate.status || "TENTATIVE",
-      tzid: candidate.tzid || DEFAULT_TZID,
-      counts,
-      responses: detailed
-    };
-  });
-
-  summaries.sort((a, b) => {
-    const aTime = a.dtstart ? new Date(a.dtstart).getTime() : Number.POSITIVE_INFINITY;
-    const bTime = b.dtstart ? new Date(b.dtstart).getTime() : Number.POSITIVE_INFINITY;
-    if (aTime === bTime) {
-      return (a.label || "").localeCompare(b.label || "", "ja");
-    }
-    return aTime - bTime;
-  });
-
-  return summaries;
-};
-
-const formatTimestampForDisplay = (isoString) => {
-  if (!isoString) return "—";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).format(date);
-};
-
-const createParticipantSummaries = (participants, candidates, responses) => {
-  const candidateLookup = new Map((candidates || []).map((candidate) => [candidate.id, candidate]));
-  const responseLookup = new Map();
-  (responses || []).forEach((response) => {
-    if (!response || !response.participantId || !response.candidateId) return;
-    let map = responseLookup.get(response.participantId);
-    if (!map) {
-      map = new Map();
-      responseLookup.set(response.participantId, map);
-    }
-    map.set(response.candidateId, response);
-  });
-
-  return (participants || []).map((participant) => {
-    const candidateMap = responseLookup.get(participant.id) || new Map();
-    const responsesForParticipant = (candidates || []).map((candidate) => {
-      const found = candidateMap.get(candidate.id);
-      const mark = normalizeMark(found?.mark);
-      const hasComment = typeof found?.comment === "string" && found.comment.trim().length > 0;
-      const commentText = hasComment ? found.comment.trim() : "";
-      return {
-        scheduleId: candidate.id,
-        datetime: formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID),
-        mark,
-        hasComment,
-        comment: hasComment ? `コメント: ${commentText}` : "コメント: 入力なし"
-      };
-    });
-
-    const commentCount = responsesForParticipant.reduce((acc, item) => (item.hasComment ? acc + 1 : acc), 0);
-    const commentHighlights =
-      commentCount > 0 ? [`(${commentCount}件のコメントあり)`] : ["(コメントなし)"];
-
-    return {
-      id: participant.id,
-      token: typeof participant.token === "string" ? participant.token : "",
-      name: participant.displayName || "参加者",
-      lastUpdated: formatTimestampForDisplay(participant.updatedAt),
-      commentHighlights: Array.from(new Set(commentHighlights)),
-      responses: responsesForParticipant
-    };
-  });
-};
 
 function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, participantShareToken = "" }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
@@ -493,8 +346,9 @@ const downloadIcsFile = (filename, contents) => {
 };
 
 function AdminResponsesApp() {
-  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
-  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
+  const [projectId, setProjectId] = useState(null);
+  const [initialRouteContext, setInitialRouteContext] = useState(null);
+  const [routeContext, setRouteContext] = useState(null);
   const routeError = useMemo(() => {
     if (initialRouteContext?.kind === "share-miss" && initialRouteContext.shareType === "participant") {
       return {
@@ -511,7 +365,9 @@ function AdminResponsesApp() {
     return null;
   }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
-  const [projectState, setProjectState] = useState(() => projectStore.getProjectStateSnapshot(projectId));
+  const [projectState, setProjectState] = useState(null);
+  const [schedules, setSchedules] = useState([]);
+  const [participantSummaries, setParticipantSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
@@ -555,46 +411,59 @@ function AdminResponsesApp() {
     if (currentUrl.pathname === desiredPath) return;
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
-    projectStore.resolveProjectIdFromLocation();
+    const resolved = projectService.resolveProjectFromLocation();
+    setRouteContext(resolved.routeContext);
   }, [initialRouteContext, participantShareToken, routeError]);
 
   useEffect(() => {
-    if (routeError) return;
     let cancelled = false;
-    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
-      if (!cancelled && nextState) {
-        setProjectState(nextState);
-      }
-    });
+    let unsubscribe = null;
 
-    ensureDemoProjectData(projectId)
-      .then(() => {
-        if (!cancelled) setLoadError("");
-      })
-      .catch((error) => {
+    const bootstrap = async () => {
+      const resolved = projectService.resolveProjectFromLocation();
+      if (cancelled) return;
+      setProjectId(resolved.projectId);
+      setInitialRouteContext(resolved.routeContext);
+      setRouteContext(resolved.routeContext);
+      setProjectState(resolved.state);
+      setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
+      setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
+      try {
+        await ensureDemoProjectData(resolved.projectId);
+        if (!cancelled) {
+          setLoadError("");
+        }
+      } catch (error) {
         console.warn("[Scheduly] failed to seed demo data", error);
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
 
-    setProjectState(projectStore.getProjectStateSnapshot(projectId));
+      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+        if (cancelled || !nextState) return;
+        setProjectState(nextState);
+        setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
+        setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
+        setRouteContext(projectService.getRouteContext());
+      });
+    };
+
+    bootstrap();
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
     };
-  }, [projectId, routeError]);
+  }, [routeError]);
 
-  const candidates = projectState.candidates || [];
-  const participants = projectState.participants || [];
-  const responses = projectState.responses || [];
-
-  const schedules = useMemo(
-    () => createScheduleSummaries(candidates, participants, responses),
-    [candidates, participants, responses]
-  );
+  const participants = projectState?.participants || [];
 
   const scheduleLookup = useMemo(() => {
     const map = new Map();
@@ -602,13 +471,11 @@ function AdminResponsesApp() {
     return map;
   }, [schedules]);
 
-  const participantSummaries = useMemo(
-    () => createParticipantSummaries(participants, candidates, responses),
-    [participants, candidates, responses]
-  );
-
   const handleDownloadAllIcs = () => {
-    let icsText = projectState.icsText || "";
+    if (!projectId) {
+      return;
+    }
+    let icsText = projectState?.icsText || "";
     if (!icsText) {
       try {
         icsText = scheduleService.exportAllCandidatesToIcs(projectId);
@@ -625,16 +492,21 @@ function AdminResponsesApp() {
     downloadIcsFile(filename, icsText);
   };
 
-  const hasIcsData = Boolean((projectState.icsText && projectState.icsText.trim()) || schedules.length);
+  const hasIcsData = Boolean((projectState?.icsText && projectState.icsText.trim()) || schedules.length);
   const participantCount = participants.length;
 
-  const projectName = projectState.project?.name || DASHBOARD_META.projectName;
-  const projectDescription = projectState.project?.description || DASHBOARD_META.description;
+  const projectName = projectState?.project?.name || DASHBOARD_META.projectName;
+  const projectDescription = projectState?.project?.description || DASHBOARD_META.description;
 
   const handleAddParticipant = () => {
     const trimmed = newParticipantName.trim();
     if (!trimmed) {
       setParticipantActionError("参加者名を入力してください");
+      setParticipantActionMessage("");
+      return;
+    }
+    if (!projectId) {
+      setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       setParticipantActionMessage("");
       return;
     }
@@ -707,6 +579,10 @@ function AdminResponsesApp() {
       setRenameError("参加者名を入力してください");
       return;
     }
+    if (!projectId) {
+      setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
     setRenameInProgress(true);
     try {
       participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
@@ -723,6 +599,11 @@ function AdminResponsesApp() {
 
   const handleRemoveParticipant = (participantId, displayName) => {
     const summaryName = displayName || "参加者";
+    if (!projectId) {
+      setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      setParticipantActionMessage("");
+      return;
+    }
     participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");

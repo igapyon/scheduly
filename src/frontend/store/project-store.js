@@ -74,6 +74,35 @@ const cloneShareTokens = (shareTokens) => {
   return next;
 };
 
+const createInitialDerivedState = () => ({
+  tallies: {
+    candidates: {},
+    participants: {}
+  }
+});
+
+const cloneTallies = (tallies) => {
+  const next = {
+    candidates: {},
+    participants: {}
+  };
+  if (tallies && typeof tallies === "object") {
+    if (tallies.candidates && typeof tallies.candidates === "object") {
+      Object.entries(tallies.candidates).forEach(([candidateId, entry]) => {
+        if (!entry || typeof entry !== "object") return;
+        next.candidates[candidateId] = { ...entry };
+      });
+    }
+    if (tallies.participants && typeof tallies.participants === "object") {
+      Object.entries(tallies.participants).forEach(([participantId, entry]) => {
+        if (!entry || typeof entry !== "object") return;
+        next.participants[participantId] = { ...entry };
+      });
+    }
+  }
+  return next;
+};
+
 const projectStore = new Map();
 const listeners = new Map();
 const participantTokenIndex = new Map();
@@ -159,7 +188,8 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
     icsText: "",
     candidates: [],
     participants: [],
-    responses: []
+    responses: [],
+    derived: createInitialDerivedState()
   };
 };
 
@@ -172,6 +202,12 @@ const ensureProjectStateShape = (projectId, rawState, { includeDemoToken = false
   project.id = isNonEmptyString(project.id) ? project.id : projectId;
   project.shareTokens = normalizeShareTokens(project.shareTokens, { includeDemo: includeDemoToken });
   nextState.project = project;
+  const baseDerived = rawState.derived && typeof rawState.derived === "object" ? rawState.derived : {};
+  nextState.derived = {
+    ...createInitialDerivedState(),
+    ...baseDerived,
+    tallies: cloneTallies(baseDerived.tallies)
+  };
   return nextState;
 };
 
@@ -418,6 +454,12 @@ const getResponses = (projectId = DEFAULT_PROJECT_ID) => {
   return cloneResponses(state.responses || []);
 };
 
+const getTallies = (projectId = DEFAULT_PROJECT_ID) => {
+  const state = ensureProjectEntry(projectId);
+  const tallies = state.derived?.tallies ?? createInitialDerivedState().tallies;
+  return cloneTallies(tallies);
+};
+
 const replaceResponses = (projectId, nextResponses) => {
   const state = ensureProjectEntry(projectId);
   const responsesArray = Array.isArray(nextResponses) ? cloneResponses(nextResponses) : [];
@@ -446,6 +488,20 @@ const upsertResponse = (projectId, response) => {
   };
   setProjectState(projectId, nextState);
   return { ...nextResponse };
+};
+
+const replaceTallies = (projectId, nextTallies) => {
+  const state = ensureProjectEntry(projectId);
+  const tallies = cloneTallies(nextTallies);
+  const nextState = {
+    ...state,
+    derived: {
+      ...(state.derived || createInitialDerivedState()),
+      tallies
+    }
+  };
+  setProjectState(projectId, nextState);
+  return cloneTallies(tallies);
 };
 
 const removeResponsesByCandidate = (projectId, candidateId) => {
@@ -793,10 +849,12 @@ module.exports = {
   removeParticipant,
   findParticipantByToken,
   getResponses,
+  getTallies,
   replaceResponses,
   upsertResponse,
   removeResponsesByCandidate,
   resetProject,
   exportProjectState,
-  importProjectState
+  importProjectState,
+  replaceTallies
 };
