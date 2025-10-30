@@ -127,6 +127,14 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
               ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
               : "/user-edit.html";
           const editLink = sharePath || fallbackPath;
+          const logPayload = {
+            source: "schedule-summary",
+            scheduleId: schedule.id,
+            participantId: response.participantId,
+            participantToken: response.participantToken,
+            shareToken,
+            href: editLink
+          };
           return (
             <li
               key={response.participantId || `${schedule.id}-resp-${index}`}
@@ -137,6 +145,9 @@ function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, parti
                   <div className="font-semibold text-zinc-800">{response.name}</div>
                   <a
                     href={editLink}
+                    onClick={(event) => {
+                      console.log("[user] navigate to answer", { ...logPayload, eventType: "click", shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey });
+                    }}
                     className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
                   >
                     <span aria-hidden="true" className="mr-1">📝</span>回答
@@ -198,19 +209,37 @@ function ParticipantSummary({
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
-            <a
-              href={
+            {(() => {
+              const participantShareHref =
                 participantShareToken && participant.id
                   ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
-                  : participant.token
-                    ? `/r/${encodeURIComponent(participant.token)}`
-                    : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`
-              }
-              onClick={(event) => event.stopPropagation()}
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-            >
-              <span aria-hidden="true" className="mr-1">📝</span>回答
-            </a>
+                  : null;
+              const fallbackHref = participant.token
+                ? `/r/${encodeURIComponent(participant.token)}`
+                : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`;
+              const editHref = participantShareHref || fallbackHref;
+              return (
+                <a
+                  href={editHref}
+                  onClick={(event) => {
+                    console.log("[user] navigate to answer", {
+                      source: "participant-summary",
+                      participantId: participant.id,
+                      participantToken: participant.token,
+                      shareToken: participantShareToken,
+                      href: editHref,
+                      shiftKey: event.shiftKey,
+                      metaKey: event.metaKey,
+                      ctrlKey: event.ctrlKey
+                    });
+                    event.stopPropagation();
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+                >
+                  <span aria-hidden="true" className="mr-1">📝</span>回答
+                </a>
+              );
+            })()}
             {onRename && (
               <button
                 type="button"

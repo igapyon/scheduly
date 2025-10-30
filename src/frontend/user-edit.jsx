@@ -319,6 +319,11 @@ function SchedulyMock() {
       setProjectId(resolved.projectId);
       setRouteContext(resolved.routeContext);
       setInitialRouteContext(resolved.routeContext);
+      console.log("[user-edit] bootstrap", {
+        projectId: resolved.projectId,
+        routeContext: resolved.routeContext,
+        location: typeof window !== "undefined" ? window.location.href : "server"
+      });
       const token =
         resolved.routeContext?.shareType === "participant" && resolved.routeContext.token
           ? String(resolved.routeContext.token)
@@ -331,6 +336,10 @@ function SchedulyMock() {
           initialParticipant = match.participantId;
         }
       }
+      console.log("[user-edit] initial participant resolved", {
+        token,
+        initialParticipant
+      });
       setInitialParticipantId(initialParticipant);
       requestedParticipantIdRef.current = initialParticipant;
     };
@@ -341,6 +350,16 @@ function SchedulyMock() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialParticipantId || selectedParticipantId) return;
+    console.log("[user-edit] sync initial participantId", {
+      initialParticipantId,
+      selectedParticipantId
+    });
+    requestedParticipantIdRef.current = initialParticipantId;
+    setSelectedParticipantId(initialParticipantId);
+  }, [initialParticipantId, selectedParticipantId]);
 
   useEffect(() => {
     if (routeError) return;
@@ -393,7 +412,7 @@ function SchedulyMock() {
         preferredId && participantList.some((participant) => participant && participant.id === preferredId);
 
       let editingId = selectedParticipantId;
-      const hasEditingParticipant =
+      let hasEditingParticipant =
         editingId && participantList.some((participant) => participant && participant.id === editingId);
 
       if (hasPreferredParticipant && editingId !== preferredId) {
@@ -404,6 +423,7 @@ function SchedulyMock() {
         }
         resetAnswers = true;
         requestedParticipantIdRef.current = null;
+        hasEditingParticipant = true;
       } else if (hasPreferredParticipant) {
         requestedParticipantIdRef.current = null;
       }
