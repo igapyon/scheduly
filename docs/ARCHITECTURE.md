@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Scheduly のフロントエンド構成と今後想定している拡張ポイントを簡潔にまとめます。現時点では「ブラウザで完結するモック」を React / webpack 版へ移植している段階であり、サーバーとの連携は今後の実装タスクです。フロントとサーバーを同じ JavaScript スタック（Node.js）で統一する方針を採り、ローカルモックからの学びをそのまま活かせる構成を目指します。
+Scheduly のフロントエンド構成と今後想定している拡張ポイントを簡潔にまとめます。現在は React / webpack 版アプリを主軸に開発しており、初期モックだった HTML 版は最新アプリのスナップショットを確認する静的コンテンツとして最小限維持しています。サーバーとの連携は今後の実装タスクであり、フロントとサーバーを同じ JavaScript スタック（Node.js）で統一する方針を採ります。
 
 ## フロントエンド構成
 
@@ -9,7 +9,7 @@ public/
 ├── index.html         # 管理者 UI (React / webpack -> index.bundle.js)
 ├── user.html          # 参加者回答一覧 UI (React / webpack -> user.bundle.js)
 ├── user-edit.html     # 参加者回答編集 UI (React / webpack -> userEdit.bundle.js)
-└── legacy/            # 旧 HTML モック一式（参照用・比較用）
+└── legacy/            # HTML モックのスナップショット（参照・比較用）
 src/frontend/
 ├── admin.jsx          # プロジェクト（候補）管理画面
 ├── user.jsx           # 参加者回答一覧（共有ビュー）
@@ -17,9 +17,9 @@ src/frontend/
 ```
 
 - **Webpack エントリ**
-- `admin.jsx` → `index.bundle.js`（`public/index.html`で読み込み）
-- `user.jsx` → `user.bundle.js`（`public/user.html`で読み込み）
-- `user-edit.jsx` → `userEdit.bundle.js`（`public/user-edit.html`で読み込み）
+- `admin.jsx` → `index.bundle.js`（`public/index.html`を初期表示し、共有トークン発行後は `/a/{token}` へリダイレクト）
+- `user.jsx` → `user.bundle.js`（`public/user.html`を初期表示し、共有トークン利用時は `/p/{token}` へリダイレクト）
+- `user-edit.jsx` → `userEdit.bundle.js`（`public/user-edit.html`を初期表示し、共有トークン利用時は `/r/{token}` へリダイレクト）
 - **Tailwind**
   - 現状は CDN で読み込み、最低限の UI を構築。将来 PostCSS 化する予定。
 - **ical.js**
@@ -27,9 +27,9 @@ src/frontend/
 
 ## データレイヤー（現状の扱い）
 
-- プロジェクト（候補）データ: `admin.jsx` 内でモックとして定義（React state）
-- 参加者回答データ: `user.jsx` 内でモックとして定義（React state）
-- ICS メタデータ: UID/SEQUENCE/DTSTAMP/TZID などを JavaScript で保持
+- プロジェクト状態は `project-store` を中心とする in-memory サービス群で管理し、`project-service` / `schedule-service` / `participant-service` / `response-service` / `tally-service` / `summary-service` が各画面から参照・更新する。
+- ICS メタデータ（UID/SEQUENCE/DTSTAMP/TZID など）は JavaScript で保持し、エクスポート時に `schedule-service` が増分管理する。
+- 既存の HTML モックに残っていたダミーデータは撤廃し、React 版アプリから JSON／ICS をエクスポート・インポートして状態を復元する運用とした。
 
 将来的にはサーバー/API 層で以下のようなエンティティを扱う想定。
 
