@@ -63,15 +63,7 @@ function formatStatusBadge(status) {
   };
 }
 
-function ScheduleSummary({
-  schedule,
-  defaultOpen = false,
-  openTrigger = 0,
-  participantShareToken = "",
-  projectId,
-  inlineEditorTarget,
-  onToggleInlineEdit
-}) {
+function ScheduleSummary({ schedule, defaultOpen = false, openTrigger = 0, projectId, inlineEditorTarget, onToggleInlineEdit }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const activeInlineParticipantId =
     inlineEditorTarget && inlineEditorTarget.scheduleId === schedule.id ? inlineEditorTarget.participantId : null;
@@ -127,30 +119,11 @@ function ScheduleSummary({
       </summary>
       <ul className="space-y-1 border-t border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
         {schedule.responses.map((response, index) => {
-          const shareToken = participantShareToken && response.participantId ? participantShareToken : "";
-          const sharePath =
-            shareToken && response.participantId
-              ? `/r/${encodeURIComponent(shareToken)}?participantId=${encodeURIComponent(response.participantId)}`
-              : "";
-          const fallbackPath = response.participantToken
-            ? `/r/${encodeURIComponent(response.participantToken)}`
-            : response.participantId
-              ? `/user-edit.html?participantId=${encodeURIComponent(response.participantId)}`
-              : "/user-edit.html";
-          const editLink = sharePath || fallbackPath;
           const isEditing = Boolean(
             activeInlineParticipantId && response.participantId && activeInlineParticipantId === response.participantId
           );
           const canInlineEdit = Boolean(projectId && response.participantId);
           // Debug log: keep permanently to help trace participant handoff issues.
-          const logPayload = {
-            source: "schedule-summary",
-            scheduleId: schedule.id,
-            participantId: response.participantId,
-            participantToken: response.participantToken,
-            shareToken,
-            href: editLink
-          };
           return (
             <li
               key={response.participantId || `${schedule.id}-resp-${index}`}
@@ -160,24 +133,7 @@ function ScheduleSummary({
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="font-semibold text-zinc-800">{response.name}</div>
-                    <a
-                      href={editLink}
-                      onClick={(event) => {
-                        console.log("[user] navigate to answer", {
-                          ...logPayload,
-                          eventType: "click",
-                          shiftKey: event.shiftKey,
-                          metaKey: event.metaKey,
-                          ctrlKey: event.ctrlKey
-                        });
-                      }}
-                      className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-                    >
-                      <span aria-hidden="true" className="mr-1">📝</span>別画面で回答
-                    </a>
-                  </div>
+                  <div className="font-semibold text-zinc-800">{response.name}</div>
                   {isEditing ? (
                     <InlineResponseEditor
                       projectId={projectId}
@@ -185,7 +141,6 @@ function ScheduleSummary({
                       schedule={{ id: schedule.id }}
                       initialMark={response.mark}
                       initialComment={response.commentRaw || ""}
-                      fallbackHref={editLink}
                       onClose={() => onToggleInlineEdit?.(response.participantId, schedule.id)}
                     />
                   ) : (
@@ -397,7 +352,6 @@ function ParticipantSummary({
   onRemove,
   onRename,
   canRemove = true,
-  participantShareToken = "",
   projectId,
   inlineEditorTarget,
   onToggleInlineEdit
@@ -406,14 +360,6 @@ function ParticipantSummary({
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const activeInlineScheduleId =
     inlineEditorTarget && inlineEditorTarget.participantId === participant.id ? inlineEditorTarget.scheduleId : null;
-  const participantShareHref =
-    participantShareToken && participant.id
-      ? `/r/${encodeURIComponent(participantShareToken)}?participantId=${encodeURIComponent(participant.id)}`
-      : "";
-  const fallbackHref = participant.token
-    ? `/r/${encodeURIComponent(participant.token)}`
-    : `/user-edit.html?participantId=${encodeURIComponent(participant.id)}`;
-  const externalEditHref = participantShareHref || fallbackHref;
 
   useEffect(() => {
     setOpen(Boolean(defaultOpen));
@@ -430,26 +376,6 @@ function ParticipantSummary({
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Participant</div>
           <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-800">
             <span>{participant.name}</span>
-            <a
-              href={externalEditHref}
-              onClick={(event) => {
-                // Debug log: keep permanently to help trace participant handoff issues.
-                console.log("[user] navigate to answer", {
-                  source: "participant-summary",
-                  participantId: participant.id,
-                  participantToken: participant.token,
-                  shareToken: participantShareToken,
-                  href: externalEditHref,
-                  shiftKey: event.shiftKey,
-                  metaKey: event.metaKey,
-                  ctrlKey: event.ctrlKey
-                });
-                event.stopPropagation();
-              }}
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-            >
-              <span aria-hidden="true" className="mr-1">📝</span>別画面で回答
-            </a>
             {onRename && (
               <button
                 type="button"
@@ -532,7 +458,6 @@ function ParticipantSummary({
                     schedule={schedule ? { id: schedule.id } : { id: response.scheduleId }}
                     initialMark={response.mark}
                     initialComment={response.commentRaw || ""}
-                    fallbackHref={externalEditHref}
                     onClose={() => onToggleInlineEdit?.(participant.id, response.scheduleId)}
                   />
                 ) : (
@@ -991,7 +916,6 @@ function AdminResponsesApp() {
                 schedule={schedule}
                 defaultOpen={index === 0}
                 openTrigger={index === 0 ? openFirstScheduleTick : 0}
-                participantShareToken={participantShareToken}
                 projectId={projectId}
                 inlineEditorTarget={inlineEditorTarget}
                 onToggleInlineEdit={toggleInlineEditor}
@@ -1036,15 +960,14 @@ function AdminResponsesApp() {
                   key={participant.id}
                   participant={participant}
                   defaultOpen={index === 0}
-                  scheduleLookup={scheduleLookup}
-                  onRemove={() => openRemoveParticipantDialog(participant)}
-                  onRename={() => openRenameParticipantDialog(participant)}
-                  canRemove={participantSummaries.length > 1}
-                  participantShareToken={participantShareToken}
-                  projectId={projectId}
-                  inlineEditorTarget={inlineEditorTarget}
-                  onToggleInlineEdit={toggleInlineEditor}
-                />
+                scheduleLookup={scheduleLookup}
+                onRemove={() => openRemoveParticipantDialog(participant)}
+                onRename={() => openRenameParticipantDialog(participant)}
+                canRemove={participantSummaries.length > 1}
+                projectId={projectId}
+                inlineEditorTarget={inlineEditorTarget}
+                onToggleInlineEdit={toggleInlineEditor}
+              />
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">

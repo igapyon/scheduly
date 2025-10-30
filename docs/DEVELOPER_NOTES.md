@@ -12,8 +12,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
   | 画面 | JSX | HTML（初期表示） | 振る舞い |
   | --- | --- | --- | --- |
   | 管理者 | `admin.jsx` | `public/index.html` | `/index.html` → 共有トークン発行後は `/a/{token}` にリダイレクト |
-  | 参加者一覧 | `user.jsx` | `public/user.html` | `/user.html` → 共有トークン利用時は `/p/{token}` にリダイレクト |
-  | 参加者編集 | `user-edit.jsx` | `public/user-edit.html` | `/user-edit.html` → 共有トークン利用時は `/r/{token}` にリダイレクト |
+  | 参加者 UI | `user.jsx` | `public/user.html` | `/user.html` → 共有トークン利用時は `/p/{token}` にリダイレクト（`/r/{token}` は後方互換で `/p/{token}` に転送） |
 - スタイルは Tailwind CDN と最小限のインライン CSS に依存。  
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
@@ -26,7 +25,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 確認方法: ブラウザで直接開けば OK
 
 ### 1.3 その他の運用メモ
-- `public/index.html` / `user.html` / `user-edit.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
+- `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 
@@ -69,7 +68,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Chrome DevTools（mac: `⌥⌘I`, Windows: `Ctrl+Shift+I` or `F12`）を常時開き、Console を監視する習慣を持つ。
 - 生成 AI を含め、挙動を確認する人には Console のチェックを促す。正常に見える場合でも念のため確認する。
 - 節目（新機能着手前後・検証直前など）では「Chrome DevTools の Console を確認してください」と明示的にリマインドする。
-- **恒久デバッグログの扱い**: 参加者画面→回答編集画面で参加者選択が途切れる既知不具合調査のため、`user.jsx` / `user-edit.jsx` に `console.log` を常駐させている。観測ポイントとして残すこと（無効化する場合もコメント化に留める）。
+- **恒久デバッグログの扱い**: 参加者画面のインライン編集で参加者選択が途切れる既知不具合調査のため、`user.jsx` に `console.log` を常駐させている。観測ポイントとして残すこと（無効化する場合もコメント化に留める）。
 
 ---
 
@@ -80,7 +79,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 優先度: 中
 - `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのファサードを経由してデータ取得・更新を行い、`projectStore.subscribe` を用いた状態同期を整える（スコープ外画面は読み取り専用ファサードに限定）。
-- `responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットリロードループを `user-edit.jsx` に組み込み、○△× 更新やコメント保存を参加者一覧へリアルタイム反映させる。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
+- `responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
 - 参加者の登録順を編集できるようにする。
 
 ### 優先度: 低
@@ -91,20 +90,19 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 主要画面のレスポンシブ対応を再検討し、モバイル表示を整備する。
 - Excel 形式でのエクスポートを実装し、CSV との差別化を図る。
 - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
-- `user.html` / `user-edit.html` への直接アクセスを防ぎ、共有 URL 経由のみ許可する仕組みを用意する。
+- `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
 
 ### ナビゲーション/UX 調整
-- 日程ごとの「回答」ボタンから遷移した際、回答編集画面でも同じ日程が選択された状態で開けるよう調整する。
+- 日程タブ／参加者タブの「回答」ボタンで開いたインライン編集が、切り替え時に意図せず閉じないようフォーカスとスクロール挙動を最適化する。
 - ICS の UID を用いた日程初期選択と、参加者名の重複チェックを組み合わせて URL クエリ/state を整備する。
-- 回答編集から「参加者一覧へ」を押した際、元が日程タブなら直前に操作した日程が開いた状態で戻せるようにする。
-- 同様に、元が参加者タブなら該当参加者のカードが開いた状態で戻せるようにする。
+- インライン編集を閉じたあとでも直前に編集中だった参加者や日程へスムーズに戻れるよう、状態復元とハイライトの仕組みを検討する。
 
 ### 継続タスク・メモ
-- 管理・参加者・回答編集の 3 画面でデータ構造や表示ロジックに矛盾がないか定期的に点検する（説明文・ステータス・タイムゾーンなど）。
+- 管理・参加者 UI の間でデータ構造や表示ロジックに齟齬がないか定期的に点検する（説明文・ステータス・タイムゾーンなど）。
 - 管理画面で「ICS インポート or 手入力 → 参加者登録 → 回答入力」という一連フローが破綻なく成立するか継続的に検証する。
 - `docs/FLOW_AND_API.md` に記載のサービス分離は優先度: 中の TODO として進行中。
-- 参加者画面→回答編集画面間での参加者選択問題は常駐ログで監視中（削除禁止）。
+- 参加者画面でのインライン編集時に参加者選択が途切れる問題は常駐ログで監視中（削除禁止）。
 
 ---
 
@@ -124,7 +122,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
   - フォーム送信ボタンは設けず、現行と同じリアルタイム反映に合わせてトーストなどの保存フィードバックを表示する。
   - モバイルでは縦積みレイアウトで収める想定（同時に1枠しか開かないため表示領域は足りる見込み）。
 - 実装メモ
-  - `user-edit.jsx` の保存ロジック（`responseService.upsert` → `tallyService.recalculate` → `summaryService` 反映）をコンポーネント化し、`user.jsx` からも再利用できるようサービス分離 TODO を先行して整える。
+  - 旧 `user-edit.jsx` の保存ロジック（`responseService.upsert` → `tallyService.recalculate` → `summaryService` 反映）をインライン編集コンポーネントへ移植済み。サービス分離を継続し、`user.jsx` からの再利用性を高める。
   - 編集コンポーネントを独立モジュール化し、従来ページ／インラインの両方で同一コードを使い回す。フォーカス管理やアクセシビリティ（キーボード操作）の検証も必要。
   - カード切り替え時はアンマウントで一度閉じる。リアルタイム更新後にサマリーやバッジを即反映できるか確認する。
 - 移行ステップ（案）

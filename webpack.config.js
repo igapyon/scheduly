@@ -6,8 +6,7 @@ const isProduction = process.env.NODE_ENV === "production";
 module.exports = {
   entry: {
     index: path.resolve(__dirname, "src/frontend/admin.jsx"),
-    user: path.resolve(__dirname, "src/frontend/user.jsx"),
-    userEdit: path.resolve(__dirname, "src/frontend/user-edit.jsx")
+    user: path.resolve(__dirname, "src/frontend/user.jsx")
   },
   output: {
     filename: "[name].bundle.js",
@@ -54,7 +53,7 @@ module.exports = {
       rewrites: [
         { from: /^\/a(?:\/.*)?$/, to: "/index.html" },
         { from: /^\/p(?:\/.*)?$/, to: "/user.html" },
-        { from: /^\/r(?:\/.*)?$/, to: "/user-edit.html" }
+        { from: /^\/r(?:\/.*)?$/, to: "/user.html" }
       ]
     },
     hot: true,

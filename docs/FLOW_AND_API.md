@@ -5,21 +5,21 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
 ## 1. 全体像
 
 ```
-管理者画面 (admin.jsx)                参加者一覧 (user.jsx)               回答編集 (user-edit.jsx)
-  ├─ projectService.resolveProjectFromLocation()  ─┐      ┌─ projectService.resolveProjectFromLocation()
-  │                                               │      │
-  ├─ scheduleService.* （候補 CRUD / ICS）        │      │
-  ├─ participantService.* （参加者 CRUD）         │      │
-  ├─ shareService.generate/rotate （共有 URL） ───┤      │
-  ├─ tallyService / summaryService で派生データ   │      │
-  └─ projectStore.subscribeProjectState()         │      │
-                                                  ▼      ▼
+管理者画面 (admin.jsx)                参加者 UI (user.jsx)
+  ├─ projectService.resolveProjectFromLocation()  ─┐
+  │                                               │
+  ├─ scheduleService.* （候補 CRUD / ICS）        │
+  ├─ participantService.* （参加者 CRUD）         │
+  ├─ shareService.generate/rotate （共有 URL） ───┤
+  ├─ tallyService / summaryService で派生データ   │
+  └─ projectStore.subscribeProjectState()         │
+                                                  ▼
                                         projectStore（オンメモリ + sessionStorage 永続化）
                                                   │
                                                   └─ shared routeContext / derived tallies / icsText
 ```
 
-- 管理者・参加者・回答編集画面はいずれも `/index.html` / `/user.html` / `/user-edit.html` から起動し、共有トークン付き URL（`/a/{adminToken}` / `/p/{participantToken}` / `/r/{participantToken}`）へリダイレクトされる。
+- 管理者・参加者画面はいずれも `/index.html` / `/user.html` から起動し、共有トークン付き URL（`/a/{adminToken}` / `/p/{participantToken}`）へリダイレクトされる。旧 `/r/{participantToken}` は参加者 UI へ後方互換で転送する。
 - URL 解析は `projectStore.resolveProjectIdFromLocation()` が担当し、`routeContext` として現在のプロジェクト／参加者情報を保持する。
 - すべてのサービスは `projectStore` を介して状態を書き換え、変更後は `tallyService.recalculate()` と `summaryService.*` を通じて派生ビューを構築する。
 
@@ -39,11 +39,11 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
 3. 再発行は `shareService.rotate()` を利用し、管理者・参加者トークンを同時に再生成。`projectStore.updateShareTokens` → `shareTokenIndex` を更新。
 4. 生成後はオプションにより同一オリジンなら `/a/{adminToken}` へ自動遷移する。クロスオリジン時はブロックされ、`navigation` オブジェクトに理由が格納される。
 
-### 2.3 参加者画面と回答編集
+### 2.3 参加者画面（インライン編集）
 
-1. `user.jsx` / `user-edit.jsx` は `projectService.resolveProjectFromLocation()` の `routeContext` を読み、`participantService.resolveByToken()` による逆引きで `participantId` を特定。
-2. 回答編集では `responseService.upsertResponse()` を通じて回答状態を保存。サービス内で `tallyService.recalculate(projectId, candidateId)` が呼ばれ、派生タリーが更新される。
-3. 参加者画面は `summaryService.buildScheduleView()` / `.buildParticipantView()` を利用して日程別／参加者別サマリーを描画。ストア購読により回答更新を即時反映する。
+1. `user.jsx` は `projectService.resolveProjectFromLocation()` の `routeContext` を読み、`participantService.resolveByToken()` による逆引きで `participantId` を特定。`/r/{token}` でアクセスされた場合も同じルートコンテキストに収束させる。
+2. カード内インライン編集では `responseService.upsertResponse()` を通じて回答状態を保存。サービス内で `tallyService.recalculate(projectId, candidateId)` が呼ばれ、派生タリーが更新される。
+3. 参加者画面は `summaryService.buildScheduleView()` / `.buildParticipantView()` を利用して日程別／参加者別サマリーを描画。ストア購読により回答更新を即時反映し、単一のインラインエディタ状態を共有する。
 
 ### 2.4 集計とエクスポート（管理者）
 
