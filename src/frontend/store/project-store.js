@@ -134,6 +134,7 @@ const decodePathToken = (value) => {
   try {
     return decodeURIComponent(value);
   } catch (error) {
+    void error;
     return value;
   }
 };

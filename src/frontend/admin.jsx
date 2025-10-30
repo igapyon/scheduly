@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useEffect, useMemo, useState, useId, useRef } from "react";
+import { useEffect, useState, useId, useRef, Fragment } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -13,7 +13,12 @@ import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import { ClipboardIcon } from "@heroicons/react/24/outline";
 
-const { DEFAULT_TZID, ensureICAL, createLogger } = sharedIcalUtils;
+const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
+
+void Fragment;
+void EventMeta;
+void InfoBadge;
+void ClipboardIcon;
 
 const {
   addCandidate: addScheduleCandidate,
@@ -40,8 +45,6 @@ const randomUUID = () => {
 };
 
 const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
-
-const logDebug = createLogger("admin");
 const pad = (n) => String(n).padStart(2, "0");
 
 const ICAL_STATUS_LABELS = {
@@ -90,8 +93,6 @@ const formatUtcForICal = (value) => {
   return `${year}${month}${day}T${hour}${minute}${second}Z`;
 };
 
-const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
-
 const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
   const dtstartLine = formatUtcForICal(candidate.dtstart);
   const dtendLine = formatUtcForICal(candidate.dtend);
@@ -117,61 +118,6 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 };
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
-
-const exportAllCandidatesToICal = (candidates) => {
-  const now = new Date();
-  const dtstampIso = now.toISOString();
-  const dtstampLine = formatUtcForICal(dtstampIso);
-
-  const lines = ICAL_HEADER_LINES.slice();
-
-  candidates.forEach((candidate) => {
-    const sequence = resolveNextSequence(candidate);
-    const veventLines = buildICalEventLines(candidate, { dtstampLine, sequence });
-    lines.push(...veventLines);
-  });
-
-  lines.push("END:VCALENDAR");
-  return joinICalLines(lines);
-};
-
-const exportCandidateToICal = (candidate) => {
-  const now = new Date();
-  const sequence = resolveNextSequence(candidate);
-  const dtstampIso = now.toISOString();
-  const dtstampLine = formatUtcForICal(dtstampIso);
-  const documentLines = ICAL_HEADER_LINES.slice();
-  documentLines.push(...buildICalEventLines(candidate, { dtstampLine, sequence }));
-  documentLines.push("END:VCALENDAR");
-
-  const icsText = joinICalLines(documentLines);
-
-  let updatedRaw = candidate.rawICalVevent;
-  try {
-    const ICAL = ensureICAL();
-    const parsed = ICAL.parse(icsText);
-    const comp = new ICAL.Component(parsed);
-    const vevent = comp.getFirstSubcomponent("vevent");
-    if (vevent) {
-      updatedRaw = vevent.toJSON();
-    }
-  } catch (parseError) {
-    console.warn("Failed to parse generated ICS back to component", parseError);
-  }
-
-  const safeName = (candidate.summary || candidate.uid || "event").replace(/[\/:*?"<>|]+/g, "_");
-
-  return {
-    icsText,
-    filename: `${safeName || "event"}.ics`,
-    updatedCandidate: {
-      ...candidate,
-      sequence,
-      dtstamp: dtstampIso,
-      rawICalVevent: updatedRaw
-    }
-  };
-};
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
   return (
@@ -424,10 +370,10 @@ function KeyValueList({ items }) {
   return (
     <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[auto,1fr]">
       {items.map(({ key, value }, idx) => (
-        <React.Fragment key={idx}>
+        <Fragment key={idx}>
           <dt className="text-xs font-semibold text-zinc-500">{key}</dt>
           <dd className="break-words text-sm text-zinc-800">{value || <span className="text-zinc-400">—</span>}</dd>
-        </React.Fragment>
+        </Fragment>
       ))}
     </dl>
   );
@@ -500,7 +446,6 @@ function OrganizerApp() {
   const [projectId, setProjectId] = useState(null);
   const [routeContext, setRouteContext] = useState(null);
   const [initialRouteContext, setInitialRouteContext] = useState(null);
-  const responseOptions = ["○", "△", "×"];
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [candidates, setCandidates] = useState([]);
@@ -742,6 +687,7 @@ function OrganizerApp() {
       const ICAL = ensureICAL();
       parsed = ICAL.parse(text);
     } catch (error) {
+      void error;
       popToast("ICSの解析に失敗しました");
       return;
     }
@@ -1103,35 +1049,6 @@ function OrganizerApp() {
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
 
-  const eventPayload = useMemo(() => {
-    return {
-      summary,
-      description,
-      responseOptions: responseOptions,
-      candidates: candidates.map((c, index) => ({
-        id: c.id,
-        order: index + 1,
-        ics: {
-          UID: c.uid,
-          SUMMARY: c.summary,
-          DTSTART: c.dtstart,
-          DTEND: c.dtend,
-          TZID: c.tzid,
-          STATUS: c.status,
-          SEQUENCE: c.sequence,
-          DTSTAMP: c.dtstamp,
-          LOCATION: c.location,
-          DESCRIPTION: c.description
-        }
-      })),
-      metadata: {
-        createdAt: "2024-05-01T10:00:00+09:00",
-        organizer: "匿名",
-        hint: "ダッシュボードから参照できます"
-      }
-    };
-  }, [summary, description, responseOptions, candidates]);
-
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -1164,7 +1081,8 @@ function OrganizerApp() {
                     } else {
                       window.open(entry.url, "_blank");
                     }
-                  } catch (e) {
+                  } catch (error) {
+                    void error;
                     window.open(entry.url, "_blank");
                   }
                 } else {
@@ -1662,9 +1580,15 @@ function OrganizerApp() {
   );
 }
 
+SectionCard.displayName = "SectionCard";
+CandidateCard.displayName = "CandidateCard";
+CandidateMetaTable.displayName = "CandidateMetaTable";
+KeyValueList.displayName = "KeyValueList";
+
 const container = document.getElementById("root");
 if (!container) {
   throw new Error("Root element not found");
 }
 const root = ReactDOM.createRoot(container);
 root.render(<OrganizerApp />);
+export default OrganizerApp;

@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -16,6 +16,10 @@ import InfoBadge from "./shared/InfoBadge.jsx";
 import { ensureDemoProjectData } from "./shared/demo-data";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
+
+void EventMeta;
+void ErrorScreen;
+void InfoBadge;
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
@@ -389,16 +393,17 @@ function AdminResponsesApp() {
     if (tokenFromState && !shareService.isPlaceholderToken(tokenFromState)) {
       return String(tokenFromState);
     }
+    const context = routeContext || initialRouteContext;
     if (
-      initialRouteContext &&
-      initialRouteContext.shareType === "participant" &&
-      initialRouteContext.token &&
-      (initialRouteContext.kind === "share" || initialRouteContext.kind === "share-miss")
+      context &&
+      context.shareType === "participant" &&
+      context.token &&
+      (context.kind === "share" || context.kind === "share-miss")
     ) {
-      return String(initialRouteContext.token);
+      return String(context.token);
     }
     return "";
-  }, [initialRouteContext, projectState, routeError]);
+  }, [initialRouteContext, projectState, routeContext, routeError]);
 
   useEffect(() => {
     if (routeError) return;
@@ -979,7 +984,13 @@ function AdminResponsesApp() {
   );
 }
 
+ScheduleSummary.displayName = "ScheduleSummary";
+ParticipantSummary.displayName = "ParticipantSummary";
+TabNavigation.displayName = "TabNavigation";
+AdminResponsesApp.displayName = "AdminResponsesApp";
+
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
 root.render(<AdminResponsesApp />);
+export default AdminResponsesApp;

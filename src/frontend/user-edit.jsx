@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -15,6 +15,10 @@ import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 
 const { sanitizeTzid } = sharedIcalUtils;
+
+void EventMeta;
+void ErrorScreen;
+void InfoBadge;
 
 const PROJECT_DESCRIPTION = "秋の合宿に向けた候補日を参加者と共有し、回答を編集するための画面です。";
 
@@ -36,20 +40,6 @@ const normalizeResponseMark = (mark) => {
   return "pending";
 };
 
-const formatTimestampForDisplay = (isoString) => {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  }).format(date);
-};
-
 const readParticipantIdFromLocation = () => {
   if (typeof window === "undefined") return null;
   try {
@@ -57,6 +47,7 @@ const readParticipantIdFromLocation = () => {
     const participantId = params.get("participantId");
     if (participantId) return participantId;
   } catch (error) {
+    void error;
     // ignore malformed query
   }
   return null;
@@ -187,37 +178,6 @@ const formatCandidateDateLabel = (candidate) => {
   return `${month}/${dayNum}（${weekday}）`;
 };
 
-const formatCandidateTimeRange = (candidate) => {
-  const zone = sanitizeTzid(candidate.tzid);
-  const start = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: zone
-  }).format(new Date(candidate.dtstart));
-  const end = new Intl.DateTimeFormat("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: zone
-  }).format(new Date(candidate.dtend));
-  return `${start}〜${end}`;
-};
-
-const formatIcalDateTimeWithZone = (iso, tz) => {
-  const zone = sanitizeTzid(tz);
-  return new Intl.DateTimeFormat("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: zone,
-    hour12: false
-  }).format(new Date(iso));
-};
-
 const StatRow = ({ candidate, maxO, onOpenDetail }) => {
   const star = candidate.tally.o === maxO && maxO > 0 ? "★ 参加者最大" : "";
   return (
@@ -290,7 +250,6 @@ function SchedulyMock() {
   const [routeContext, setRouteContext] = useState(null);
   const [initialRouteContext, setInitialRouteContext] = useState(null);
   const [initialParticipantId, setInitialParticipantId] = useState(null);
-  const [projectState, setProjectState] = useState(null);
 
   const routeError = useMemo(() => {
     const ctx = routeContext || initialRouteContext;
@@ -331,7 +290,6 @@ function SchedulyMock() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const answersRef = useRef(answers);
-  const [savedAt, setSavedAt] = useState("");
   const [toast, setToast] = useState("");
   const [detailCandidateId, setDetailCandidateId] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -375,7 +333,6 @@ function SchedulyMock() {
       }
       setInitialParticipantId(initialParticipant);
       requestedParticipantIdRef.current = initialParticipant;
-      setProjectState(resolved.state || {});
     };
 
     bootstrap();
@@ -418,7 +375,6 @@ function SchedulyMock() {
 
     const syncFromState = (nextState, { resetAnswers = false } = {}) => {
       if (!nextState) return;
-      setProjectState(nextState);
       const participantList = nextState.participants || [];
       console.log("[user-edit] participants snapshot", participantList.map((p) => p?.id));
       setParticipants(participantList);
@@ -474,10 +430,8 @@ function SchedulyMock() {
           setAnswers(buildAnswersForParticipant(nextState, editingId));
           const participant = participantList.find((item) => item && item.id === editingId);
           console.log("[user-edit] answers loaded for", editingId, participant);
-          setSavedAt(formatTimestampForDisplay(participant?.updatedAt));
         } else {
           setAnswers({});
-          setSavedAt("");
         }
         setIndex(0);
       }
@@ -540,10 +494,6 @@ function SchedulyMock() {
     answersRef.current = answers;
   }, [answers]);
 
-  const touchSavedAt = () => {
-    setSavedAt(formatTimestampForDisplay(new Date().toISOString()));
-  };
-
   useEffect(() => {
     if (!detailCandidate) return undefined;
     const prev = document.body.style.overflow;
@@ -587,7 +537,6 @@ function SchedulyMock() {
       });
       return nextAnswers;
     });
-    touchSavedAt();
   };
 
 const handleCommentChange = (value) => {
@@ -623,7 +572,6 @@ const commitComment = (value) => {
     mark: currentMark || "pending",
     comment: value
   });
-  touchSavedAt();
 };
 
   const go = (dir) => {
@@ -1166,7 +1114,13 @@ const commitComment = (value) => {
   );
 }
 
+StatRow.displayName = "StatRow";
+Modal.displayName = "Modal";
+ParticipantList.displayName = "ParticipantList";
+SchedulyMock.displayName = "SchedulyMock";
+
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
 root.render(<SchedulyMock />);
+export default SchedulyMock;

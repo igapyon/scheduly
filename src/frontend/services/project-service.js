@@ -62,6 +62,7 @@ const load = (identifier = null) => {
       };
     }
   } catch (error) {
+    void error;
     // ignore participant resolution failure
   }
   const projectId = ensureProjectId(lookupKey);

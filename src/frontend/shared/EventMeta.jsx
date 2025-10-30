@@ -1,7 +1,5 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React from "react";
-
 function EventMeta({
   summary,
   summaryClassName = "text-sm font-semibold text-zinc-800",

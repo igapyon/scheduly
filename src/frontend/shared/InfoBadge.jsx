@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useId, useRef, useState, useEffect } from "react";
+import { useId, useRef, useState, useEffect } from "react";
 
 const mergeClass = (...tokens) => tokens.filter(Boolean).join(" ");
 
