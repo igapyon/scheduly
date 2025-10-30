@@ -2,10 +2,23 @@
 
 Scheduly のモックを改善するときに頼りにしたい開発メモです。UI の概要は README に譲り、ここでは実装の裏側やデバッグの勘所を簡潔にまとめます。現在進行中の作業メモや TODO を残して再開しやすくする役割を担っており、QA 手順は `docs/VERIFY_CHECKLIST.md` に分離しています。
 
-## モックの前提
+## モック構成と前提
+
+### レガシーモック
 
 - レガシーモックは `public/legacy/*.html` に置かれ、React 18（UMD 版）＋ Tailwind CDN ＋ Babel Standalone で動作します。ブラウザで直接開くだけで確認できます。
+
+### React / webpack 版
+
 - React / webpack 版は `src/frontend/` を起点に進めている再構築中のコードです。`npm run dev` や `npm run build` を利用して挙動を確認します。
+
+### Webpack 版の補足メモ
+
+- `src/frontend/` に React エントリ（管理者向け `admin.jsx` → `index.bundle.js`、参加者回答一覧 `user.jsx` → `user.bundle.js`、参加者回答編集 `user-edit.jsx` → `userEdit.bundle.js`）を配置し、スタイルは当面 HTML 側で読み込む Tailwind CDN と最小限のインライン CSS で対応。
+- `public/index.html`（管理画面） / `public/user.html`（参加者回答一覧） / `public/user-edit.html`（参加者回答編集）で Tailwind CDN を読み込みます。管理画面では ical.js CDN も読み込んでいます。
+- 開発時は `npm run dev` で `webpack-dev-server`（ポート 5173）を起動。`http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く。Console を必ず確認。
+- ビルドは `npm run build` → `npm run postbuild` の流れ（`postbuild` は `scripts/copy-static.js` により `public` ディレクトリを `dist` へ複製）。生成された `dist` を静的ホスティングへ配置できる。
+- 既存の HTML モックを移行する際は、まず共通関数（ICS のユーティリティなど）を `src/frontend/utils/` に切り出し、小さなコンポーネント単位で JSX に置き換える。UI の差異が出ないよう段階的に差し替える。
 
 ## ICS まわりのメモ
 
@@ -13,14 +26,14 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - ICS 生成に失敗した場合は、候補データを含めて `console.error` を出力するようにしています。Chrome 開発者ツールの Console で状況を確認してください。
 - ICS インポートのプレビューは既定で全候補 OFF、既存の UID と一致する候補のみ ON になります。振る舞いを変えるときは `handleIcsImport` とプレビュー UI をセットで確認すると迷いません。
 
-## モック更新ワークフロー
+## レガシーモック更新ワークフロー
 
 1. React/webpack 版を `npm run dev` で起動し、目的の画面（例: `http://localhost:5173/index.html`）を表示する。
 2. Chrome DevTools の Elements タブで該当 DOM を選択し、右クリック → `Copy` → `Copy outerHTML` でレンダリング後の HTML を取得する。
 3. `public/legacy/*.html` を更新するときは、コピーした DOM を該当セクション（多くの場合は `<section>` や `<details>` 単位）に丸ごと置き換え、**その後** 文言やダミーリンクなどを微調整する。部分的な追い足し／削りではなく、一旦全置換 → 手直しの流れにすると齟齬が起きにくい。
 4. 取得した DOM を生成 AI などに渡し、トークナイズや改行調整、重複クラスの整理など手作業でやりづらい細部だけ補助させる。
 5. モック側に貼り付けるときは動作ロジックを追加しない（トーストやボタンは見栄え再現のみ）。必要があれば Tailwind クラスをそのまま利用する。
-5. 反映後はブラウザでレガシーモックを開き、見た目と最低限の開閉などが崩れていないかを目視確認する。
+6. 反映後はブラウザでレガシーモックを開き、見た目と最低限の開閉などが崩れていないかを目視確認する。
 
 - スクリーンショット (`docs/screenshot/*.png`) は React 版の最新 UI が差異なく再現できているか判断する材料になる。UI 更新を行った場合は同じ手順で撮り直し、ファイルを更新する習慣を付ける。
 
@@ -37,36 +50,42 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - 生成 AI も含め、誰かが挙動を確認するときは Console をチェックするよう声かけするのがベストプラクティスです。正常に見えるときでも念のため覗いておくと安心です。
 - 明示的なリマインダー：生成 AI は節目ごと（新機能着手前後や検証の直前など）に「Chrome DevTools の Console を確認してください」と促し、毎返信ではなく適度な頻度で案内すること。
 
-## Webpack への移行メモ
-
-- `src/frontend/` に React エントリ（管理者向け `admin.jsx` → `index.bundle.js`、参加者回答一覧 `user.jsx` → `user.bundle.js`、参加者回答編集 `user-edit.jsx` → `userEdit.bundle.js`）を配置し、スタイルは当面 HTML 側で読み込む Tailwind CDN と最小限のインライン CSS で対応。
-- `public/index.html`（管理画面） / `public/user.html`（参加者回答一覧） / `public/user-edit.html`（参加者回答編集）で Tailwind CDN を読み込みます。管理画面では ical.js CDN も読み込んでいます。
-- 開発時は `npm run dev` で `webpack-dev-server`（ポート 5173）を起動。`http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く。Console を必ず確認。
-- ビルドは `npm run build` → `npm run postbuild` の流れ（`postbuild` は `scripts/copy-static.js` により `public` ディレクトリを `dist` へ複製）。生成された `dist` を静的ホスティングへ配置できる。
-- 既存の HTML モックを移行する際は、まず共通関数（ICS のユーティリティなど）を `src/frontend/utils/` に切り出し、小さなコンポーネント単位で JSX に置き換える。UI の差異が出ないよう段階的に差し替える。
-
 ## TODO のタネ
+
+### 優先度: 高
+
+- TODO: （優先度: 高）`summary-service` の派生データを用い、「○最多の日程」「未回答者一覧」などハイライト統計を UI に表示する。集計基盤を活用し、管理・参加者各画面で意思決定に役立つサマリーを提供する。
+
+### 優先度: 中
+
+- TODO: （優先度: 中）`docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのサービス経由でデータを取得・更新し、`projectStore.subscribe` を使った状態同期を整える（スコープ外画面は読み取り専用ファサードを利用）。
+- TODO: （優先度: 中）`responseService.upsert` 後に `tallyService.recalculate` を必ず呼び出すホットリロードループを `user-edit.jsx` へ組み込み、○△× 更新やコメント保存が参加者一覧画面へ即時反映されるようにする。集計表示は `summaryService` に集約し、`user.jsx` ではサマリーデータを描画するだけの構成にする。
+- TODO: （優先度: 中）参加者の登録順を編集できるようにする。
+
+### 優先度: 低
 
 - （優先度: 低）ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で組み込むなど、タイムゾーン情報の扱いを強化する（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
 - `src/frontend` 側の UI 変更は直近バックポート済み。今後差分が出たときは `public/legacy` の HTML モックへ随時反映してギャップを最小化する。
 - 現状のオンメモリ実装ではブラウザの `sessionStorage` に状態を保持しています。将来的に本番運用する際はサーバー側の永続化（API 経由のストア）へ置き換えること。
-- TODO: （優先度: 高）`summary-service` の派生データを用い、「○最多の日程」「未回答者一覧」などハイライト統計を UI に表示する。集計基盤を活用し、管理・参加者各画面で意思決定に役立つサマリーを提供する。
-- 参加者画面→回答編集画面間での参加者選択が途切れた既知の不具合があり、原因調査のため `user.jsx` / `user-edit.jsx` に `console.log` を残しています。恒久的な観測ポイントとして削除しないでください（disable 時はコメント化するなどして再調査に備える）。
-- TODO: （優先度: 低）参加者の登録順を編集できるようにする。
 - TODO: （優先度: 低）履歴や監査ログを収集できる仕組みを導入する。
 - TODO: （優先度: 低）主要画面のレスポンシブ対応を再検討し、モバイル表示に対応させる（優先度: 低）。
 - TODO: Excel 形式でエクスポートできるようにし、CSV との差別化を図る。
 - TODO: 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - TODO: 将来的に `user.html` や `user-edit.html` への直接アクセスを防ぐ仕組み（例: 共有URLからの遷移のみ許可）を導入する。
-- 管理・参加者・回答編集の 3 画面でデータ構造や表示ロジックが矛盾していないか確認し、必要に応じて調整する（説明文・ステータス・タイムゾーンなど）。
-- 管理画面で ICS をインポートまたは手入力 → 参加者登録 → 回答入力、という一連のフローが技術的に破綻なく成立するか検証する。
-- TODO: （優先度: 中）`docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのサービス経由でデータを取得・更新し、`projectStore.subscribe` を使った状態同期を整える（スコープ外画面は読み取り専用ファサードを利用）。
-- TODO: （優先度: 中）`responseService.upsert` 後に `tallyService.recalculate` を必ず呼び出すホットリロードループを `user-edit.jsx` へ組み込み、○△× 更新やコメント保存が参加者一覧画面へ即時反映されるようにする。集計表示は `summaryService` に集約し、`user.jsx` ではサマリーデータを描画するだけの構成にする。
 - ICS インポートプレビューから選択した候補のみをストアへ適用できるようにし、未選択候補のスキップ理由を含めたログ／トースト表示を整える。
+
+### ナビゲーション／UX 調整
+
 - TODO: 日程ごとの「回答」ボタンから遷移した際、回答編集画面でも同じ日程が選択された状態で開くように調整する。
 - TODO: 日程の初期選択は ICS の UID を引き渡す形で実装し、参加者名の重複チェックと組み合わせて URL クエリ/state を整備する。
 - TODO: 回答編集から「参加者一覧へ」を押した際、遷移元が日程ごとタブなら直前に操作した日程が開いた状態で戻れるようにする。
 - TODO: 回答編集から「参加者一覧へ」を押した際、遷移元が参加者ごとタブなら該当参加者のカードが開いた状態で戻れるようにする。
+
+### 継続タスク・メモ
+
+- 管理・参加者・回答編集の 3 画面でデータ構造や表示ロジックが矛盾していないか確認し、必要に応じて調整する（説明文・ステータス・タイムゾーンなど）。
+- 管理画面で ICS をインポートまたは手入力 → 参加者登録 → 回答入力、という一連のフローが技術的に破綻なく成立するか検証する。
+- 参加者画面→回答編集画面間での参加者選択が途切れた既知の不具合があり、原因調査のため `user.jsx` / `user-edit.jsx` に `console.log` を残しています。恒久的な観測ポイントとして削除しないでください（disable 時はコメント化するなどして再調査に備える）。
 
 ## あえて実装しない機能（初期リリース）
 
