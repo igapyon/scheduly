@@ -50,6 +50,9 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - （優先度: 低）ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で組み込むなど、タイムゾーン情報の扱いを強化する（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
 - `src/frontend` 側の UI 変更は直近バックポート済み。今後差分が出たときは `public/legacy` の HTML モックへ随時反映してギャップを最小化する。
 - 現状のオンメモリ実装ではブラウザの `sessionStorage` に状態を保持しています。将来的に本番運用する際はサーバー側の永続化（API 経由のストア）へ置き換えること。
+- TODO: （優先度: 中）`docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理をすべて `projectStore` 経由に集約する。
+- TODO: （優先度: 中）管理者・参加者一覧・回答編集の各 React 画面で、上記サービスを利用するようリファクタし、`projectStore.subscribe` を使った状態同期を整備する。
+- TODO: （優先度: 中）集計処理を `tallyService` / `summaryService` に集約し、`responseService.upsert` 完了時に `tallyService.recalculate` を必ず実行して一覧へ即時反映させるホットリロードループを構築する。
 - TODO: （優先度: 低）参加者の登録順を編集できるようにする。
 - TODO: （優先度: 低）履歴や監査ログを収集できる仕組みを導入する。
 - TODO: （優先度: 低）主要画面のレスポンシブ対応を再検討し、モバイル表示に対応させる（優先度: 低）。
