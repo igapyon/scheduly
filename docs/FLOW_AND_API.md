@@ -1,196 +1,159 @@
 # Flow & API Sketch
 
-React 版 Scheduly をオンメモリ構成で動かす際のユーザーフローと、フロントエンド内部で想定する API 面（関数・データハンドラ）のたたき台をまとめる。永続化は行わず、`ProjectState` を 1 つの塊として保持／初期化／破棄する前提。
+React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。オンメモリ構成（`projectStore` + sessionStorage）を前提に、管理者／参加者の画面遷移と主要サービスの責務を整理する。
 
 ## 1. 全体像
 
 ```
-管理者 (admin.jsx)
-  ├─ プロジェクト初期化 → ProjectState.load()
-  ├─ 候補編集・ICS入出力 → scheduleService.*
-  └─ 管理者 URL 発行 → shareService.generateAdminToken()
-
-参加者一覧 (user.jsx)
-  └─ 参加者トークンで ProjectState を読み取り → read facade (readonly)
-
-参加者回答編集 (user-edit.jsx)
-  ├─ 同じ参加者トークンで ProjectState を読み取り
-  └─ 回答を登録 → responseService.upsert()
-
-共通: ProjectState を in-memory store (スコープ内の JS オブジェクト) に保持
+管理者画面 (admin.jsx)                参加者一覧 (user.jsx)               回答編集 (user-edit.jsx)
+  ├─ projectService.resolveProjectFromLocation()  ─┐      ┌─ projectService.resolveProjectFromLocation()
+  │                                               │      │
+  ├─ scheduleService.* （候補 CRUD / ICS）        │      │
+  ├─ participantService.* （参加者 CRUD）         │      │
+  ├─ shareService.generate/rotate （共有 URL） ───┤      │
+  ├─ tallyService / summaryService で派生データ   │      │
+  └─ projectStore.subscribeProjectState()         │      │
+                                                  ▼      ▼
+                                        projectStore（オンメモリ + sessionStorage 永続化）
+                                                  │
+                                                  └─ shared routeContext / derived tallies / icsText
 ```
+
+- 管理者・参加者・回答編集画面はいずれも `/index.html` / `/user.html` / `/user-edit.html` から起動し、共有トークン付き URL（`/a/{adminToken}` / `/p/{participantToken}` / `/r/{participantToken}`）へリダイレクトされる。
+- URL 解析は `projectStore.resolveProjectIdFromLocation()` が担当し、`routeContext` として現在のプロジェクト／参加者情報を保持する。
+- すべてのサービスは `projectStore` を介して状態を書き換え、変更後は `tallyService.recalculate()` と `summaryService.*` を通じて派生ビューを構築する。
 
 ## 2. コアフロー
 
-### 2.1 プロジェクト作成～候補準備（管理者）
+### 2.1 プロジェクト初期化と候補整備（管理者）
 
-1. 管理画面で「新規プロジェクト」を作成  
-   - `projectService.create({ name, description, defaultTzid })`  
-   - `ProjectState` の初期構造を生成し、`icsText` は空の VCALENDAR で初期化
-2. 手動入力または ICS 取り込みで候補を追加  
-   - 手動: `scheduleService.addCandidate(projectId, candidateDraft)` → VEVENT を作成 → `icsText` 再構築  
-   - ICS: `scheduleService.importIcs(projectId, fileText)` → VEVENT 群をマージ → `icsText` 更新
-3. 参加者の初期データがある場合  
-   - `participantService.bulkUpsert(projectId, participants)`（各参加者に固有トークンを付与）
-4. 既存プロジェクトの状態を再利用する場合  
-   - `projectStore.importProjectState(projectId, payload)` で JSON スナップショットを読み込み、全データを置き換える  
-   - エクスポートは `projectStore.exportProjectState(projectId)` を呼び出し、管理画面からは「プロジェクトをエクスポート」ボタンでダウンロードできる
+1. `projectService.resolveProjectFromLocation()` でプロジェクト ID と `routeContext` を決定。
+2. 新規作成時は `projectService.create()` → `projectStore.resetProject()` で初期状態を生成。`icsText` は空の VCALENDAR を前提に再計算される。
+3. 候補追加・更新は `scheduleService.addCandidate` / `updateCandidate` / `removeCandidate` が担い、処理後に `projectStore.replaceCandidates` と `tallyService.recalculate` を実行。ICS テキストは `scheduleService.persistCandidates()` 内で常に再生成され `projectStore` に保存される。
+4. 外部 ICS の取り込みは `scheduleService.replaceCandidatesFromImport()` を経由し、`UID` / `DTSTAMP` の差分を保ったまま候補一覧と `icsText` を更新。
 
-### 2.2 共有準備～閲覧（管理者 → 参加者）
+### 2.2 参加者管理と共有 URL
 
-1. 管理者が管理用 URL を生成  
-   - `shareService.generateAdminToken(projectId)` → `shareTokens.admin` を更新
-2. 参加者一覧／回答編集画面は参加者固有トークンつき URL でアクセス  
-   - 例: 一覧 `https://scheduly.app/p/{participantToken}`、回答編集 `https://scheduly.app/r/{participantToken}`（デモ時は `demo-participant-001` のような固定文字列を利用すると便利）
-   - `projectService.loadByParticipantToken(participantToken)` を呼び出し、`ProjectState` を読み取り（参加者は日程の更新権限なし）
-3. 画面内では `ProjectState.candidates`（UI 内で扱う日程配列）と `responses` を組み合わせてサマリーを表示
+1. 参加者の CRUD は `participantService.addParticipant` / `updateParticipant` / `removeParticipant` / `bulkUpsertParticipants` が提供。トークンは `ensureUniqueToken` で生成され、`projectStore.upsertParticipant` に保存。
+2. 共有 URL は `shareService.generate(projectId, { baseUrl, lastGeneratedBy, navigateToAdminUrl })` でプレースホルダーを実利用トークンへ差し替え。既存トークンが有効な場合は URL のみ更新する。
+3. 再発行は `shareService.rotate()` を利用し、管理者・参加者トークンを同時に再生成。`projectStore.updateShareTokens` → `shareTokenIndex` を更新。
+4. 生成後はオプションにより同一オリジンなら `/a/{adminToken}` へ自動遷移する。クロスオリジン時はブロックされ、`navigation` オブジェクトに理由が格納される。
 
-### 2.3 参加者回答（参加者）
+### 2.3 参加者画面と回答編集
 
-1. `user-edit.jsx` が参加者識別用のトークンを受け取り、`participantService.resolveByToken()` で `projectId` / `participantId` を取得
-2. 回答を送信  
-   - `responseService.upsert({ projectId, participantId, candidateId, mark, comment })`
-   - 同時に `responses` 内の該当レコードを更新し、`updatedAt` を現在時刻に更新
-3. 更新後に `tallyService.recalculate(projectId, candidateId)` で対象候補の集計を再計算（オンデマンド or まとめて）
+1. `user.jsx` / `user-edit.jsx` は `projectService.resolveProjectFromLocation()` の `routeContext` を読み、`participantService.resolveByToken()` による逆引きで `participantId` を特定。
+2. 回答編集では `responseService.upsertResponse()` を通じて回答状態を保存。サービス内で `tallyService.recalculate(projectId, candidateId)` が呼ばれ、派生タリーが更新される。
+3. 参加者画面は `summaryService.buildScheduleView()` / `.buildParticipantView()` を利用して日程別／参加者別サマリーを描画。ストア購読により回答更新を即時反映する。
 
-### 2.4 集計～エクスポート（管理者）
+### 2.4 集計とエクスポート（管理者）
 
-1. 管理画面が `responses` を読み込み、候補ごとの集計値を表示  
-2. 確定候補が決まったら `scheduleService.markConfirmed(candidateId)` などで `status` を更新 → VEVENT を再生成  
-3. `scheduleService.exportAll(projectId)` で `icsText` をそのままダウンロード
+1. `admin.jsx` の集計パネルは `summaryService` を利用し、`projectStore` の派生タリーを表示。
+2. 確定候補などステータス変更は `scheduleService.updateCandidate()` で `status` / `sequence` / `dtstamp` を更新。
+3. ICS エクスポートは `scheduleService.exportAllCandidatesToIcs()` / `exportCandidateToIcs()` を呼び、`projectStore.getIcsText()` を活用してファイルダウンロードを行う。
+4. プロジェクト全体のスナップショットは `projectService.exportState()`（JSON）で取得でき、`importState()` で復元可能。
 
-## 3. サービス/関数インターフェース（案）
+## 3. サービス API サーフェス
 
-オンメモリ運用のため、単一の `projectStore` を中心に関数を提供するイメージ。実際の実装では module 単位で分割してもよい。
+主要サービスは `src/frontend/services/` 配下に実装済み。ここでは代表的な関数と用途を示す（抜粋）。
 
-```ts
-type ProjectStateStore = {
-  get(projectId: string): ProjectState | undefined;
-  set(projectId: string, next: ProjectState): void;
-  delete(projectId: string): void;
-};
-```
+### 3.1 project-service
 
-### 3.1 Project Service
+| 関数 | 役割 |
+| ---- | ---- |
+| `create(payload)` | 新規プロジェクト ID を生成し初期化。 |
+| `resolveProjectFromLocation()` | 共有トークン付き URL を解析し、`projectId` と `routeContext` を返す。 |
+| `load(identifier)` | プロジェクト ID・管理者トークン・参加者トークンのいずれかで状態を取得。 |
+| `updateMeta(projectId, changes)` | プロジェクトのメタ情報更新。 |
+| `exportState(projectId, { returnJson })` / `importState(projectId, payload)` | JSON スナップショットの入出力。 |
+| `subscribe(projectId, callback)` | ストア変更の購読。 |
 
-```ts
-projectService.create(payload: {
-  name: string;
-  description?: string;
-  defaultTzid: string;
-}): ProjectState
+### 3.2 schedule-service（ICS ハンドリング）
 
-projectService.load(tokenOrId: string): ProjectState
-projectService.updateMeta(projectId: string, changes: Partial<Project>)
-```
+| 関数 | 役割 |
+| ---- | ---- |
+| `addCandidate` / `updateCandidate` / `removeCandidate` | 候補 CRUD。保存時に ICS とタリーを再計算。 |
+| `replaceCandidatesFromImport(projectId, vevents, sourceIcsText)` | ICS ファイル取り込み。 |
+| `exportAllCandidatesToIcs(projectId)` / `exportCandidateToIcs(projectId, candidateId)` | ICS テキストを生成しファイル名・シーケンスを整備。 |
+| `createBlankCandidate()` / `createCandidateFromVevent()` | UI で利用する候補テンプレート・ICS パース。 |
 
-### 3.2 Schedule Service（ICS ハンドリング）
+### 3.3 participant-service
 
-```ts
-scheduleService.addCandidate(projectId, draft: CandidateDraft): ScheduleCandidate
-scheduleService.updateCandidate(projectId, candidateId, changes: CandidateChanges): ScheduleCandidate
-scheduleService.removeCandidate(projectId, candidateId): void
+| 関数 | 役割 |
+| ---- | ---- |
+| `addParticipant` / `updateParticipant` / `removeParticipant` | 参加者 CRUD。トークン重複・表示名重複を検証。 |
+| `bulkUpsertParticipants` | CSV インポート等の差分 upsert。 |
+| `resolveByToken(token)` | 参加者トークンから `projectId` / `participantId` を逆引き。 |
+| `listParticipants(projectId)` / `getToken(projectId, participantId)` | 表示・共有用のユーティリティ。 |
 
-scheduleService.importIcs(projectId, icsText: string): {
-  added: number;
-  updated: number;
-  skipped: number;
-}
+### 3.4 response-service
 
-scheduleService.exportAll(projectId): string // 最新の icsText を返す
-scheduleService.markStatus(projectId, candidateId, status: CandidateStatus)
-```
+| 関数 | 役割 |
+| ---- | ---- |
+| `upsertResponse(projectId, payload)` | 回答を登録・更新し、候補タリーを即時再計算。 |
+| `bulkImportResponses(projectId, list)` | バルクインポート（重複 ID は上書き）。 |
+| `clearResponsesForParticipant(projectId, participantId)` | 指定参加者の回答をリセット。 |
+| `listResponses` / `getResponse` | 現在状態の参照。 |
 
-**実装メモ**  
-すべての更新は管理者権限でのみ許可し、`ProjectState.icsText` を再生成 → `ProjectState.candidates` を再パースするサイクルで一元管理する。参加者向け API／UI からは `scheduleService` の更新系を公開せず、読み取り専用のビュー（`summaryService.*`）を経由させることでセキュリティを担保する。`CandidateDraft` → VEVENT 変換には既存の `shared/ical-utils` 関数を流用できる。REST API 化する場合はリソース名を「日程」に合わせて `/projects/:projectId/schedules` を採用すると自然（内部プロパティ名は ICS 由来の `candidates` を維持しても、英語圏では “schedule candidates” として違和感は少ない）。
+### 3.5 share-service
 
-### 3.3 Share Service（共有トークン）
+| 関数 | 役割 |
+| ---- | ---- |
+| `generate(projectId, { baseUrl, lastGeneratedBy, navigateToAdminUrl })` | 未発行トークンを発行、既存トークンは URL のみ更新。 |
+| `rotate(projectId, { ... })` | 管理者・参加者トークンを強制再発行。 |
+| `invalidate(projectId, type)` | 指定種別を削除（将来 UI 用）。 |
+| `buildUrl(type, token, baseUrl)` / `isPlaceholderToken(token)` | URL 組み立て・プレースホルダー判定。 |
 
-```ts
-shareService.generateAdminToken(projectId): string
-shareService.getAdminToken(projectId): string | null
-shareService.invalidateAdminToken(projectId): void
-```
+### 3.6 tally-service / summary-service
 
-> 管理者向けの制御用 URL に付与するトークンを生成・管理する。オンメモリ構成では `Project.shareTokens.admin` に保存するだけでよいが、REST API としては `POST /projects/:projectId/share-tokens/admin`（生成）、`GET /projects/:projectId/share-tokens/admin`（取得）、`DELETE /projects/:projectId/share-tokens/admin`（無効化）といったエンドポイントを想定。
-
-### 3.4 Participant Service
-
-```ts
-participantService.add(projectId, payload: { displayName: string; email?: string }): Participant // トークン生成含む
-participantService.update(projectId, participantId, changes: Partial<Participant>): Participant
-participantService.remove(projectId, participantId): void
-
-participantService.bulkUpsert(projectId, list: Participant[]): void // 既存を残しつつ差分 upsert
-participantService.resolveByToken(participantToken: string): { projectId: string; participantId: string }
-participantService.getToken(projectId, participantId): string
-```
-
-> REST API 化する場合は `POST /projects/:projectId/participants:bulk` のように `POST` を使ったバルク upsert エンドポイントを用意し、既存レコードは維持したまま追加・更新のみ行う想定。全置き換えが必要になったら `PUT /projects/:projectId/participants` を別途定義する。  
-> `participantService.resolveByToken` は参加者 URL に埋め込まれたトークンから `projectId` と `participantId` を逆引きする役割。REST API に落とす場合は `POST /participants:resolve`（ボディに token）や `GET /participants/resolve?token=...` といったエンドポイントが考えられる。URL 生成時は `/p/{token}`（一覧）と `/r/{token}`（回答）の両方に同一トークンを埋め込む。
-
-### 3.5 Response Service
-
-```ts
-responseService.upsert(projectId, response: {
-  participantId: string;
-  candidateId: string;
-  mark: 'o' | 'd' | 'x';
-  comment?: string;
-}): Response
-
-responseService.bulkImport(projectId, list: Response[]): void
-responseService.clear(projectId, participantId): void
-```
-
-更新後は `response.updatedAt` を現在時刻で上書き。必要に応じて `tallyService.recalculate` を呼ぶ。
-
-### 3.6 Tally / Summary Service
-
-```ts
-tallyService.recalculate(projectId): void // 全候補まとめて
-tallyService.recalculate(projectId, candidateId): void // 単一候補
-
-// ビュー用の派生データ
-summaryService.buildScheduleView(projectId): ScheduleCandidateView[] // 日程ごとの一覧
-summaryService.buildParticipantView(projectId): ParticipantSummary[] // 参加者ごとの一覧
-```
+| サービス | 関数 | 役割 |
+| -------- | ---- | ---- |
+| tally-service | `recalculate(projectId, candidateId?)` | 候補・参加者単位の派生タリーを更新。 |
+| summary-service | `buildScheduleView(projectId, options?)` / `buildParticipantView` | UI 表示用の集計ビューを生成。 |
 
 ## 4. API 呼び出し例
 
-### 候補を 1 件追加するフロー
+### 候補を追加し即座に再描画
 
 ```ts
+const { projectId } = projectService.resolveProjectFromLocation();
 const candidate = scheduleService.addCandidate(projectId, {
-  summary: "秋の合宿 調整会議 Day5",
-  startsAt: "2025-11-04T10:00:00+09:00",
-  endsAt: "2025-11-04T12:00:00+09:00",
+  summary: "キックオフ会議",
+  dtstart: "2025-11-04T10:00",
+  dtend: "2025-11-04T11:00",
   tzid: "Asia/Tokyo",
-  status: "TENTATIVE",
-  location: "オンライン",
-  description: "予備日その2"
+  location: "オンライン"
 });
 
-// UI では ProjectState から candidates（日程）を再取得して再描画する
-const state = projectStore.get(projectId);
-renderCandidates(state.candidates);
+projectService.subscribe(projectId, (state) => {
+  renderSchedule(summaryService.buildScheduleView(projectId, { state }));
+});
 ```
 
-### 参加者が回答を送信するフロー
+### 参加者が回答を送信
 
 ```ts
-responseService.upsert(projectId, {
-  participantId,
-  candidateId,
-  mark: 'o',
-  comment: '15:00 まで在宅です'
+const { projectId, routeContext } = projectService.resolveProjectFromLocation();
+responseService.upsertResponse(projectId, {
+  participantId: routeContext.participantId,
+  candidateId: selectedCandidateId,
+  mark: "o",
+  comment: "この時間なら対応できます"
 });
-
-tallyService.recalculate(projectId, candidateId);
 ```
 
-## 5. 残課題・検討メモ
+### 共有 URL を再発行し管理画面へ遷移
 
-- トークン認証やアクセス制御は未定義。現在はフロント内のみの想定なので、インターフェースレベルで抽象化しておく。
-- 複数プロジェクトを同時に扱う場合は `projectStore` を Map として保持すれば対応できる。UI 側でアクティブな `projectId` を渡す設計にする。
-- 将来的にバックエンド API が導入された場合、ここで定義したサービス関数を fetch ベースに差し替えれば、React コンポーネント側の呼び出しはそのまま流用できる見込み。
+```ts
+shareService.rotate(projectId, {
+  baseUrl: window.location.origin,
+  lastGeneratedBy: currentUserEmail,
+  navigateToAdminUrl: true
+});
+```
+
+## 5. 検討メモと今後の拡張
+
+- `routeContext` を軸にした画面遷移（タブ復元やスクロール位置保存など）の整備。
+- `summary-service` の派生データを活かした UI 拡張（最多回答日・未回答者一覧など）を優先 TODO として管理。
+- バックエンド実装時は、ここで定義したサービス層を fetch/API 呼び出しへ置き換える想定。`projectStore` はキャッシュ層として流用できる。
+- アクセス制御や監査ログ、トークン失効 API は今後のサーバーサイド連携で検討。現状はフロント内で `shareService.isPlaceholderToken` を活用し、プレースホルダー値を意図的に除外している。

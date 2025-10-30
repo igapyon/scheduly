@@ -1,40 +1,58 @@
 # iCal (ICS) Workflow
 
-Scheduly で扱う日程候補は、ICS (iCalendar) をベースに整備・配布することを前提にしています。ICS の準備方法には大きく以下の 2 系統があり、いずれも最終的には `UID`, `DTSTAMP`, `TZID` などのメタデータを揃えて管理者 UI に取り込みます。
+Scheduly の候補管理は iCalendar (ICS) を中心に構成され、React / webpack 版では `schedule-service` と `projectStore` が候補・ICS テキストを一元管理しています。ここでは最新のデータフローと運用パターンをまとめます。
 
-## 1. 外部カレンダーで作成 → Scheduly にインポート
+## 1. ワークフロー概要
 
-1. Google Calendar 等で予定を作成し、対象イベント（またはカレンダー）を ICS としてエクスポートする。
-2. 管理 UI (`public/index.html`) の「ICS から追加」からファイルを選択し、プレビューを確認。
-3. `UID` が既存候補と一致するものは `DTSTAMP` を比較し、新しいものだけを更新。それ以外は新規候補として取り込む。
-4. 取り込んだ候補は Scheduly 内で編集・配布できる。
+- 管理画面は `/index.html` から `/a/{adminToken}` にリダイレクトされ、`admin.jsx` を通じて `scheduleService` を利用します。
+- 候補一覧・参加者回答は `projectStore` に保存され、`icsText` も同じストアに永続化されます（sessionStorage ベース）。
+- どのルートで候補を作成しても、`tallyService.recalculate()` により派生タリーが更新され、参加者画面や回答編集画面へ即時反映されます。
 
-### このルートの特徴
-- 外部サービスで詳細調整を行い、その結果を Scheduly へ連携させたいケースに向く。
-- UID および DTSTAMP を正しく持っている ICS であることが前提。外部サービスとの二重管理になるため、同期タイミングを明確にしておく必要がある。
+## 2. 外部カレンダーで作成 → Scheduly にインポート
 
-## 2. Scheduly 内で直接入力 → 必要に応じて iCal をエクスポート
-
-1. 管理 UI 上で候補日時・場所・説明などを直接入力する。
-2. `exportCandidateToICal`, `exportAllCandidatesToICal` を使って個別またはまとめて ICS を生成できる。
-3. 将来的には `VEVENT` に `VTIMEZONE` を添付したり、複数候補をまとめて配布する動線を整える。
+1. Google Calendar など外部サービスで予定を作成し、ICS としてエクスポート。
+2. 管理画面（`admin.jsx` の「ICS から追加」モーダル）でファイルを選択し、プレビューで内容を確認。
+3. `scheduleService.replaceCandidatesFromImport()` が `UID` と `DTSTAMP` を見ながら候補をインポート。既存 UID と一致し `DTSTAMP` が新しいものは上書き、その他は新規候補として追加。
+4. 取り込んだ候補は Scheduly 内で編集・配布・参加者回答に利用できる。
 
 ### このルートの特徴
-- Scheduly を ICS のソース（真のデータ）として扱えるため、参加者回答や確定日時の管理と一体化しやすい。
-- 外部連携が不要であれば、このルートだけで完結させることも可能。
+- 外部サービス側で詳細調整したイベントを Scheduly へ連携させたいケースに適する。
+- ICS には `UID` と `DTSTAMP` が必須。外部サービスとの二重管理になるため、どちらを最新ソースとするか運用ルールを明確にする。
+- インポート直後に `icsText` が更新されるため、参加者側の「全候補を ICS でダウンロード」にも同内容が提供される。
 
-## ICS を扱う際のメタデータ方針
+## 3. Scheduly 内で直接入力 → 必要に応じて ICS をエクスポート
 
-| 項目 | 役割 | 備考 |
-|------|------|------|
-| UID | 候補のユニーク識別子 | 外部との同期時に必須。同じ UID を持つイベントは同じ候補として扱う。 |
-| DTSTAMP | 更新時刻 | 同じ UID の候補が複数存在する場合、新しい方を採用する判断材料。 |
-| SEQUENCE | 版数 | 既存の ICS をベースにインクリメントする運用。 |
-| DTSTART / DTEND | 開始・終了日時 | タイムゾーンも合わせて考慮する。 |
-| TZID | タイムゾーン ID | 現状は候補ごとに設定。将来的には `VTIMEZONE` の添付を検討。 |
-| LOCATION / DESCRIPTION / STATUS | 補足情報 | 参加者への案内にも利用。 |
+1. 管理画面から候補日時・場所・説明を直接編集（`scheduleService.addCandidate` / `updateCandidate` / `removeCandidate`）。
+2. `scheduleService.exportCandidateToIcs()` または `exportAllCandidatesToIcs()` で個別／全体の ICS を生成。ファイル名や `SEQUENCE`／`DTSTAMP` も自動更新される。
+3. 参加者画面 (`user.jsx`) でも最新候補が存在すれば一括エクスポートが可能。ストアの `icsText` が空の場合は都度生成する。
 
-## 今後の検討事項
+### このルートの特徴
+- Scheduly をシングルソースとみなし、候補編集から参加者回答までをアプリ内で完結できる。
+- エクスポート時に `rawICalVevent` を更新しておくことで、再度 ICS をインポートしても差分判定がしやすい。
+- 外部連携が不要なチームではこのルートのみで運用可能。
 
-- `VTIMEZONE` の自動付与（特に海外メンバーがいる場合）
-- ICS の差分通知（外部の更新を定期的に取り込みたい場合）
+## 4. ICS を扱う際のメタデータ方針
+
+| 項目 | 役割 | 実装メモ |
+|------|------|----------|
+| UID | 候補のユニーク識別子 | `generateSchedulyUid()` で生成。外部同期時もこの UID を基準にマージ。 |
+| DTSTAMP | 更新時刻 | `scheduleService` が ISO8601 で管理し、出力時に UTC へ変換 (`formatUtcForICal`)。 |
+| SEQUENCE | 版数 | 個別エクスポート時は `resolveNextSequence()` でインクリメント。 |
+| DTSTART / DTEND | 開始・終了時刻 | 現在は UTC 出力。編集 UI ではローカル時刻を保持し、ICS 化時に `formatUtcForICal` を利用。 |
+| TZID | タイムゾーン ID | 候補ごとに設定。入力が無い場合は `DEFAULT_TZID`（`Asia/Tokyo`）を使用。`X-SCHEDULY-TZID` プロパティでも補足。 |
+| LOCATION / DESCRIPTION / STATUS | 補足情報 | `escapeICalText()` で ICS エスケープ済み。 |
+| rawICalVevent | 元 ICS JSON | 再インポート時の差分判定用に `toJSON()` で保持。 |
+
+## 5. 実装ノート
+
+- ICS テキストは常に最新候補をシリアライズした文字列として `projectStore` に保持し、`projectStore.getIcsText()` で参照できる。
+- `scheduleService.persistCandidates()` が候補保存・タリー再計算・ICS 更新を一括で実行するため、管理者 UI はサービス呼び出しだけで済む。
+- `shared/ical-utils.js` の `ensureICAL()` により、`ical.js` を lazily ロードしてパース処理を行う。
+- デバッグログは `createLogger("schedule-service")` を利用しており、問題解析時に console チェックする。
+
+## 6. 今後の検討事項
+
+- `VTIMEZONE` の自動付与（海外メンバー向けの適切なタイムゾーン情報配布）。
+- 外部 ICS との差分通知や、定期的な再インポートのための UI/スケジューラ整備。
+- `scheduleService` での検証強化（例: 不正フォーマットのガード、`TZID` のバリデーション）。
+- バックエンド導入時に ICS を API で配布する仕組み（署名付き URL など）の設計。

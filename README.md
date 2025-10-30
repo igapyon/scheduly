@@ -1,6 +1,7 @@
 # scheduly
 
-Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリです。React / webpack 版を主軸に開発を進めつつ、混乱回避のためにレガシーモックも最小限維持しています。全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)、データ構造は [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、フローと内部 API の草案は [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md) を参照してください。
+Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整アプリです。現在は React / webpack 版アプリを主導で開発しており、以前の HTML モックは最新アプリのスナップショットを確認する静的コンテンツとして最小限保守しています。  
+全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)、データ構造は [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、フローと内部 API の草案は [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md) を参照してください。
 
 > ⚠ **匿名アクセスの注意**  
 > 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
@@ -21,10 +22,10 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 - [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md): コントリビューター一覧
 - [docs/CHANGELOG.md](docs/CHANGELOG.md): 変更履歴のメモ
 
-| 種別 | 主な用途 | 配置 | 起動方法 |
+| 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
-| React / webpack 版 | レガシー UI を段階的に移植中 | `src/frontend/` | `npm run dev` / `npm run build` |
-| レガシーモック | 既存 HTML のまま UI を確認したい時 | `public/legacy/` | ブラウザで直接開く |
+| React / webpack 版 | 本番想定のアプリ実装（共有トークンで `/a/{token}` / `/p/{token}` / `/r/{token}` へリダイレクト） | `src/frontend/` | `npm run dev` / `npm run build` |
+| レガシーモック | 最新アプリ UI のスナップショット確認用静的コンテンツ | `public/legacy/` | ブラウザで直接開くだけ |
 
 どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
 
@@ -35,15 +36,16 @@ Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュ�
 
 ## React / webpack 版（`src/frontend/`）
 
-- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者モックの React 版。候補編集に加えて、ICS インポート／エクスポート、プロジェクト全体の JSON エクスポート／インポートをサポートしており、`public/index.html` で読み込みます。ヘッダーから参加者回答一覧（`user.html`）へのリンクを設置済みです。
-- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者回答の共有ビュー。日程別／参加者別のタブ切り替えやサマリー表示を備え、参加者自身も閲覧できる一覧画面として `public/user.html` で読み込みます。
-- `user-edit.jsx`（ビルド後は `userEdit.bundle.js`）: 参加者が自分の回答を登録・編集するモバイル UI。長押しモーダル、○△× 回答、コメント入力などを備え、`public/user-edit.html` からアクセスできます。
+- `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者向けアプリ。候補編集・ICS 入出力・プロジェクト JSON 入出力を備え、`public/index.html` から共有トークン発行後は `/a/{token}` へリダイレクトされます。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者回答一覧。日程別／参加者別タブやサマリー表示があり、`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。
+- `user-edit.jsx`（ビルド後は `userEdit.bundle.js`）: 参加者自身の回答編集 UI。○△× 選択やコメント入力を備え、`public/user-edit.html` から共有トークン利用時は `/r/{token}` へ遷移します。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）
     - `http://localhost:5173/index.html`（管理者）、`http://localhost:5173/user.html`（参加者回答一覧）、`http://localhost:5173/user-edit.html`（参加者回答編集）を必要に応じて開く
      - Console の警告・エラーを節目ごとに確認
+    - **Lint**: コード変更後は `npm run lint` をこまめに実行し、スタイルガイドと静的解析の結果を即時に確認する
   3. 本番ビルド: `npm run build`
   4. 静的資産のコピー: `npm run postbuild`（`dist/` に `public/` 内容がコピーされます）
 - React / ReactDOM を含むためバンドルは大きめです。最終的な最適化は移植後に検討します。
