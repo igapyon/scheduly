@@ -2,6 +2,7 @@
 
 const sharedIcalUtils = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
+const tallyService = require("./tally-service");
 
 const {
   DEFAULT_TZID,
@@ -102,6 +103,7 @@ const serializeCandidatesToIcs = (candidates) => {
 const persistCandidates = (projectId, nextCandidates, explicitIcsText) => {
   const icsText = typeof explicitIcsText === "string" ? explicitIcsText : serializeCandidatesToIcs(nextCandidates);
   projectStore.replaceCandidates(projectId, nextCandidates, icsText);
+  tallyService.recalculate(projectId);
   return projectStore.getProjectStateSnapshot(projectId);
 };
 
@@ -183,7 +185,8 @@ const updateCandidate = (projectId, candidateId, nextCandidate) => {
 const removeCandidate = (projectId, candidateId) => {
   const existing = projectStore.getCandidates(projectId);
   const nextCandidates = existing.filter((candidate) => candidate.id !== candidateId);
-  persistCandidates(projectId, nextCandidates);
+  projectStore.removeResponsesByCandidate(projectId, candidateId);
+  return persistCandidates(projectId, nextCandidates);
 };
 
 const exportAllCandidatesToIcs = (projectId) => {

@@ -1,10 +1,10 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import React, { useEffect, useMemo, useState, useId, useRef } from "react";
+import { useEffect, useState, useId, useRef, Fragment } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
-import projectStore from "./store/project-store";
+import projectService from "./services/project-service";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
 import EventMeta from "./shared/EventMeta.jsx";
@@ -13,7 +13,12 @@ import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import { ClipboardIcon } from "@heroicons/react/24/outline";
 
-const { DEFAULT_TZID, ensureICAL, createLogger } = sharedIcalUtils;
+const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
+
+void Fragment;
+void EventMeta;
+void InfoBadge;
+void ClipboardIcon;
 
 const {
   addCandidate: addScheduleCandidate,
@@ -40,8 +45,6 @@ const randomUUID = () => {
 };
 
 const generateSchedulyUid = () => `igapyon-scheduly-${randomUUID()}`;
-
-const logDebug = createLogger("admin");
 const pad = (n) => String(n).padStart(2, "0");
 
 const ICAL_STATUS_LABELS = {
@@ -90,8 +93,6 @@ const formatUtcForICal = (value) => {
   return `${year}${month}${day}T${hour}${minute}${second}Z`;
 };
 
-const resolveNextSequence = (candidate) => (typeof candidate.sequence === "number" ? candidate.sequence + 1 : 1);
-
 const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
   const dtstartLine = formatUtcForICal(candidate.dtstart);
   const dtendLine = formatUtcForICal(candidate.dtend);
@@ -117,61 +118,6 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 };
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
-
-const exportAllCandidatesToICal = (candidates) => {
-  const now = new Date();
-  const dtstampIso = now.toISOString();
-  const dtstampLine = formatUtcForICal(dtstampIso);
-
-  const lines = ICAL_HEADER_LINES.slice();
-
-  candidates.forEach((candidate) => {
-    const sequence = resolveNextSequence(candidate);
-    const veventLines = buildICalEventLines(candidate, { dtstampLine, sequence });
-    lines.push(...veventLines);
-  });
-
-  lines.push("END:VCALENDAR");
-  return joinICalLines(lines);
-};
-
-const exportCandidateToICal = (candidate) => {
-  const now = new Date();
-  const sequence = resolveNextSequence(candidate);
-  const dtstampIso = now.toISOString();
-  const dtstampLine = formatUtcForICal(dtstampIso);
-  const documentLines = ICAL_HEADER_LINES.slice();
-  documentLines.push(...buildICalEventLines(candidate, { dtstampLine, sequence }));
-  documentLines.push("END:VCALENDAR");
-
-  const icsText = joinICalLines(documentLines);
-
-  let updatedRaw = candidate.rawICalVevent;
-  try {
-    const ICAL = ensureICAL();
-    const parsed = ICAL.parse(icsText);
-    const comp = new ICAL.Component(parsed);
-    const vevent = comp.getFirstSubcomponent("vevent");
-    if (vevent) {
-      updatedRaw = vevent.toJSON();
-    }
-  } catch (parseError) {
-    console.warn("Failed to parse generated ICS back to component", parseError);
-  }
-
-  const safeName = (candidate.summary || candidate.uid || "event").replace(/[\/:*?"<>|]+/g, "_");
-
-  return {
-    icsText,
-    filename: `${safeName || "event"}.ics`,
-    updatedCandidate: {
-      ...candidate,
-      sequence,
-      dtstamp: dtstampIso,
-      rawICalVevent: updatedRaw
-    }
-  };
-};
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
   return (
@@ -424,10 +370,10 @@ function KeyValueList({ items }) {
   return (
     <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[auto,1fr]">
       {items.map(({ key, value }, idx) => (
-        <React.Fragment key={idx}>
+        <Fragment key={idx}>
           <dt className="text-xs font-semibold text-zinc-500">{key}</dt>
           <dd className="break-words text-sm text-zinc-800">{value || <span className="text-zinc-400">—</span>}</dd>
-        </React.Fragment>
+        </Fragment>
       ))}
     </dl>
   );
@@ -497,21 +443,16 @@ const formatShareIssuedAtDisplay = (entry) => {
 };
 
 function OrganizerApp() {
-  const projectId = useMemo(() => projectStore.resolveProjectIdFromLocation(), []);
-  const initialProjectState = useMemo(() => projectStore.getProjectStateSnapshot(projectId), [projectId]);
-  const initialShareTokens = useMemo(() => shareService.get(projectId), [projectId]);
-  const initialRouteContext = useMemo(() => projectStore.getCurrentRouteContext(), []);
-  const isAdminShareMiss =
-    initialRouteContext?.kind === "share-miss" && initialRouteContext?.shareType === "admin";
-  const [summary, setSummary] = useState(initialProjectState.project?.name || "");
-  const [description, setDescription] = useState(initialProjectState.project?.description || "");
-  const responseOptions = ["○", "△", "×"];
-  const [candidates, setCandidates] = useState(initialProjectState.candidates || []);
+  const [projectId, setProjectId] = useState(null);
+  const [routeContext, setRouteContext] = useState(null);
+  const [initialRouteContext, setInitialRouteContext] = useState(null);
+  const [summary, setSummary] = useState("");
+  const [description, setDescription] = useState("");
+  const [candidates, setCandidates] = useState([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [shareTokens, setShareTokens] = useState(initialShareTokens);
-  const [baseUrl, setBaseUrl] = useState(
-    () => deriveBaseUrlFromAdminEntry(initialShareTokens.admin) ?? resolveDefaultBaseUrl()
-  );
+  const [shareTokens, setShareTokens] = useState({});
+  const [baseUrl, setBaseUrl] = useState(() => resolveDefaultBaseUrl());
+  const baseUrlTouchedRef = useRef(false);
   const [navigateAfterGenerate, setNavigateAfterGenerate] = useState(false);
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
@@ -525,43 +466,75 @@ function OrganizerApp() {
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
 
-  useEffect(() => {
-    setCandidates(initialProjectState.candidates || []);
-    const unsubscribe = projectStore.subscribeProjectState(projectId, (nextState) => {
-      if (!nextState) return;
-      const nextProject = nextState.project || {};
-      setSummary((prev) => (nextProject.name !== undefined && nextProject.name !== prev ? nextProject.name : prev));
-      setDescription((prev) =>
-        nextProject.description !== undefined && nextProject.description !== prev ? nextProject.description : prev
-      );
-      setCandidates(nextState.candidates || []);
-      setShareTokens(shareService.get(projectId));
-    });
-    return unsubscribe;
-  }, [projectId, initialProjectState]);
-
-  useEffect(() => {
-    projectStore.updateProjectMeta(projectId, { name: summary, description });
-  }, [projectId, summary, description]);
+  const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
 
   useEffect(() => {
     let cancelled = false;
-    setInitialDataLoaded(false);
+    let unsubscribe = null;
 
-    ensureDemoProjectData(projectId)
-      .catch((error) => {
+    const bootstrap = async () => {
+      const resolved = projectService.resolveProjectFromLocation();
+      if (cancelled) {
+        return;
+      }
+
+      setProjectId(resolved.projectId);
+      setRouteContext(resolved.routeContext);
+      setInitialRouteContext(resolved.routeContext);
+      const state = resolved.state || {};
+      setSummary(state.project?.name || "");
+      setDescription(state.project?.description || "");
+      setCandidates(state.candidates || []);
+
+      const tokens = shareService.get(resolved.projectId);
+      setShareTokens(tokens);
+      const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
+      baseUrlTouchedRef.current = false;
+      setBaseUrl(derivedBaseUrl);
+
+      try {
+        await ensureDemoProjectData(resolved.projectId);
+      } catch (error) {
         console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setInitialDataLoaded(true);
         }
+      }
+
+      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+        if (cancelled || !nextState) return;
+        setSummary(nextState.project?.name || "");
+        setDescription(nextState.project?.description || "");
+        setCandidates(nextState.candidates || []);
+        setShareTokens(shareService.get(resolved.projectId));
+        setRouteContext(projectService.getRouteContext());
       });
+    };
+
+    bootstrap();
 
     return () => {
       cancelled = true;
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
     };
-  }, [projectId]);
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) return;
+    projectService.updateMeta(projectId, { name: summary, description });
+  }, [projectId, summary, description]);
+
+  useEffect(() => {
+    if (baseUrlTouchedRef.current) return;
+    const derived = deriveBaseUrlFromAdminEntry(shareTokens?.admin);
+    if (derived) {
+      baseUrlTouchedRef.current = false;
+      setBaseUrl(derived);
+    }
+  }, [shareTokens]);
 
   const downloadTextFile = (filename, text, mimeType = "text/plain;charset=utf-8") => {
     const blob = new Blob([text], { type: mimeType });
@@ -579,19 +552,26 @@ function OrganizerApp() {
   };
 
   const updateCandidate = (id, next) => {
+    if (!projectId) return;
     updateScheduleCandidate(projectId, id, next);
   };
 
   const removeCandidate = (id) => {
+    if (!projectId) return;
     removeScheduleCandidate(projectId, id);
   };
 
   const addCandidate = () => {
+    if (!projectId) return;
     addScheduleCandidate(projectId);
     popToast("日程を追加しました");
   };
 
   const handleExportAllCandidates = () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
     if (!candidates.length) {
       popToast("ダウンロード対象の日程がありません");
       return;
@@ -608,6 +588,10 @@ function OrganizerApp() {
   };
 
   const handleExportCandidate = (candidateId) => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
     const target = candidates.find((item) => item.id === candidateId);
     if (!target) {
       popToast("候補が見つかりませんでした");
@@ -668,11 +652,14 @@ function OrganizerApp() {
   };
 
   const handleDeleteProject = () => {
-    const fresh = projectStore.resetProject(projectId);
+    if (!projectId) return;
+    const fresh = projectService.reset(projectId);
     setSummary(fresh.project?.name || "");
     setDescription(fresh.project?.description || "");
     setCandidates(fresh.candidates || []);
+    baseUrlTouchedRef.current = false;
     refreshShareTokensState({ resetWhenMissing: true });
+    setRouteContext(projectService.getRouteContext());
     setImportPreview(null);
     setInitialDataLoaded(true);
     popToast("プロジェクトを削除し初期状態に戻しました");
@@ -690,12 +677,17 @@ function OrganizerApp() {
   };
 
   const handleIcsImport = async (file) => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
     const text = await file.text();
     let parsed;
     try {
       const ICAL = ensureICAL();
       parsed = ICAL.parse(text);
     } catch (error) {
+      void error;
       popToast("ICSの解析に失敗しました");
       return;
     }
@@ -836,12 +828,15 @@ function OrganizerApp() {
   };
 
   const refreshShareTokensState = (options = {}) => {
+    if (!projectId) return shareTokens;
     const tokens = shareService.get(projectId);
     setShareTokens(tokens);
     const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
-    if (derived) {
+    if (derived && !baseUrlTouchedRef.current) {
+      baseUrlTouchedRef.current = false;
       setBaseUrl(derived);
-    } else if (options.resetWhenMissing) {
+    } else if (options.resetWhenMissing && !baseUrlTouchedRef.current) {
+      baseUrlTouchedRef.current = false;
       setBaseUrl(resolveDefaultBaseUrl());
     }
     return tokens;
@@ -887,7 +882,9 @@ function OrganizerApp() {
       const current = new URL(window.location.href);
       if (target.origin === current.origin) {
         window.history.replaceState(null, "", target.pathname + target.search + target.hash);
-        projectStore.resolveProjectIdFromLocation();
+        const resolved = projectService.resolveProjectFromLocation();
+        setProjectId(resolved.projectId);
+        setRouteContext(resolved.routeContext);
       } else {
         window.location.assign(entry.url);
       }
@@ -898,6 +895,10 @@ function OrganizerApp() {
   };
 
   const handleShareLinkAction = () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
     const hasIssued = hasIssuedShareTokens;
     if (hasIssued) {
       const confirmed = window.confirm("共有URLを再発行します。以前のリンクは無効になります。続行しますか？");
@@ -907,6 +908,7 @@ function OrganizerApp() {
       const action = hasIssued ? shareService.rotate : shareService.generate;
       const result = action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
       refreshShareTokensState({ resetWhenMissing: true });
+      setRouteContext(projectService.getRouteContext());
       const notices = [];
       if (hasIssued) {
         notices.push("以前のリンクは無効です");
@@ -940,6 +942,7 @@ function OrganizerApp() {
   };
 
   useEffect(() => {
+    if (!projectId) return;
     if (autoIssueHandledRef.current) return;
     const adminEntry = shareTokens?.admin || null;
     const hasValidAdminToken =
@@ -970,8 +973,12 @@ function OrganizerApp() {
   }, [projectId, baseUrl, shareTokens, initialRouteContext]);
 
   const handleExportProjectInfo = () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
     try {
-      const exportData = projectStore.exportProjectState(projectId);
+      const exportData = projectService.exportState(projectId);
       const serialized = JSON.stringify(exportData, null, 2);
       const filename = `scheduly-project-${projectId}-${new Date().toISOString().split("T")[0]}.json`;
       downloadTextFile(filename, serialized, "application/json;charset=utf-8");
@@ -985,6 +992,11 @@ function OrganizerApp() {
   const handleProjectImportFromFile = async (event) => {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      event.target.value = "";
+      return;
+    }
     try {
       const confirmed = window.confirm("現在のプロジェクトを置き換えます。よろしいですか？");
       if (!confirmed) {
@@ -1001,12 +1013,14 @@ function OrganizerApp() {
             (parseError instanceof Error ? parseError.message : String(parseError))
         );
       }
-      projectStore.importProjectState(projectId, parsed);
-      const snapshot = projectStore.getProjectStateSnapshot(projectId);
+      projectService.importState(projectId, parsed);
+      const snapshot = projectService.getState(projectId);
       setSummary(snapshot.project?.name || "");
       setDescription(snapshot.project?.description || "");
       setCandidates(snapshot.candidates || []);
+      baseUrlTouchedRef.current = false;
       refreshShareTokensState({ resetWhenMissing: true });
+      setRouteContext(projectService.getRouteContext());
       setImportPreview(null);
       setInitialDataLoaded(true);
       popToast("プロジェクト情報をインポートしました");
@@ -1034,35 +1048,6 @@ function OrganizerApp() {
     participantShareEntry &&
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
-
-  const eventPayload = useMemo(() => {
-    return {
-      summary,
-      description,
-      responseOptions: responseOptions,
-      candidates: candidates.map((c, index) => ({
-        id: c.id,
-        order: index + 1,
-        ics: {
-          UID: c.uid,
-          SUMMARY: c.summary,
-          DTSTART: c.dtstart,
-          DTEND: c.dtend,
-          TZID: c.tzid,
-          STATUS: c.status,
-          SEQUENCE: c.sequence,
-          DTSTAMP: c.dtstamp,
-          LOCATION: c.location,
-          DESCRIPTION: c.description
-        }
-      })),
-      metadata: {
-        createdAt: "2024-05-01T10:00:00+09:00",
-        organizer: "匿名",
-        hint: "ダッシュボードから参照できます"
-      }
-    };
-  }, [summary, description, responseOptions, candidates]);
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1096,7 +1081,8 @@ function OrganizerApp() {
                     } else {
                       window.open(entry.url, "_blank");
                     }
-                  } catch (e) {
+                  } catch (error) {
+                    void error;
                     window.open(entry.url, "_blank");
                   }
                 } else {
@@ -1232,7 +1218,10 @@ function OrganizerApp() {
                 <input
                   type="url"
                   value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
+                  onChange={(event) => {
+                    baseUrlTouchedRef.current = true;
+                    setBaseUrl(event.target.value);
+                  }}
                   onBlur={handleBaseUrlBlur}
                   placeholder="https://scheduly.app"
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
@@ -1591,9 +1580,15 @@ function OrganizerApp() {
   );
 }
 
+SectionCard.displayName = "SectionCard";
+CandidateCard.displayName = "CandidateCard";
+CandidateMetaTable.displayName = "CandidateMetaTable";
+KeyValueList.displayName = "KeyValueList";
+
 const container = document.getElementById("root");
 if (!container) {
   throw new Error("Root element not found");
 }
 const root = ReactDOM.createRoot(container);
 root.render(<OrganizerApp />);
+export default OrganizerApp;

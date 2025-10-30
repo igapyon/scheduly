@@ -1,6 +1,7 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const projectStore = require("../store/project-store");
+const tallyService = require("./tally-service");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
 
@@ -49,6 +50,7 @@ const upsertResponse = (projectId, payload) => {
     updatedAt
   };
   projectStore.upsertResponse(projectId, response);
+  tallyService.recalculate(projectId, payload.candidateId);
   return response;
 };
 
@@ -80,12 +82,14 @@ const bulkImportResponses = (projectId, list) => {
   });
 
   projectStore.replaceResponses(projectId, Array.from(merged.values()));
+  tallyService.recalculate(projectId);
   return imported;
 };
 
 const clearResponsesForParticipant = (projectId, participantId) => {
   const responses = projectStore.getResponses(projectId).filter((item) => item && item.participantId !== participantId);
   projectStore.replaceResponses(projectId, responses);
+  tallyService.recalculate(projectId);
 };
 
 module.exports = {
