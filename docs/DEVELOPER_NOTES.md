@@ -50,9 +50,6 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - （優先度: 低）ICS 生成時に `TZID` 付きの `VTIMEZONE` を自動で組み込むなど、タイムゾーン情報の扱いを強化する（現状はカスタムプロパティ `X-SCHEDULY-TZID` のみ）。
 - `src/frontend` 側の UI 変更は直近バックポート済み。今後差分が出たときは `public/legacy` の HTML モックへ随時反映してギャップを最小化する。
 - 現状のオンメモリ実装ではブラウザの `sessionStorage` に状態を保持しています。将来的に本番運用する際はサーバー側の永続化（API 経由のストア）へ置き換えること。
-- TODO: （優先度: 中）`docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理をすべて `projectStore` 経由に集約する。
-- TODO: （優先度: 中）管理者・参加者一覧・回答編集の各 React 画面で、上記サービスを利用するようリファクタし、`projectStore.subscribe` を使った状態同期を整備する。
-- TODO: （優先度: 中）集計処理を `tallyService` / `summaryService` に集約し、`responseService.upsert` 完了時に `tallyService.recalculate` を必ず実行して一覧へ即時反映させるホットリロードループを構築する。
 - TODO: （優先度: 低）参加者の登録順を編集できるようにする。
 - TODO: （優先度: 低）履歴や監査ログを収集できる仕組みを導入する。
 - TODO: （優先度: 低）主要画面のレスポンシブ対応を再検討し、モバイル表示に対応させる（優先度: 低）。
@@ -61,8 +58,8 @@ Scheduly のモックを改善するときに頼りにしたい開発メモで�
 - TODO: 将来的に `user.html` や `user-edit.html` への直接アクセスを防ぐ仕組み（例: 共有URLからの遷移のみ許可）を導入する。
 - 管理・参加者・回答編集の 3 画面でデータ構造や表示ロジックが矛盾していないか確認し、必要に応じて調整する（説明文・ステータス・タイムゾーンなど）。
 - 管理画面で ICS をインポートまたは手入力 → 参加者登録 → 回答入力、という一連のフローが技術的に破綻なく成立するか検証する。
-- `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectStore` / `scheduleService` / `participantService` / `responseService` / `summaryService`）を実装し、React 3 画面から呼び出す。スコープ外の画面からは読み取り専用 API のみ公開する。
-- `responseService.upsert` の結果を使って `tallyService.recalculate` を反映するホットリロードループを `user-edit.jsx` から組み込み、○△× 更新とコメント保存がリアルタイムで一覧に反映されるよう整える。
+- TODO: （優先度: 中）`docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのサービス経由でデータを取得・更新し、`projectStore.subscribe` を使った状態同期を整える（スコープ外画面は読み取り専用ファサードを利用）。
+- TODO: （優先度: 中）`responseService.upsert` 後に `tallyService.recalculate` を必ず呼び出すホットリロードループを `user-edit.jsx` へ組み込み、○△× 更新やコメント保存が参加者一覧画面へ即時反映されるようにする。集計表示は `summaryService` に集約し、`user.jsx` ではサマリーデータを描画するだけの構成にする。
 - ICS インポートプレビューから選択した候補のみをストアへ適用できるようにし、未選択候補のスキップ理由を含めたログ／トースト表示を整える。
 - TODO: 日程ごとの「回答」ボタンから遷移した際、回答編集画面でも同じ日程が選択された状態で開くように調整する。
 - TODO: 日程の初期選択は ICS の UID を引き渡す形で実装し、参加者名の重複チェックと組み合わせて URL クエリ/state を整備する。
