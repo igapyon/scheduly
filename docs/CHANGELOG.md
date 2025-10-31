@@ -20,6 +20,27 @@ Scheduly の変更履歴を記録するドキュメントです。まだ公式�
 - project-store.js を拡張して派生タリーを永続化し、新しいゲッター／ルートコンテキストの連携を整備。
 - 共有コンポーネントの JSX ランタイム移行に伴う import 整理と displayName 付与を実施し、永久ログの注意書きを docs/DEVELOPER_NOTES.md に追記。
 
-テスト
+## 2025-10-31
 
-- npm run lint
+Commits
+- Cherry-pick: モックを最新で更新 (#32)
+- Cherry-pick: UI操作性の改善 (#33)
+
+Highlights
+- Update legacy mock HTML files and add schedule-based mock page.
+- Remove obsolete legacy mock pages.
+- Improve UI operability in participant/user screens.
+- Update developer notes.
+
+Files Changed (overview)
+- docs/DEVELOPER_NOTES.md
+- public/legacy/scheduly-admin-mock.html
+- public/legacy/scheduly-user-byschedule-mock.html (added)
+- public/legacy/scheduly-user-byuser-mock.html
+- public/legacy/scheduly-user-edit-mock.html (deleted)
+- public/legacy/scheduly-user-mock.html (deleted)
+- src/frontend/shared/EventMeta.jsx
+- src/frontend/user.jsx
+
+Stats
+- 8 files changed, 331 insertions(+), 784 deletions(-)
