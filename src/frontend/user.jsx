@@ -770,10 +770,11 @@ function AdminResponsesApp() {
       const candidates = projectState?.candidates || [];
       const responses = projectState?.responses || [];
 
-      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者ごとに「回答・コメント」の2列
+      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者ごとに「回答・コメント」の2列 + 右端集計列
       const participantNames = participants.map((p) => p.displayName || p.name || p.id);
       const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
-      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participantHeaderPairs]);
+      const rightSummaryHeaders = ['○', '△', '×', '未回答'];
+      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participantHeaderPairs, ...rightSummaryHeaders]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
@@ -800,14 +801,21 @@ function AdminResponsesApp() {
         return `${hh}:${mi}`;
       };
 
+      const pairCols = participants.length * 2; // E以降の参加者の列数
+      let grandO = 0, grandD = 0, grandX = 0, grandP = 0;
       candidates.forEach((c) => {
         const display = c.summary || c.label || c.id;
         const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display];
+        let co = 0, cd = 0, cx = 0, cp = 0;
         participants.forEach((p) => {
           const r = respMap.get(`${c.id}::${p.id}`);
           row.push(markToSymbol(r?.mark));
           row.push(typeof r?.comment === 'string' ? r.comment : '');
+          const m = r?.mark;
+          if (m === 'o') co += 1; else if (m === 'd') cd += 1; else if (m === 'x') cx += 1; else cp += 1;
         });
+        grandO += co; grandD += cd; grandX += cx; grandP += cp;
+        row.push(co, cd, cx, cp); // 行末に集計
         ws.addRow(row);
       });
 
@@ -842,7 +850,7 @@ function AdminResponsesApp() {
       countFor('未回答');
 
       ws.getRow(1).font = { bold: true };
-      // 列幅: BとCは同じ幅（Cを基準）、Dは広め、E以降は同一幅
+      // 列幅: BとCは同じ、Dは広め、E以降は回答/コメントのペア、右端4列は集計
       const dateColWidth = 12;
       const timeColWidth = 10; // B, C 共通
       const titleColWidth = 44; // D
@@ -858,14 +866,24 @@ function AdminResponsesApp() {
         else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
         else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
         else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
-        else if (n >= 5) {
+        else if (n >= 5 && n < 5 + pairCols) {
           // 5,6 が最初の参加者の (回答, コメント)、以降も2列毎
           const offset = n - 5; // 0-based
           const isCommentCol = offset % 2 === 1;
           w = isCommentCol ? commentColWidth : markColWidth;
+        } else if (n >= 5 + pairCols) {
+          // 右端の4集計列（○, △, ×, 未回答）
+          const idxFromRightStart = n - (5 + pairCols); // 0..3
+          w = idxFromRightStart === 3 ? 10 : 8; // 未回答少し広め
         }
         col.width = w;
       });
+
+      // 右端集計列の合計行を追加（全候補に対する総数）
+      const totalRow = ['', '', '', '合計'];
+      for (let i = 0; i < pairCols; i += 1) totalRow.push('');
+      totalRow.push(grandO, grandD, grandX, grandP);
+      ws.addRow(totalRow);
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
