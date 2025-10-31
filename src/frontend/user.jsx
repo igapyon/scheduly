@@ -771,7 +771,7 @@ function AdminResponsesApp() {
       const responses = projectState?.responses || [];
 
       // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者名
-      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participants.map((p) => p.name || p.id)]);
+      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participants.map((p) => p.displayName || p.name || p.id)]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
