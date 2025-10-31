@@ -781,7 +781,7 @@ function AdminResponsesApp() {
         respMap.set(key, r);
       });
 
-      const markToSymbol = (mark) => (mark === 'o' ? '○' : mark === 'd' ? '△' : mark === 'x' ? '×' : '');
+      const markToSymbol = (mark) => (mark === 'o' ? '○' : mark === 'd' ? '△' : mark === 'x' ? '×' : 'ー');
 
       const formatDate = (value) => {
         if (!value) return '';
