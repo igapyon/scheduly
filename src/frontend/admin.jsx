@@ -160,7 +160,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
   return (
     <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" open={open} onToggle={handleToggle}>
       <summary
-        className="flex list-none cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition hover:bg-emerald-50/50 sm:flex-row sm:items-center sm:justify-between"
+        className={`flex list-none cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition sm:flex-row sm:items-center sm:justify-between ${open ? "bg-emerald-50/60" : "bg-white"}`}
         onClick={(event) => {
           event.preventDefault();
           handleSummaryClick();
@@ -213,7 +213,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
         </div>
       </summary>
 
-      <div className="space-y-4 border-t border-zinc-200 px-5 py-5">
+      <div className={`space-y-4 px-5 py-5 ${open ? "rounded-b-2xl border border-emerald-200 bg-emerald-50/60" : "border-t border-zinc-200"}`}>
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
