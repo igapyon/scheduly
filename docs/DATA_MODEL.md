@@ -57,9 +57,9 @@ type ProjectState = {
 | `summary` | string | ◯ | `SUMMARY` | 候補名 |
 | `description` | string | △ | `DESCRIPTION` | 詳細説明 |
 | `location` | string | △ | `LOCATION` | 会場情報 |
-| `timezone` (`tzid`) | string | ◯ | `TZID` or `X-SCHEDULY-TZID` | 開催タイムゾーン |
-| `startsAt` | ISO string | ◯ | `DTSTART` | UTC or ローカル ISO。UI ではローカル入力形式に変換 |
-| `endsAt` | ISO string | ◯ | `DTEND` | 同上 |
+| `tzid` | string | ◯ | `TZID` or `X-SCHEDULY-TZID` | 開催タイムゾーン（実装では `tzid` フィールド） |
+| `dtstart` | ISO string | ◯ | `DTSTART` | UTC or ローカル ISO。UI ではローカル入力形式に変換 |
+| `dtend` | ISO string | ◯ | `DTEND` | 同上 |
 | `rawVevent` | string (ICS) or JSON | ◯ | VEVENT 全体 | **正規データ**。再出力時に利用 |
 
 > **編集方針**  
@@ -107,7 +107,7 @@ UI では `ScheduleCandidate` 本体に `tally?: CandidateTally` を付与して
 | `updatedAt` | ISO string | ◯ | 最終更新日時 |
 | `source` | `'web' \| 'ics' \| 'import' \| ...` | △ | どの経路で登録されたか（任意） |
 
-> 参加者が候補を未回答の場合、`Response` 自体を作らないか、`mark: null` として保持するかは実装ポリシー次第。現行モックでは「未回答」を UI 側で計算して表示している。
+> 未回答表現について: 実装では `responses` に該当組み合わせが無い、または `mark` が `'o'|'d'|'x'` 以外の場合を未回答として扱い、UI では `pending` 相当として描画する（Excel 出力では記号 `ー`）。
 
 ### 3.3 集計とビュー用の派生構造
 
@@ -118,13 +118,13 @@ type ParticipantSummary = {
   participant: Participant;
   responses: Array<{
     candidateId: string;
-    mark: 'o' | 'd' | 'x' | null;
+    mark: 'o' | 'd' | 'x' | null; // 未回答は null / 欠如をUI側で pending 表示
     comment?: string;
     candidateSnapshot: {
       summary: string;
-      startsAt: string;
-      endsAt: string;
-      timezone: string;
+      dtstart: string;
+      dtend: string;
+      tzid: string;
       status: ScheduleCandidate['status'];
       location?: string;
       description?: string;
@@ -149,4 +149,16 @@ type ParticipantSummary = {
 - `timezone` は ICS より `TZID` として渡される場合と、Chrome DevTools からコピーした DOM のようにテキストとしてのみ存在する場合がある。保存時は `sanitizeTzid` 相当の正規化処理を行う。
 - 将来的に API を設計する場合は、`Project` をルートとした REST（例: `/projects/:id/candidates`, `/projects/:id/participants`）か、GraphQL / tRPC などでまとめて取得する形を想定すると UI 実装との整合が取りやすい。
 
-このドキュメントは仕様検討フェーズのベースラインとして利用し、実装着手後にフィールド追加・命名変更が必要になった場合は随時更新する。
+ このドキュメントは仕様検討フェーズのベースラインとして利用し、実装着手後にフィールド追加・命名変更が必要になった場合は随時更新する。
+
+---
+
+## 6. Export / 派生ビュー（参考）
+
+UI からの派生出力として、参加者画面（user.jsx）は Excel 形式のエクスポートを提供している（exceljs）。データモデルに直接の新フィールドは追加しないが、出力列は次のスナップショットを基に生成される。
+
+- 列: 日付, 開始, 終了, タイトル（SUMMARY）, ステータス（STATUS）, 場所（LOCATION）, 説明（DESCRIPTION）
+- 以降: 参加者ごとに 2 列ペア（回答記号, コメント）
+- 右端: ○/△/×/ー の日程別集計 + 最終行に総合計
+
+> 実装メモ: 記号セルは○=緑/△=黄/×=赤/ー=灰のフォント色で出力。ヘッダ行は薄い青、合計行は薄いオレンジ背景で視認性を高めている。
