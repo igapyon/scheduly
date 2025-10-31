@@ -770,7 +770,8 @@ function AdminResponsesApp() {
       const candidates = projectState?.candidates || [];
       const responses = projectState?.responses || [];
 
-      ws.addRow(['日程/参加者', ...participants.map((p) => p.name || p.id)]);
+      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者名
+      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participants.map((p) => p.name || p.id)]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
@@ -779,8 +780,27 @@ function AdminResponsesApp() {
 
       const markToSymbol = (mark) => (mark === 'o' ? '○' : mark === 'd' ? '△' : mark === 'x' ? '×' : '');
 
+      const formatDate = (value) => {
+        if (!value) return '';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}/${mm}/${dd}`;
+      };
+      const formatTime = (value) => {
+        if (!value) return '';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${hh}:${mi}`;
+      };
+
       candidates.forEach((c) => {
-        const row = [c.summary || c.label || c.id];
+        const display = c.summary || c.label || c.id;
+        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display];
         participants.forEach((p) => {
           const r = respMap.get(`${c.id}::${p.id}`);
           row.push(markToSymbol(r?.mark));
@@ -790,7 +810,11 @@ function AdminResponsesApp() {
 
       ws.getRow(1).font = { bold: true };
       ws.columns.forEach((col, idx) => {
-        const w = idx === 1 ? 40 : 12;
+        let w = 12; // default for participant columns
+        if (idx === 1) w = 12; // 日付
+        else if (idx === 2) w = 8; // 開始
+        else if (idx === 3) w = 8; // 終了
+        else if (idx === 4) w = 40; // 日程ラベル
         col.width = w;
       });
 
