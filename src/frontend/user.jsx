@@ -811,6 +811,36 @@ function AdminResponsesApp() {
         ws.addRow(row);
       });
 
+      // 集計行（○/△/×/未回答の件数）を日程データの直下に追加
+      const countFor = (key) => {
+        const row = ['', '', '', key];
+        participants.forEach((p) => {
+          let cnt = 0;
+          candidates.forEach((c) => {
+            const r = respMap.get(`${c.id}::${p.id}`);
+            const m = r?.mark;
+            if (key === '未回答') {
+              if (!m || (m !== 'o' && m !== 'd' && m !== 'x')) cnt += 1;
+            } else if (key === '○') {
+              if (m === 'o') cnt += 1;
+            } else if (key === '△') {
+              if (m === 'd') cnt += 1;
+            } else if (key === '×') {
+              if (m === 'x') cnt += 1;
+            }
+          });
+          // 参加者は2列ペア（回答, コメント）。回答列に件数、コメント列は空。
+          row.push(cnt);
+          row.push('');
+        });
+        ws.addRow(row);
+      };
+
+      countFor('○');
+      countFor('△');
+      countFor('×');
+      countFor('未回答');
+
       ws.getRow(1).font = { bold: true };
       // 列幅: BとCは同じ幅（Cを基準）、Dは広め、E以降は同一幅
       const dateColWidth = 12;
