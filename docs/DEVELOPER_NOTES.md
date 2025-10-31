@@ -91,6 +91,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - N/A
 
 ### 優先度: 中
+- Tailwind を本番ビルドへ移行（CDN 依存を解消）。PostCSS/CLI を導入し、`tailwind.config.js` の `content` を `public/**/*.html` と `src/frontend/**/*.{js,jsx}` に設定、生成 CSS を HTML へ適用する。CDN 警告を解消する。
+- 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
 - `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのファサードを経由してデータ取得・更新を行い、`projectStore.subscribe` を用いた状態同期を整える（スコープ外画面は読み取り専用ファサードに限定）。
 - `responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
 - 参加者の登録順を編集できるようにする。
@@ -107,6 +109,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
+- favicon 404 を解消（`public/favicon.ico` 追加、または `<link rel="icon">` を明示）。
+- InfoBadge / SectionCard の利用ガイドを本ドキュメントに整備（左列: `basis-0 grow min-w-0`、右列: `shrink-0`、テキスト: `break-words` の原則）。
 
 ### ナビゲーション/UX 調整
 - 日程タブ／参加者タブの「回答」ボタンで開いたインライン編集が、切り替え時に意図せず閉じないようフォーカスとスクロール挙動を最適化する。
