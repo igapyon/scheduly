@@ -9,8 +9,10 @@ function EventMeta({
   timezoneClassName = "text-xs text-zinc-400",
   description,
   descriptionClassName = "text-xs text-zinc-500",
+  descriptionTitle,
   location,
   locationClassName = "flex flex-wrap items-center gap-2 text-xs text-zinc-500",
+  locationTitle,
   showLocationIcon = false,
   statusText,
   statusPrefix = "状態:",
@@ -31,9 +33,13 @@ function EventMeta({
           {shouldShowTimezone ? <span className={timezoneClassName}>{normalizedTimezone}</span> : null}
         </div>
       ) : null}
-      {description ? <div className={descriptionClassName}>{description}</div> : null}
+      {description ? (
+        <div className={descriptionClassName} title={descriptionTitle}>
+          {description}
+        </div>
+      ) : null}
       {(location || statusText) ? (
-        <div className={locationClassName}>
+        <div className={locationClassName} title={locationTitle}>
           {location ? (
             <span className={showLocationIcon ? "inline-flex items-center gap-1" : undefined}>
               {showLocationIcon ? <span aria-hidden="true">📍</span> : null}

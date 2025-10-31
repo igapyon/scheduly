@@ -93,9 +93,11 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
             dateTime={schedule.rangeLabel}
             dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-zinc-600"
             description={schedule.description}
-            descriptionClassName="text-xs text-zinc-500"
+            descriptionClassName={`text-xs text-zinc-500${open ? "" : " whitespace-nowrap truncate max-w-[48ch]"}`}
+            descriptionTitle={open ? undefined : schedule.description}
             location={schedule.location}
-            locationClassName="flex items-center gap-2 text-xs text-zinc-500"
+            locationClassName={`flex items-center gap-2 text-xs text-zinc-500${open ? "" : " whitespace-nowrap truncate max-w-[48ch]"}`}
+            locationTitle={open ? undefined : schedule.location}
             showLocationIcon
           />
         </div>
