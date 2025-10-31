@@ -770,8 +770,10 @@ function AdminResponsesApp() {
       const candidates = projectState?.candidates || [];
       const responses = projectState?.responses || [];
 
-      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者名
-      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participants.map((p) => p.displayName || p.name || p.id)]);
+      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者ごとに「回答・コメント」の2列
+      const participantNames = participants.map((p) => p.displayName || p.name || p.id);
+      const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
+      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participantHeaderPairs]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
@@ -804,6 +806,7 @@ function AdminResponsesApp() {
         participants.forEach((p) => {
           const r = respMap.get(`${c.id}::${p.id}`);
           row.push(markToSymbol(r?.mark));
+          row.push(typeof r?.comment === 'string' ? r.comment : '');
         });
         ws.addRow(row);
       });
@@ -813,15 +816,24 @@ function AdminResponsesApp() {
       const dateColWidth = 12;
       const timeColWidth = 10; // B, C 共通
       const titleColWidth = 44; // D
-      const participantColWidth = 14; // E以降（E=F=...）
+      const markColWidth = 6; // 参加者の回答列（○△×）
+      const commentColWidth = 24; // 参加者のコメント列
       // 注意: forEach の idx は 0 始まり。ExcelJS の列番号は 1 始まり。
       ws.columns.forEach((col, idx) => {
         const n = idx + 1; // 列番号 (A=1, B=2 ...)
-        let w = participantColWidth; // default for participant columns (E以降)
+        // 参加者は2列ペア（回答, コメント）がE以降に並ぶ
+        // E=5 が最初の回答列、F=6 がそのコメント列
+        let w = markColWidth; // default (回答列)
         if (n === 1) w = dateColWidth; // A: 日付
         else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
         else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
         else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
+        else if (n >= 5) {
+          // 5,6 が最初の参加者の (回答, コメント)、以降も2列毎
+          const offset = n - 5; // 0-based
+          const isCommentCol = offset % 2 === 1;
+          w = isCommentCol ? commentColWidth : markColWidth;
+        }
         col.width = w;
       });
 
