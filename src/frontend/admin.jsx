@@ -144,7 +144,6 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
 
 function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen }) {
   const open = Boolean(isOpen);
-  const [metaOpen, setMetaOpen] = useState(false);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
   const ignoreNextClickRef = useRef(false);
@@ -200,16 +199,6 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
-            onClick={(event) => {
-              event.preventDefault();
-              setMetaOpen(true);
-            }}
-          >
-            ICS 詳細
-          </button>
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
@@ -317,22 +306,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
 
       </div>
 
-      {metaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6" onClick={() => setMetaOpen(false)}>
-          <div
-            className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
-            role="dialog"
-            aria-labelledby={dialogTitleId}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-        <h3 id={dialogTitleId} className="text-sm font-semibold text-zinc-800">ICS詳細</h3>
-              <button className="text-xs text-zinc-500" onClick={() => setMetaOpen(false)}>閉じる</button>
-            </div>
-            <CandidateMetaTable candidate={value} />
-          </div>
-        </div>
-      )}
+      {/* Hidden UID for diagnostics/export: not visible, remains in DOM */}
+      <div className="hidden" aria-hidden="true" data-uid={value?.uid || ""}>{value?.uid || ""}</div>
     </details>
   );
 }
