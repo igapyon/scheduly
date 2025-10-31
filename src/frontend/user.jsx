@@ -817,6 +817,23 @@ function AdminResponsesApp() {
         grandO += co; grandD += cd; grandX += cx; grandP += cp;
         row.push(co, cd, cx, cp); // 行末に集計
         ws.addRow(row);
+
+        // 記号セル（回答列）のフォント色をマークに応じて着色
+        const last = ws.lastRow;
+        const colorFor = (mark) => {
+          // emerald-600, amber-600, rose-600, zinc-500
+          if (mark === 'o') return { argb: 'FF059669' };
+          if (mark === 'd') return { argb: 'FFF59E0B' };
+          if (mark === 'x') return { argb: 'FFEF4444' };
+          return { argb: 'FF6B7280' }; // 未回答
+        };
+        participants.forEach((p, idx) => {
+          const r = respMap.get(`${c.id}::${p.id}`);
+          const mark = r?.mark;
+          const col = 5 + idx * 2; // E=5, 次の回答列は +2 ずつ
+          const cell = last.getCell(col);
+          cell.font = { ...(cell.font || {}), color: colorFor(mark) };
+        });
       });
 
       // 集計行（○/△/×/未回答の件数）を日程データの直下に追加
