@@ -444,9 +444,15 @@ function ParticipantSummary({
                   dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-600"
                   timezone={schedule ? timezone : null}
                   description={description}
-                  descriptionClassName="text-xs text-zinc-500"
+                  descriptionClassName={`text-xs text-zinc-500${
+                    isEditing ? "" : " whitespace-nowrap truncate max-w-[48ch]"
+                  }`}
+                  descriptionTitle={isEditing ? undefined : description}
                   location={location}
-                  locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+                  locationClassName={`flex items-center gap-1 text-xs text-zinc-500${
+                    isEditing ? "" : " whitespace-nowrap truncate max-w-[48ch]"
+                  }`}
+                  locationTitle={isEditing ? undefined : location}
                   showLocationIcon
                   statusText={null}
                   statusPrefix=""
@@ -461,7 +467,14 @@ function ParticipantSummary({
                     onClose={() => onToggleInlineEdit?.(participant.id, response.scheduleId)}
                   />
                 ) : (
-                  <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+                  <div
+                    className={`text-xs ${
+                      response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"
+                    } whitespace-nowrap truncate max-w-[40ch]`}
+                    title={response.comment || undefined}
+                  >
+                    {response.comment}
+                  </div>
                 )}
               </div>
               <div className="flex flex-col items-end gap-2">
