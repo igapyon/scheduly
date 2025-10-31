@@ -898,9 +898,8 @@ function AdminResponsesApp() {
           const isCommentCol = offset % 2 === 1;
           w = isCommentCol ? commentColWidth : markColWidth;
         } else if (n >= 5 + pairCols) {
-          // 右端の4集計列（○, △, ×, 未回答）
-          const idxFromRightStart = n - (5 + pairCols); // 0..3
-          w = idxFromRightStart === 3 ? 10 : 8; // 未回答少し広め
+          // 右端の4集計列（○, △, ×, ー）: いずれも同幅（×に合わせる）
+          w = 8;
         }
         col.width = w;
       });
