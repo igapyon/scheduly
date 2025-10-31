@@ -142,19 +142,15 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove }) {
- 
-  const [open, setOpen] = useState(index === 0);
+function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen }) {
+  const open = Boolean(isOpen);
   const [metaOpen, setMetaOpen] = useState(false);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
 
-  const handleToggle = (event) => {
-    setOpen(event.currentTarget.open);
-  };
-
+  const handleToggle = () => {};
   const handleSummaryClick = () => {
-    setOpen((prev) => !prev);
+    if (typeof onToggleOpen === 'function') onToggleOpen();
   };
 
   return (
@@ -467,6 +463,7 @@ function OrganizerApp() {
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
+  const [openCandidateId, setOpenCandidateId] = useState(null);
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
@@ -489,6 +486,9 @@ function OrganizerApp() {
       setSummary(state.project?.name || "");
       setDescription(state.project?.description || "");
       setCandidates(state.candidates || []);
+      if (!openCandidateId && state.candidates && state.candidates.length > 0) {
+        setOpenCandidateId(state.candidates[0].id);
+      }
 
       const tokens = shareService.get(resolved.projectId);
       setShareTokens(tokens);
@@ -511,6 +511,10 @@ function OrganizerApp() {
         setSummary(nextState.project?.name || "");
         setDescription(nextState.project?.description || "");
         setCandidates(nextState.candidates || []);
+        // 既に開いているIDがなく、候補があれば先頭を開く
+        if (!openCandidateId && nextState.candidates && nextState.candidates.length > 0) {
+          setOpenCandidateId((prev) => prev || nextState.candidates[0].id);
+        }
         setShareTokens(shareService.get(resolved.projectId));
         setRouteContext(projectService.getRouteContext());
       });
@@ -1195,6 +1199,8 @@ function OrganizerApp() {
                   onRemove={() => openCandidateDeleteDialog(candidate)}
                   onExport={() => handleExportCandidate(candidate.id)}
                   disableRemove={candidates.length === 1}
+                  isOpen={openCandidateId === candidate.id}
+                  onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
                 />
               ))
             )}
