@@ -121,21 +121,21 @@ const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + I
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className="w-full space-y-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+        <div className="space-y-1 min-w-0 basis-0 grow">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-700">
               <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
-              <span>{title}</span>
+              <span className="break-words">{title}</span>
             </h2>
             {infoMessage && (
               <InfoBadge ariaLabel={`${title} の説明`} title={infoTitle || title} message={infoMessage} />
             )}
           </div>
-          {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
+          {description && <p className="mt-1 break-words text-xs text-zinc-500">{description}</p>}
         </div>
-        {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
       <div className="space-y-4">{children}</div>
     </section>
@@ -160,13 +160,13 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
   return (
     <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" open={open} onToggle={handleToggle}>
       <summary
-        className="flex cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition hover:bg-emerald-50/50 sm:flex-row sm:items-center sm:justify-between"
+        className="flex list-none cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition hover:bg-emerald-50/50 sm:flex-row sm:items-center sm:justify-between"
         onClick={(event) => {
           event.preventDefault();
           handleSummaryClick();
         }}
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-center gap-2 text-xs">
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
               {formatIcalStatusLabel(value.status || "CONFIRMED")}
@@ -174,21 +174,21 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           </div>
           <EventMeta
             summary={value.summary || "タイトル未設定"}
-            summaryClassName="text-sm font-semibold text-zinc-800"
+            summaryClassName="min-w-0 break-words text-sm font-semibold text-zinc-800"
             dateTime={displayMeta}
             dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-500"
             timezone={value.tzid || DEFAULT_TZID}
             timezoneClassName="text-xs text-zinc-400"
             description={value.description}
-            descriptionClassName="text-xs text-zinc-500"
+            descriptionClassName="break-words text-xs text-zinc-500"
             location={value.location}
-            locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+            locationClassName="flex items-center gap-1 break-words text-xs text-zinc-500"
             showLocationIcon
             statusText={null}
             statusPrefix=""
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
@@ -465,6 +465,20 @@ function OrganizerApp() {
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
+
+  // モバイル幅での横スクロール抑止（念のため全体に適用）
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflowX = html.style.overflowX;
+    const prevBodyOverflowX = body.style.overflowX;
+    html.style.overflowX = "hidden";
+    body.style.overflowX = "hidden";
+    return () => {
+      html.style.overflowX = prevHtmlOverflowX;
+      body.style.overflowX = prevBodyOverflowX;
+    };
+  }, []);
 
   const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
 
@@ -1050,16 +1064,16 @@ function OrganizerApp() {
     isNonEmptyString(participantShareEntry.url);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
-      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <div className="mx-auto flex min-h-screen w-full max-w-[calc(100vw-24px)] flex-col gap-5 overflow-x-hidden px-4 py-6 text-zinc-900 sm:max-w-3xl sm:px-6">
+      <header className="w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-zinc-900">
+            <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-bold text-zinc-900">
               <span aria-hidden="true">🗂️</span>
-              <span>Scheduly 管理</span>
+              <span className="break-words">Scheduly 管理</span>
             </h1>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 break-words text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
             {isAdminShareMiss && (
@@ -1068,8 +1082,8 @@ function OrganizerApp() {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
               type="button"
               onClick={() => {
                 const entry = shareTokens?.participant;
@@ -1105,9 +1119,9 @@ function OrganizerApp() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-5">
+      <div className="grid w-full flex-1 grid-cols-1 gap-5 overflow-x-hidden">
 
-        <main className="space-y-5">
+        <main className="w-full space-y-5 overflow-x-hidden">
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
@@ -1197,7 +1211,7 @@ function OrganizerApp() {
           </SectionCard>
         </main>
 
-        <aside className="space-y-5">
+        <aside className="w-full space-y-5 overflow-x-hidden">
           <SectionCard
             title="共有URL"
             description="参加者へ共有するリンクと管理者リンクを確認できます。"
