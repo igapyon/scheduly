@@ -760,6 +760,196 @@ function AdminResponsesApp() {
     downloadIcsFile(filename, icsText);
   };
 
+  const handleDownloadAllExcel = async () => {
+    try {
+      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Responses');
+
+      const participants = projectState?.participants || [];
+      const candidates = projectState?.candidates || [];
+      const responses = projectState?.responses || [];
+
+      // ヘッダー行: 日付 / 開始 / 終了 / タイトル（SUMMARY） / ステータス（STATUS） / 場所（LOCATION） / 説明（DESCRIPTION）
+      //           + 参加者ごとに「回答・コメント」の2列 + 右端集計列
+      const participantNames = participants.map((p) => p.displayName || p.name || p.id);
+      const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
+      const rightSummaryHeaders = ['○', '△', '×', 'ー'];
+      ws.addRow(['日付', '開始', '終了', 'タイトル（SUMMARY）', 'ステータス（STATUS）', '場所（LOCATION）', '説明（DESCRIPTION）', ...participantHeaderPairs, ...rightSummaryHeaders]);
+      const respMap = new Map();
+      responses.forEach((r) => {
+        const key = `${r.candidateId}::${r.participantId}`;
+        respMap.set(key, r);
+      });
+
+      const markToSymbol = (mark) => (mark === 'o' ? '○' : mark === 'd' ? '△' : mark === 'x' ? '×' : 'ー');
+
+      const formatDate = (value) => {
+        if (!value) return '';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}/${mm}/${dd}`;
+      };
+      const formatTime = (value) => {
+        if (!value) return '';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${hh}:${mi}`;
+      };
+
+      const pairCols = participants.length * 2; // 参加者の列数（回答+コメント）
+      const firstParticipantCol = 8; // H列(=8)から参加者ペアが始まる（E:5=STATUS, F:6=場所, G:7=説明）
+      let grandO = 0, grandD = 0, grandX = 0, grandP = 0;
+      candidates.forEach((c) => {
+        const display = c.summary || c.label || c.id;
+        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display, (c.status || 'TENTATIVE'), c.location || '', c.description || ''];
+        let co = 0, cd = 0, cx = 0, cp = 0;
+        participants.forEach((p) => {
+          const r = respMap.get(`${c.id}::${p.id}`);
+          row.push(markToSymbol(r?.mark));
+          row.push(typeof r?.comment === 'string' ? r.comment : '');
+          const m = r?.mark;
+          if (m === 'o') co += 1; else if (m === 'd') cd += 1; else if (m === 'x') cx += 1; else cp += 1;
+        });
+        grandO += co; grandD += cd; grandX += cx; grandP += cp;
+        row.push(co, cd, cx, cp); // 行末に集計
+        ws.addRow(row);
+
+        // 記号セル（回答列）のフォント色をマークに応じて着色
+        const last = ws.lastRow;
+        const colorFor = (mark) => {
+          // emerald-600, amber-600, rose-600, zinc-500
+          if (mark === 'o') return { argb: 'FF059669' };
+          if (mark === 'd') return { argb: 'FFF59E0B' };
+          if (mark === 'x') return { argb: 'FFEF4444' };
+          return { argb: 'FF6B7280' }; // 未回答
+        };
+        participants.forEach((p, idx) => {
+          const r = respMap.get(`${c.id}::${p.id}`);
+          const mark = r?.mark;
+          const col = firstParticipantCol + idx * 2; // G=7, 次の回答列は +2 ずつ
+          const cell = last.getCell(col);
+          cell.font = { ...(cell.font || {}), color: colorFor(mark) };
+        });
+      });
+
+      // 集計行（○/△/×/ー の件数）を日程データの直下に追加
+      const countFor = (key) => {
+        // A:日付, B:開始, C:終了, D:タイトル, E:STATUS, F:場所, G:説明
+        // 参加者ペアは H 列以降のため、EFG 分の空白を挿入
+        const row = ['', '', '', key, '', '', ''];
+        participants.forEach((p) => {
+          let cnt = 0;
+          candidates.forEach((c) => {
+            const r = respMap.get(`${c.id}::${p.id}`);
+            const m = r?.mark;
+            if (key === 'ー') {
+              if (!m || (m !== 'o' && m !== 'd' && m !== 'x')) cnt += 1;
+            } else if (key === '○') {
+              if (m === 'o') cnt += 1;
+            } else if (key === '△') {
+              if (m === 'd') cnt += 1;
+            } else if (key === '×') {
+              if (m === 'x') cnt += 1;
+            }
+          });
+          // 参加者は2列ペア（回答, コメント）。回答列に件数、コメント列は空。
+          row.push(cnt);
+          row.push('');
+        });
+        ws.addRow(row);
+      };
+
+      countFor('○');
+      countFor('△');
+      countFor('×');
+      countFor('ー');
+
+      ws.getRow(1).font = { bold: true };
+      // タイトル行: 薄い青色背景
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0F2FE' } // sky-100相当
+        };
+      });
+      // 列幅: BとCは同じ、Dは広め、E=ステータス、F=場所・G=説明を広め、H以降は回答/コメントのペア、右端4列は集計
+      const dateColWidth = 12;
+      const timeColWidth = 10; // B, C 共通
+      const titleColWidth = 44; // D
+      const statusColWidth = 14; // E: ステータス
+      const locColWidth = 40; // F: 場所
+      const descColWidth = 64; // G: 説明
+      const markColWidth = 6; // 参加者の回答列（○△×）
+      const commentColWidth = 24; // 参加者のコメント列
+      // 注意: forEach の idx は 0 始まり。ExcelJS の列番号は 1 始まり。
+      ws.columns.forEach((col, idx) => {
+        const n = idx + 1; // 列番号 (A=1, B=2 ...)
+        // 参加者は2列ペア（回答, コメント）がE以降に並ぶ
+        // G=7 が最初の回答列、隣がそのコメント列
+        let w = markColWidth; // default (回答列)
+        if (n === 1) w = dateColWidth; // A: 日付
+        else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
+        else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
+        else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
+        else if (n === 5) w = statusColWidth; // E: ステータス
+        else if (n === 6) w = locColWidth; // F: 場所
+        else if (n === 7) w = descColWidth; // G: 説明
+        else if (n >= firstParticipantCol && n < firstParticipantCol + pairCols) {
+          // H以降が参加者の (回答, コメント)、以降も2列毎
+          const offset = n - firstParticipantCol; // 0-based
+          const isCommentCol = offset % 2 === 1;
+          w = isCommentCol ? commentColWidth : markColWidth;
+        } else if (n >= firstParticipantCol + pairCols) {
+          // 右端の4集計列（○, △, ×, ー）: いずれも同幅（×に合わせる）
+          w = 8;
+        }
+        col.width = w;
+      });
+
+      // 右端集計列の合計行を追加（全候補に対する総数）
+      const totalRow = ['', '', '', '合計'];
+      // E, F, G はステータス・場所・説明の列。合計行は空で埋める
+      totalRow.push('', '', '');
+      for (let i = 0; i < pairCols; i += 1) totalRow.push('');
+      totalRow.push(grandO, grandD, grandX, grandP);
+      ws.addRow(totalRow);
+      // 合計行: 薄いオレンジ色背景
+      const lastRow = ws.lastRow;
+      lastRow.font = { ...(lastRow.font || {}), bold: true };
+      lastRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFEF3C7' } // amber-100相当
+        };
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'responses.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+    } catch (error) {
+      console.error('Excel export failed (exceljs not installed?)', error);
+      alert('Excelエクスポートに失敗しました。exceljs 依存を追加後に再試行してください。\nnpm i exceljs');
+    }
+  };
+
   const hasIcsData = Boolean((projectState?.icsText && projectState.icsText.trim()) || schedules.length);
   const participantCount = participants.length;
 
@@ -1033,12 +1223,14 @@ function AdminResponsesApp() {
             >
               日程をICSに一括エクスポート
             </button>
-            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
-              全回答を CSV でダウンロード
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300"
+              onClick={handleDownloadAllExcel}
+            >
+              全回答を Excelブックでダウンロード
             </button>
-            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
-              サマリーをコピー（仮）
-            </button>
+            {/* TODO: サマリーをコピー機能は仕様検討中のため一時的に非表示 */}
           </div>
         </div>
       </section>
