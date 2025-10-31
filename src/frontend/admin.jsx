@@ -119,7 +119,7 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
-function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "" }) {
   return (
     <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -137,7 +137,7 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
         </div>
         {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className={`space-y-4 ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
@@ -1120,6 +1120,7 @@ function OrganizerApp() {
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
             infoMessage="日程調整プロジェクトの情報を設定します。プロジェクトの目的を設定します。"
+            bodyClassName="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
