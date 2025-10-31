@@ -770,11 +770,12 @@ function AdminResponsesApp() {
       const candidates = projectState?.candidates || [];
       const responses = projectState?.responses || [];
 
-      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者ごとに「回答・コメント」の2列 + 右端集計列
+      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル / 詳細テキスト / 場所
+      //           + 参加者ごとに「回答・コメント」の2列 + 右端集計列
       const participantNames = participants.map((p) => p.displayName || p.name || p.id);
       const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
       const rightSummaryHeaders = ['○', '△', '×', 'ー'];
-      ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participantHeaderPairs, ...rightSummaryHeaders]);
+      ws.addRow(['日付', '開始', '終了', '日程/参加者', '詳細テキスト', '場所', ...participantHeaderPairs, ...rightSummaryHeaders]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
@@ -801,11 +802,12 @@ function AdminResponsesApp() {
         return `${hh}:${mi}`;
       };
 
-      const pairCols = participants.length * 2; // E以降の参加者の列数
+      const pairCols = participants.length * 2; // 参加者の列数（回答+コメント）
+      const firstParticipantCol = 7; // G列(=7)から参加者ペアが始まる（E:5=詳細、F:6=場所）
       let grandO = 0, grandD = 0, grandX = 0, grandP = 0;
       candidates.forEach((c) => {
         const display = c.summary || c.label || c.id;
-        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display];
+        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display, c.description || '', c.location || ''];
         let co = 0, cd = 0, cx = 0, cp = 0;
         participants.forEach((p) => {
           const r = respMap.get(`${c.id}::${p.id}`);
@@ -830,7 +832,7 @@ function AdminResponsesApp() {
         participants.forEach((p, idx) => {
           const r = respMap.get(`${c.id}::${p.id}`);
           const mark = r?.mark;
-          const col = 5 + idx * 2; // E=5, 次の回答列は +2 ずつ
+          const col = firstParticipantCol + idx * 2; // G=7, 次の回答列は +2 ずつ
           const cell = last.getCell(col);
           cell.font = { ...(cell.font || {}), color: colorFor(mark) };
         });
@@ -876,28 +878,32 @@ function AdminResponsesApp() {
           fgColor: { argb: 'FFE0F2FE' } // sky-100相当
         };
       });
-      // 列幅: BとCは同じ、Dは広め、E以降は回答/コメントのペア、右端4列は集計
+      // 列幅: BとCは同じ、Dは広め、E=詳細・F=場所を広め、G以降は回答/コメントのペア、右端4列は集計
       const dateColWidth = 12;
       const timeColWidth = 10; // B, C 共通
       const titleColWidth = 44; // D
+      const descColWidth = 64; // E: 詳細テキスト
+      const locColWidth = 40; // F: 場所
       const markColWidth = 6; // 参加者の回答列（○△×）
       const commentColWidth = 24; // 参加者のコメント列
       // 注意: forEach の idx は 0 始まり。ExcelJS の列番号は 1 始まり。
       ws.columns.forEach((col, idx) => {
         const n = idx + 1; // 列番号 (A=1, B=2 ...)
         // 参加者は2列ペア（回答, コメント）がE以降に並ぶ
-        // E=5 が最初の回答列、F=6 がそのコメント列
+        // G=7 が最初の回答列、隣がそのコメント列
         let w = markColWidth; // default (回答列)
         if (n === 1) w = dateColWidth; // A: 日付
         else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
         else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
         else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
-        else if (n >= 5 && n < 5 + pairCols) {
-          // 5,6 が最初の参加者の (回答, コメント)、以降も2列毎
-          const offset = n - 5; // 0-based
+        else if (n === 5) w = descColWidth; // E: 詳細
+        else if (n === 6) w = locColWidth; // F: 場所
+        else if (n >= firstParticipantCol && n < firstParticipantCol + pairCols) {
+          // G以降が参加者の (回答, コメント)、以降も2列毎
+          const offset = n - firstParticipantCol; // 0-based
           const isCommentCol = offset % 2 === 1;
           w = isCommentCol ? commentColWidth : markColWidth;
-        } else if (n >= 5 + pairCols) {
+        } else if (n >= firstParticipantCol + pairCols) {
           // 右端の4集計列（○, △, ×, ー）: いずれも同幅（×に合わせる）
           w = 8;
         }
@@ -906,6 +912,8 @@ function AdminResponsesApp() {
 
       // 右端集計列の合計行を追加（全候補に対する総数）
       const totalRow = ['', '', '', '合計'];
+      // E, F は詳細・場所の列。合計行は空で埋める
+      totalRow.push('', '');
       for (let i = 0; i < pairCols; i += 1) totalRow.push('');
       totalRow.push(grandO, grandD, grandX, grandP);
       ws.addRow(totalRow);
