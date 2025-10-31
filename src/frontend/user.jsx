@@ -773,7 +773,7 @@ function AdminResponsesApp() {
       // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル + 参加者ごとに「回答・コメント」の2列 + 右端集計列
       const participantNames = participants.map((p) => p.displayName || p.name || p.id);
       const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
-      const rightSummaryHeaders = ['○', '△', '×', '未回答'];
+      const rightSummaryHeaders = ['○', '△', '×', 'ー'];
       ws.addRow(['日付', '開始', '終了', '日程/参加者', ...participantHeaderPairs, ...rightSummaryHeaders]);
       const respMap = new Map();
       responses.forEach((r) => {
@@ -836,7 +836,7 @@ function AdminResponsesApp() {
         });
       });
 
-      // 集計行（○/△/×/未回答の件数）を日程データの直下に追加
+      // 集計行（○/△/×/ー の件数）を日程データの直下に追加
       const countFor = (key) => {
         const row = ['', '', '', key];
         participants.forEach((p) => {
@@ -844,7 +844,7 @@ function AdminResponsesApp() {
           candidates.forEach((c) => {
             const r = respMap.get(`${c.id}::${p.id}`);
             const m = r?.mark;
-            if (key === '未回答') {
+            if (key === 'ー') {
               if (!m || (m !== 'o' && m !== 'd' && m !== 'x')) cnt += 1;
             } else if (key === '○') {
               if (m === 'o') cnt += 1;
@@ -864,7 +864,7 @@ function AdminResponsesApp() {
       countFor('○');
       countFor('△');
       countFor('×');
-      countFor('未回答');
+      countFor('ー');
 
       ws.getRow(1).font = { bold: true };
       // 列幅: BとCは同じ、Dは広め、E以降は回答/コメントのペア、右端4列は集計
