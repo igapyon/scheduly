@@ -486,9 +486,6 @@ function OrganizerApp() {
       setSummary(state.project?.name || "");
       setDescription(state.project?.description || "");
       setCandidates(state.candidates || []);
-      if (!openCandidateId && state.candidates && state.candidates.length > 0) {
-        setOpenCandidateId(state.candidates[0].id);
-      }
 
       const tokens = shareService.get(resolved.projectId);
       setShareTokens(tokens);
@@ -511,10 +508,7 @@ function OrganizerApp() {
         setSummary(nextState.project?.name || "");
         setDescription(nextState.project?.description || "");
         setCandidates(nextState.candidates || []);
-        // 既に開いているIDがなく、候補があれば先頭を開く
-        if (!openCandidateId && nextState.candidates && nextState.candidates.length > 0) {
-          setOpenCandidateId((prev) => prev || nextState.candidates[0].id);
-        }
+        // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
         setShareTokens(shareService.get(resolved.projectId));
         setRouteContext(projectService.getRouteContext());
       });
