@@ -45,11 +45,12 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
 2. カード内インライン編集では `responseService.upsertResponse()` を通じて回答状態を保存。サービス内で `tallyService.recalculate(projectId, candidateId)` が呼ばれ、派生タリーが更新される。
 3. 参加者画面は `summaryService.buildScheduleView()` / `.buildParticipantView()` を利用して日程別／参加者別サマリーを描画。ストア購読により回答更新を即時反映し、単一のインラインエディタ状態を共有する。
 
-### 2.4 集計とエクスポート（管理者）
+### 2.4 集計とエクスポート（管理者/参加者）
 
 1. `admin.jsx` の集計パネルは `summaryService` を利用し、`projectStore` の派生タリーを表示。
 2. 確定候補などステータス変更は `scheduleService.updateCandidate()` で `status` / `sequence` / `dtstamp` を更新。
 3. ICS エクスポートは `scheduleService.exportAllCandidatesToIcs()` / `exportCandidateToIcs()` を呼び、`projectStore.getIcsText()` を活用してファイルダウンロードを行う。
+4. 参加者 UI は exceljs を用いた Excel エクスポートを提供。フロントで `Workbook` を生成し、Blob ダウンロードする。列は「日付/開始/終了/タイトル/ステータス/場所/説明」に続き、参加者ごとの(回答, コメント)の2列ペア、右端に ○/△/×/ー の集計と総合計行を出力する。
 4. プロジェクト全体のスナップショットは `projectService.exportState()`（JSON）で取得でき、`importState()` で復元可能。
 
 ## 3. サービス API サーフェス
