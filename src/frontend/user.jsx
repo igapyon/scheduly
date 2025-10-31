@@ -760,6 +760,58 @@ function AdminResponsesApp() {
     downloadIcsFile(filename, icsText);
   };
 
+  const handleDownloadAllExcel = async () => {
+    try {
+      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Responses');
+
+      const participants = projectState?.participants || [];
+      const candidates = projectState?.candidates || [];
+      const responses = projectState?.responses || [];
+
+      ws.addRow(['日程/参加者', ...participants.map((p) => p.name || p.id)]);
+      const respMap = new Map();
+      responses.forEach((r) => {
+        const key = `${r.candidateId}::${r.participantId}`;
+        respMap.set(key, r);
+      });
+
+      const markToSymbol = (mark) => (mark === 'o' ? '○' : mark === 'd' ? '△' : mark === 'x' ? '×' : '');
+
+      candidates.forEach((c) => {
+        const row = [c.summary || c.label || c.id];
+        participants.forEach((p) => {
+          const r = respMap.get(`${c.id}::${p.id}`);
+          row.push(markToSymbol(r?.mark));
+        });
+        ws.addRow(row);
+      });
+
+      ws.getRow(1).font = { bold: true };
+      ws.columns.forEach((col, idx) => {
+        const w = idx === 1 ? 40 : 12;
+        col.width = w;
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'responses.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+    } catch (error) {
+      console.error('Excel export failed (exceljs not installed?)', error);
+      alert('Excelエクスポートに失敗しました。exceljs 依存を追加後に再試行してください。\nnpm i exceljs');
+    }
+  };
+
   const hasIcsData = Boolean((projectState?.icsText && projectState.icsText.trim()) || schedules.length);
   const participantCount = participants.length;
 
@@ -1033,8 +1085,12 @@ function AdminResponsesApp() {
             >
               日程をICSに一括エクスポート
             </button>
-            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
-              全回答を CSV でダウンロード
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300"
+              onClick={handleDownloadAllExcel}
+            >
+              全回答を Excelブックでダウンロード
             </button>
             {/* TODO: サマリーをコピー機能は仕様検討中のため一時的に非表示 */}
           </div>
