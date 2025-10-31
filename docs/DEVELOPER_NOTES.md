@@ -14,6 +14,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
   | 管理者 | `admin.jsx` | `public/index.html` | `/index.html` → 共有トークン発行後は `/a/{token}` にリダイレクト |
   | 参加者 UI | `user.jsx` | `public/user.html` | `/user.html` → 共有トークン利用時は `/p/{token}` にリダイレクト（`/r/{token}` は後方互換で `/p/{token}` に転送） |
 - スタイルは Tailwind CDN と最小限のインライン CSS に依存。  
+  - 注記: CDN 読み込みは開発用途を前提としており、本番では PostCSS/CLI によるビルドに切り替える（ブラウザ Console の警告対策）。
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
 - **Lint**: UI / ロジック変更時は `npm run lint` をこまめに実行し、共有のコード規約と静的解析の結果を即時フィードバックする。
@@ -133,6 +134,18 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `InlineResponseEditor` は ○△× の 3 ボタンとコメント欄を備え、操作ごとに `responseService.upsert` で回答を保存 → `tallyService.recalculate` が派生タリーを更新 → `projectStore.subscribe` の購読側で `summaryService.build*View` を再構築する流れ。状態は自動保存で、成否をステータスメッセージでフィードバックする。
 - スケジュール側／参加者側の両サマリーから共通コンポーネントを呼び出しており、`toggleInlineEditor` が対象カードの開閉を一元管理する。アンマウント時にタイマー等もクリーンアップする。
 - モバイル表示では縦積みレイアウトで自然に収まり、開いている枠が 1 件に限定されるため表示領域にも余裕がある。既存の「別画面で回答」リンクはフォールバックとして残している。
+
+### 8.1 最近のUI調整（要点）
+- 省略表示（トランケーション）
+  - 日程ごとサマリー・参加者ごとの各行で、説明・場所・コメントは閉じている時のみ `truncate max-w-[40ch]` を適用。展開時はフル表示に戻す。
+  - 省略時は `title` を付与して全文をツールチップで確認可能。
+- 編集時の右カラム整理
+  - 編集中は行右肩の丸バッジ（○/△/×）と「閉じる」ボタンを非表示。閉じる操作はエディタ内のボタンに一本化。
+- 狭幅時のレイアウト耐性
+  - 行コンテナに `overflow-hidden`、本文側に `min-w-0`、ボタン側に `shrink-0` を付与し、右側の「回答」ボタンが常に見えるようにした。
+- 長押しで編集を開く
+  - 非編集時、行テキスト領域の長押し（既定 500ms）で回答編集を開く。ボタンが見切れていても操作できる。実装は `createLongPressHandlers`（hooks 非依存）。
+
 
 ---
 
