@@ -4,7 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scheduly 参加者</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=1" />
+    <!-- Tailwind CSS: prefer built CSS; fallback to CDN without console errors. -->
+    <script>
+      (async function () {
+        try {
+          const res = await fetch('/assets/tailwind.css', { method: 'HEAD' });
+          if (res && res.ok) {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = '/assets/tailwind.css';
+            document.head.appendChild(l);
+          } else {
+            var s = document.createElement('script');
+            s.src = 'https://cdn.tailwindcss.com';
+            document.head.appendChild(s);
+          }
+        } catch (e) {
+          var s2 = document.createElement('script');
+          s2.src = 'https://cdn.tailwindcss.com';
+          document.head.appendChild(s2);
+        }
+      })();
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.4.0/ical.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
       *,*::before,*::after{box-sizing:border-box;}

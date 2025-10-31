@@ -119,54 +119,63 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
-function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "" }) {
   return (
     <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+        <div className="space-y-1 min-w-0 basis-0 grow">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-700">
               <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
-              <span>{title}</span>
+              <span className="break-words">{title}</span>
             </h2>
             {infoMessage && (
               <InfoBadge ariaLabel={`${title} の説明`} title={infoTitle || title} message={infoMessage} />
             )}
           </div>
-          {description && <p className="mt-1 text-xs text-zinc-500">{description}</p>}
+          {description && <p className="mt-1 break-words text-xs text-zinc-500">{description}</p>}
         </div>
-        {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className={`space-y-4 ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove }) {
- 
-  const [open, setOpen] = useState(index === 0);
+function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen }) {
+  const open = Boolean(isOpen);
   const [metaOpen, setMetaOpen] = useState(false);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
+  const ignoreNextClickRef = useRef(false);
 
-  const handleToggle = (event) => {
-    setOpen(event.currentTarget.open);
-  };
-
+  const handleToggle = () => {};
   const handleSummaryClick = () => {
-    setOpen((prev) => !prev);
+    if (ignoreNextClickRef.current) {
+      ignoreNextClickRef.current = false;
+      return;
+    }
+    if (typeof onToggleOpen === 'function') onToggleOpen();
   };
 
   return (
     <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm" open={open} onToggle={handleToggle}>
       <summary
-        className="flex cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition hover:bg-emerald-50/50 sm:flex-row sm:items-center sm:justify-between"
+        className={`flex list-none cursor-pointer flex-col gap-3 rounded-2xl px-5 py-4 transition sm:flex-row sm:items-center sm:justify-between ${open ? "bg-emerald-50/60" : "bg-white"}`}
         onClick={(event) => {
           event.preventDefault();
           handleSummaryClick();
         }}
       >
-        <div className="flex flex-col gap-2">
+        <div
+          className="flex min-w-0 flex-col gap-2"
+          {...(!open
+            ? createLongPressHandlers(() => {
+                ignoreNextClickRef.current = true;
+                if (typeof onToggleOpen === 'function') onToggleOpen();
+              }, 500)
+            : {})}
+        >
           <div className="flex items-center gap-2 text-xs">
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
               {formatIcalStatusLabel(value.status || "CONFIRMED")}
@@ -174,21 +183,23 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           </div>
           <EventMeta
             summary={value.summary || "タイトル未設定"}
-            summaryClassName="text-sm font-semibold text-zinc-800"
+            summaryClassName="min-w-0 break-words text-sm font-semibold text-zinc-800"
             dateTime={displayMeta}
             dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-500"
             timezone={value.tzid || DEFAULT_TZID}
             timezoneClassName="text-xs text-zinc-400"
             description={value.description}
-            descriptionClassName="text-xs text-zinc-500"
+            descriptionClassName={`text-xs text-zinc-500 ${open ? "break-words" : "whitespace-nowrap truncate max-w-[48ch]"}`}
+            descriptionTitle={open ? undefined : (value.description || "")}
             location={value.location}
-            locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+            locationClassName={`flex items-center gap-1 text-xs text-zinc-500 ${open ? "break-words" : "whitespace-nowrap truncate max-w-[40ch]"}`}
+            locationTitle={open ? undefined : (value.location || "")}
             showLocationIcon
             statusText={null}
             statusPrefix=""
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
@@ -212,7 +223,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
         </div>
       </summary>
 
-      <div className="space-y-4 border-t border-zinc-200 px-5 py-5">
+      <div className={`space-y-4 px-5 py-5 ${open ? "rounded-b-2xl border border-emerald-200 bg-emerald-50/60" : "border-t border-zinc-200"}`}>
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
@@ -465,6 +476,9 @@ function OrganizerApp() {
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
+  const [openCandidateId, setOpenCandidateId] = useState(null);
+
+  // 横スクロール抑止のグローバル適用は不要になったため削除
 
   const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
 
@@ -507,6 +521,7 @@ function OrganizerApp() {
         setSummary(nextState.project?.name || "");
         setDescription(nextState.project?.description || "");
         setCandidates(nextState.candidates || []);
+        // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
         setShareTokens(shareService.get(resolved.projectId));
         setRouteContext(projectService.getRouteContext());
       });
@@ -1053,13 +1068,13 @@ function OrganizerApp() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
       <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-zinc-900">
+            <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-bold text-zinc-900">
               <span aria-hidden="true">🗂️</span>
-              <span>Scheduly 管理</span>
+              <span className="break-words">Scheduly 管理</span>
             </h1>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 break-words text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
             </p>
             {isAdminShareMiss && (
@@ -1068,8 +1083,8 @@ function OrganizerApp() {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
               type="button"
               onClick={() => {
                 const entry = shareTokens?.participant;
@@ -1107,11 +1122,12 @@ function OrganizerApp() {
 
       <div className="grid flex-1 gap-5">
 
-        <main className="space-y-5">
+        <main className="space-y-5" style={{ contain: "inline-size" }}>
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
             infoMessage="日程調整プロジェクトの情報を設定します。プロジェクトの目的を設定します。"
+            bodyClassName="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4"
           >
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">プロジェクト名</span>
@@ -1191,13 +1207,15 @@ function OrganizerApp() {
                   onRemove={() => openCandidateDeleteDialog(candidate)}
                   onExport={() => handleExportCandidate(candidate.id)}
                   disableRemove={candidates.length === 1}
+                  isOpen={openCandidateId === candidate.id}
+                  onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
                 />
               ))
             )}
           </SectionCard>
         </main>
 
-        <aside className="space-y-5">
+        <aside className="space-y-5" style={{ contain: "inline-size" }}>
           <SectionCard
             title="共有URL"
             description="参加者へ共有するリンクと管理者リンクを確認できます。"
@@ -1592,3 +1610,32 @@ if (!container) {
 const root = ReactDOM.createRoot(container);
 root.render(<OrganizerApp />);
 export default OrganizerApp;
+
+// Long-press handlers factory (no React hooks; safe to call anywhere)
+function createLongPressHandlers(onTrigger, delayMs = 500) {
+  let timerId = null;
+  const start = (event) => {
+    if (event && event.button === 2) return; // ignore right-click
+    if (timerId) window.clearTimeout(timerId);
+    timerId = window.setTimeout(() => {
+      timerId = null;
+      try {
+        onTrigger?.();
+      } catch (e) {
+        console.warn("long-press handler failed", e);
+      }
+    }, delayMs);
+  };
+  const cancel = () => {
+    if (timerId) {
+      window.clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel
+  };
+}

@@ -13,8 +13,11 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
   | --- | --- | --- | --- |
   | 管理者 | `admin.jsx` | `public/index.html` | `/index.html` → 共有トークン発行後は `/a/{token}` にリダイレクト |
   | 参加者 UI | `user.jsx` | `public/user.html` | `/user.html` → 共有トークン利用時は `/p/{token}` にリダイレクト（`/r/{token}` は後方互換で `/p/{token}` に転送） |
-- スタイルは Tailwind CDN と最小限のインライン CSS に依存。  
-  - 注記: CDN 読み込みは開発用途を前提としており、本番では PostCSS/CLI によるビルドに切り替える（ブラウザ Console の警告対策）。
+- スタイルは Tailwind を PostCSS/CLI でビルドして適用する（CDN は廃止）。
+  - セットアップ: `npm i -D tailwindcss postcss autoprefixer`
+  - 初回ビルド: `npm run css:build`（出力: `public/assets/tailwind.css`）
+  - 監視ビルド: `npm run css:watch`
+  - HTML 側は `<link rel="stylesheet" href="/assets/tailwind.css" />` を読み込む（`public/index.html` / `public/user.html`）
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
 - **Lint**: UI / ロジック変更時は `npm run lint` をこまめに実行し、共有のコード規約と静的解析の結果を即時フィードバックする。
@@ -91,6 +94,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - N/A
 
 ### 優先度: 中
+- Tailwind を本番ビルドへ移行（CDN 依存を解消）。PostCSS/CLI を導入し、`tailwind.config.js` の `content` を `public/**/*.html` と `src/frontend/**/*.{js,jsx}` に設定、生成 CSS を HTML へ適用する。CDN 警告を解消する。
+- 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
 - `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのファサードを経由してデータ取得・更新を行い、`projectStore.subscribe` を用いた状態同期を整える（スコープ外画面は読み取り専用ファサードに限定）。
 - `responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
 - 参加者の登録順を編集できるようにする。
@@ -107,6 +112,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
+- favicon 404 を解消（`public/favicon.ico` 追加、または `<link rel="icon">` を明示）。
+- InfoBadge / SectionCard の利用ガイドを本ドキュメントに整備（左列: `basis-0 grow min-w-0`、右列: `shrink-0`、テキスト: `break-words` の原則）。
 
 ### ナビゲーション/UX 調整
 - 日程タブ／参加者タブの「回答」ボタンで開いたインライン編集が、切り替え時に意図せず閉じないようフォーカスとスクロール挙動を最適化する。
@@ -169,3 +176,16 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 - コメントを提出する前に、lint やテスト実行コマンドが最新の状態か再確認する。
 - PR 依頼の都度フォーマットが変わる場合は、このメモに補足を追記する。
+
+---
+
+## 10. Codex（支援AI）の権限と作業範囲
+
+- リポジトリ操作の原則
+  - 本AIはリモートへの `git push`、GitHub 上での PR 作成・マージ・ラベル操作などの「外部サービスへの書き込み」を行わない。
+  - 実施可能なのはローカル作業（ブランチ作成、ローカルコミット、差分抽出、PR本文のドラフト作成、CHANGELOG/ドキュメント更新）まで。
+- 依頼時の期待値
+  - PR を作りたい場合は、AIは「ローカルで比較用ブランチの用意」「`pr/*.md` にPR文面ドラフト作成」「`docs/CHANGELOG.md` の更新」までを支援し、最終的な `git push` と GitHub 上の PR 作成は人間が実施する。
+  - ネットワーク権限が必要な操作（パッケージの取得、GitHub CLI でのPR生成等）はスコープ外。必要に応じて実行手順のみ提示する。
+- 例（想定ワークフロー）
+  - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。

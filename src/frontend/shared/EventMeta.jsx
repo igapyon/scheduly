@@ -3,6 +3,7 @@
 function EventMeta({
   summary,
   summaryClassName = "text-sm font-semibold text-zinc-800",
+  summaryTitle,
   dateTime,
   dateTimeClassName = "flex flex-wrap items-center gap-1 text-sm text-zinc-600",
   timezone,
@@ -24,8 +25,8 @@ function EventMeta({
   const shouldShowTimezone = Boolean(normalizedTimezone && !dateTimeText.includes(`(${normalizedTimezone})`));
 
   return (
-    <div className="space-y-1">
-      {summary ? <div className={summaryClassName}>{summary}</div> : null}
+    <div className="space-y-1 min-w-0 max-w-full">
+      {summary ? <div className={`${summaryClassName} break-words`} title={summaryTitle}>{summary}</div> : null}
       {(dateTime || shouldShowTimezone) ? (
         <div className={dateTimeClassName}>
           {dateTime ? <span>{dateTime}</span> : null}
@@ -34,12 +35,12 @@ function EventMeta({
         </div>
       ) : null}
       {description ? (
-        <div className={descriptionClassName} title={descriptionTitle}>
+        <div className={`${descriptionClassName} break-words`} title={descriptionTitle}>
           {description}
         </div>
       ) : null}
       {(location || statusText) ? (
-        <div className={locationClassName} title={locationTitle}>
+        <div className={`${locationClassName} break-words`} title={locationTitle}>
           {location ? (
             <span className={showLocationIcon ? "inline-flex items-center gap-1" : undefined}>
               {showLocationIcon ? <span aria-hidden="true">📍</span> : null}
