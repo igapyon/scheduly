@@ -13,8 +13,11 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
   | --- | --- | --- | --- |
   | 管理者 | `admin.jsx` | `public/index.html` | `/index.html` → 共有トークン発行後は `/a/{token}` にリダイレクト |
   | 参加者 UI | `user.jsx` | `public/user.html` | `/user.html` → 共有トークン利用時は `/p/{token}` にリダイレクト（`/r/{token}` は後方互換で `/p/{token}` に転送） |
-- スタイルは Tailwind CDN と最小限のインライン CSS に依存。  
-  - 注記: CDN 読み込みは開発用途を前提としており、本番では PostCSS/CLI によるビルドに切り替える（ブラウザ Console の警告対策）。
+- スタイルは Tailwind を PostCSS/CLI でビルドして適用する（CDN は廃止）。
+  - セットアップ: `npm i -D tailwindcss postcss autoprefixer`
+  - 初回ビルド: `npm run css:build`（出力: `public/assets/tailwind.css`）
+  - 監視ビルド: `npm run css:watch`
+  - HTML 側は `<link rel="stylesheet" href="/assets/tailwind.css" />` を読み込む（`public/index.html` / `public/user.html`）
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
 - **Lint**: UI / ロジック変更時は `npm run lint` をこまめに実行し、共有のコード規約と静的解析の結果を即時フィードバックする。
