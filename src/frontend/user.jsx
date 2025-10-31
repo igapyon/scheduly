@@ -432,11 +432,11 @@ function ParticipantSummary({
           return (
             <li
               key={`${participant.id}-${response.scheduleId}`}
-              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 overflow-hidden ${
                 isEditing ? "border-emerald-300 bg-emerald-50/40" : response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
               }`}
             >
-              <div className="flex-1 space-y-1">
+              <div className="flex-1 min-w-0 space-y-1">
                 <EventMeta
                   summary={summaryLabel}
                   summaryClassName="text-sm font-semibold text-zinc-800"
@@ -477,7 +477,7 @@ function ParticipantSummary({
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex shrink-0 flex-col items-end gap-2">
                 <span
                   className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
                 >
