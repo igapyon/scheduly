@@ -867,6 +867,15 @@ function AdminResponsesApp() {
       countFor('ー');
 
       ws.getRow(1).font = { bold: true };
+      // タイトル行: 薄い青色背景
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0F2FE' } // sky-100相当
+        };
+      });
       // 列幅: BとCは同じ、Dは広め、E以降は回答/コメントのペア、右端4列は集計
       const dateColWidth = 12;
       const timeColWidth = 10; // B, C 共通
@@ -901,6 +910,16 @@ function AdminResponsesApp() {
       for (let i = 0; i < pairCols; i += 1) totalRow.push('');
       totalRow.push(grandO, grandD, grandX, grandP);
       ws.addRow(totalRow);
+      // 合計行: 薄いオレンジ色背景
+      const lastRow = ws.lastRow;
+      lastRow.font = { ...(lastRow.font || {}), bold: true };
+      lastRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFEF3C7' } // amber-100相当
+        };
+      });
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
