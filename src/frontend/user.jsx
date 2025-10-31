@@ -770,12 +770,12 @@ function AdminResponsesApp() {
       const candidates = projectState?.candidates || [];
       const responses = projectState?.responses || [];
 
-      // ヘッダー行: 日付 / 開始 / 終了 / 日程ラベル / 詳細テキスト / 場所
+      // ヘッダー行: 日付 / 開始 / 終了 / タイトル（SUMMARY） / 場所（LOCATION） / 説明（DESCRIPTION）
       //           + 参加者ごとに「回答・コメント」の2列 + 右端集計列
       const participantNames = participants.map((p) => p.displayName || p.name || p.id);
       const participantHeaderPairs = participantNames.flatMap((name) => [name, `${name} コメント`]);
       const rightSummaryHeaders = ['○', '△', '×', 'ー'];
-      ws.addRow(['日付', '開始', '終了', '日程/参加者', '詳細テキスト', '場所', ...participantHeaderPairs, ...rightSummaryHeaders]);
+      ws.addRow(['日付', '開始', '終了', 'タイトル（SUMMARY）', '場所（LOCATION）', '説明（DESCRIPTION）', ...participantHeaderPairs, ...rightSummaryHeaders]);
       const respMap = new Map();
       responses.forEach((r) => {
         const key = `${r.candidateId}::${r.participantId}`;
@@ -803,11 +803,11 @@ function AdminResponsesApp() {
       };
 
       const pairCols = participants.length * 2; // 参加者の列数（回答+コメント）
-      const firstParticipantCol = 7; // G列(=7)から参加者ペアが始まる（E:5=詳細、F:6=場所）
+      const firstParticipantCol = 7; // G列(=7)から参加者ペアが始まる（E:5=場所、F:6=説明）
       let grandO = 0, grandD = 0, grandX = 0, grandP = 0;
       candidates.forEach((c) => {
         const display = c.summary || c.label || c.id;
-        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display, c.description || '', c.location || ''];
+        const row = [formatDate(c.dtstart), formatTime(c.dtstart), formatTime(c.dtend), display, c.location || '', c.description || ''];
         let co = 0, cd = 0, cx = 0, cp = 0;
         participants.forEach((p) => {
           const r = respMap.get(`${c.id}::${p.id}`);
@@ -878,12 +878,12 @@ function AdminResponsesApp() {
           fgColor: { argb: 'FFE0F2FE' } // sky-100相当
         };
       });
-      // 列幅: BとCは同じ、Dは広め、E=詳細・F=場所を広め、G以降は回答/コメントのペア、右端4列は集計
+      // 列幅: BとCは同じ、Dは広め、E=場所・F=説明を広め、G以降は回答/コメントのペア、右端4列は集計
       const dateColWidth = 12;
       const timeColWidth = 10; // B, C 共通
       const titleColWidth = 44; // D
-      const descColWidth = 64; // E: 詳細テキスト
-      const locColWidth = 40; // F: 場所
+      const locColWidth = 40; // E: 場所
+      const descColWidth = 64; // F: 説明
       const markColWidth = 6; // 参加者の回答列（○△×）
       const commentColWidth = 24; // 参加者のコメント列
       // 注意: forEach の idx は 0 始まり。ExcelJS の列番号は 1 始まり。
@@ -896,8 +896,8 @@ function AdminResponsesApp() {
         else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
         else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
         else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
-        else if (n === 5) w = descColWidth; // E: 詳細
-        else if (n === 6) w = locColWidth; // F: 場所
+        else if (n === 5) w = locColWidth; // E: 場所
+        else if (n === 6) w = descColWidth; // F: 説明
         else if (n >= firstParticipantCol && n < firstParticipantCol + pairCols) {
           // G以降が参加者の (回答, コメント)、以降も2列毎
           const offset = n - firstParticipantCol; // 0-based
