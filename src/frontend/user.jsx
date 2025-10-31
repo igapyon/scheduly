@@ -93,9 +93,11 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
             dateTime={schedule.rangeLabel}
             dateTimeClassName="flex flex-wrap items-center gap-1 text-sm text-zinc-600"
             description={schedule.description}
-            descriptionClassName="text-xs text-zinc-500"
+            descriptionClassName={`text-xs text-zinc-500${open ? "" : " whitespace-nowrap truncate max-w-[48ch]"}`}
+            descriptionTitle={open ? undefined : schedule.description}
             location={schedule.location}
-            locationClassName="flex items-center gap-2 text-xs text-zinc-500"
+            locationClassName={`flex items-center gap-2 text-xs text-zinc-500${open ? "" : " whitespace-nowrap truncate max-w-[48ch]"}`}
+            locationTitle={open ? undefined : schedule.location}
             showLocationIcon
           />
         </div>
@@ -124,12 +126,17 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
           return (
             <li
               key={response.participantId || `${schedule.id}-resp-${index}`}
-              className={`rounded-lg bg-white px-3 py-2 shadow-sm ${
+              className={`rounded-lg bg-white px-3 py-2 shadow-sm overflow-hidden ${
                 isEditing ? "border border-emerald-300 bg-emerald-50/50" : "border border-transparent"
               }`}
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 space-y-2">
+                <div
+                  className="flex-1 min-w-0 space-y-2"
+                  {...(!isEditing && canInlineEdit
+                    ? createLongPressHandlers(() => onToggleInlineEdit?.(response.participantId, schedule.id), 500)
+                    : {})}
+                >
                   <div className="font-semibold text-zinc-800">{response.name}</div>
                   {isEditing ? (
                     <InlineResponseEditor
@@ -146,31 +153,31 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <span className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}>
-                    {MARK_SYMBOL[response.mark] ?? "？"}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!canInlineEdit}
-                    onClick={() => {
-                      if (!canInlineEdit) return;
-                      console.log("[user] inline answer toggle", {
-                        source: "schedule-summary",
-                        participantId: response.participantId,
-                        scheduleId: schedule.id,
-                        editing: !isEditing
-                      });
-                      onToggleInlineEdit?.(response.participantId, schedule.id);
-                    }}
-                    className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
-                      isEditing
-                        ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
-                        : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    }`}
-                  >
-                    {isEditing ? "閉じる" : "回答"}
-                  </button>
+                <div className="flex shrink-0 items-center justify-end gap-2">
+                  {!isEditing && (
+                    <span className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}>
+                      {MARK_SYMBOL[response.mark] ?? "？"}
+                    </span>
+                  )}
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      disabled={!canInlineEdit}
+                      onClick={() => {
+                        if (!canInlineEdit) return;
+                        console.log("[user] inline answer toggle", {
+                          source: "schedule-summary",
+                          participantId: response.participantId,
+                          scheduleId: schedule.id,
+                          editing: true
+                        });
+                        onToggleInlineEdit?.(response.participantId, schedule.id);
+                      }}
+                      className="rounded-lg border px-2 py-1 text-[11px] font-semibold transition border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      回答
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
@@ -430,11 +437,16 @@ function ParticipantSummary({
           return (
             <li
               key={`${participant.id}-${response.scheduleId}`}
-              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 overflow-hidden ${
                 isEditing ? "border-emerald-300 bg-emerald-50/40" : response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
               }`}
             >
-              <div className="flex-1 space-y-1">
+              <div
+                className="flex-1 min-w-0 space-y-1"
+                {...(!isEditing
+                  ? createLongPressHandlers(() => onToggleInlineEdit?.(participant.id, response.scheduleId), 500)
+                  : {})}
+              >
                 <EventMeta
                   summary={summaryLabel}
                   summaryClassName="text-sm font-semibold text-zinc-800"
@@ -442,9 +454,15 @@ function ParticipantSummary({
                   dateTimeClassName="flex flex-wrap items-center gap-1 text-xs text-zinc-600"
                   timezone={schedule ? timezone : null}
                   description={description}
-                  descriptionClassName="text-xs text-zinc-500"
+                  descriptionClassName={`text-xs text-zinc-500${
+                    isEditing ? "" : " whitespace-nowrap truncate max-w-[48ch]"
+                  }`}
+                  descriptionTitle={isEditing ? undefined : description}
                   location={location}
-                  locationClassName="flex items-center gap-1 text-xs text-zinc-500"
+                  locationClassName={`flex items-center gap-1 text-xs text-zinc-500${
+                    isEditing ? "" : " whitespace-nowrap truncate max-w-[48ch]"
+                  }`}
+                  locationTitle={isEditing ? undefined : location}
                   showLocationIcon
                   statusText={null}
                   statusPrefix=""
@@ -459,33 +477,40 @@ function ParticipantSummary({
                     onClose={() => onToggleInlineEdit?.(participant.id, response.scheduleId)}
                   />
                 ) : (
-                  <div className={`text-xs ${response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"}`}>{response.comment}</div>
+                  <div
+                    className={`text-xs ${
+                      response.mark === "pending" ? "text-zinc-600" : "text-zinc-500"
+                    } whitespace-nowrap truncate max-w-[40ch]`}
+                    title={response.comment || undefined}
+                  >
+                    {response.comment}
+                  </div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <span
-                  className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
-                >
-                  {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
-                </span>
-                <button
-                  type="button"
-                  className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
-                    isEditing
-                      ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
-                      : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700"
-                  }`}
-                  onClick={() => {
-                    console.log("[user] inline answer toggle", {
-                      participantId: participant.id,
-                      scheduleId: response.scheduleId,
-                      editing: !isEditing
-                    });
-                    onToggleInlineEdit?.(participant.id, response.scheduleId);
-                  }}
-                >
-                  {isEditing ? "閉じる" : "回答"}
-                </button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {!isEditing && (
+                  <span
+                    className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+                  >
+                    {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+                  </span>
+                )}
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className="rounded-lg border px-2 py-1 text-[11px] font-semibold transition border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700"
+                    onClick={() => {
+                      console.log("[user] inline answer toggle", {
+                        participantId: participant.id,
+                        scheduleId: response.scheduleId,
+                        editing: true
+                      });
+                      onToggleInlineEdit?.(participant.id, response.scheduleId);
+                    }}
+                  >
+                    回答
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -1221,3 +1246,31 @@ if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
 root.render(<AdminResponsesApp />);
 export default AdminResponsesApp;
+// Long-press handlers factory (no React hooks; safe to call anywhere)
+function createLongPressHandlers(onTrigger, delayMs = 500) {
+  let timerId = null;
+  const start = (event) => {
+    if (event && event.button === 2) return; // ignore right-click
+    if (timerId) window.clearTimeout(timerId);
+    timerId = window.setTimeout(() => {
+      timerId = null;
+      try {
+        onTrigger?.();
+      } catch (e) {
+        console.warn("long-press handler failed", e);
+      }
+    }, delayMs);
+  };
+  const cancel = () => {
+    if (timerId) {
+      window.clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel
+  };
+}
