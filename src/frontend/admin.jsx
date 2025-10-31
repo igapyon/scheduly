@@ -183,7 +183,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             descriptionClassName={`text-xs text-zinc-500 ${open ? "break-words" : "whitespace-nowrap truncate max-w-[48ch]"}`}
             descriptionTitle={open ? undefined : (value.description || "")}
             location={value.location}
-            locationClassName="flex items-center gap-1 break-words text-xs text-zinc-500"
+            locationClassName={`flex items-center gap-1 text-xs text-zinc-500 ${open ? "break-words" : "whitespace-nowrap truncate max-w-[40ch]"}`}
+            locationTitle={open ? undefined : (value.location || "")}
             showLocationIcon
             statusText={null}
             statusPrefix=""
