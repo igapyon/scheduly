@@ -1036,9 +1036,7 @@ function AdminResponsesApp() {
             <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
               全回答を CSV でダウンロード
             </button>
-            <button className="rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-zinc-300">
-              サマリーをコピー（仮）
-            </button>
+            {/* TODO: サマリーをコピー機能は仕様検討中のため一時的に非表示 */}
           </div>
         </div>
       </section>
