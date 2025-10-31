@@ -131,7 +131,12 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
               }`}
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 min-w-0 space-y-2">
+                <div
+                  className="flex-1 min-w-0 space-y-2"
+                  {...(!isEditing && canInlineEdit
+                    ? createLongPressHandlers(() => onToggleInlineEdit?.(response.participantId, schedule.id), 500)
+                    : {})}
+                >
                   <div className="font-semibold text-zinc-800">{response.name}</div>
                   {isEditing ? (
                     <InlineResponseEditor
@@ -436,7 +441,12 @@ function ParticipantSummary({
                 isEditing ? "border-emerald-300 bg-emerald-50/40" : response.mark === "pending" ? "border-dashed border-zinc-300" : "border-transparent"
               }`}
             >
-              <div className="flex-1 min-w-0 space-y-1">
+              <div
+                className="flex-1 min-w-0 space-y-1"
+                {...(!isEditing
+                  ? createLongPressHandlers(() => onToggleInlineEdit?.(participant.id, response.scheduleId), 500)
+                  : {})}
+              >
                 <EventMeta
                   summary={summaryLabel}
                   summaryClassName="text-sm font-semibold text-zinc-800"
@@ -1236,3 +1246,31 @@ if (!container) throw new Error("Root element not found");
 const root = ReactDOM.createRoot(container);
 root.render(<AdminResponsesApp />);
 export default AdminResponsesApp;
+// Long-press handlers factory (no React hooks; safe to call anywhere)
+function createLongPressHandlers(onTrigger, delayMs = 500) {
+  let timerId = null;
+  const start = (event) => {
+    if (event && event.button === 2) return; // ignore right-click
+    if (timerId) window.clearTimeout(timerId);
+    timerId = window.setTimeout(() => {
+      timerId = null;
+      try {
+        onTrigger?.();
+      } catch (e) {
+        console.warn("long-press handler failed", e);
+      }
+    }, delayMs);
+  };
+  const cancel = () => {
+    if (timerId) {
+      window.clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel
+  };
+}
