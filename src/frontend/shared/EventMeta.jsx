@@ -3,6 +3,7 @@
 function EventMeta({
   summary,
   summaryClassName = "text-sm font-semibold text-zinc-800",
+  summaryTitle,
   dateTime,
   dateTimeClassName = "flex flex-wrap items-center gap-1 text-sm text-zinc-600",
   timezone,
@@ -25,7 +26,7 @@ function EventMeta({
 
   return (
     <div className="space-y-1 min-w-0 max-w-full">
-      {summary ? <div className={`${summaryClassName} break-words`}>{summary}</div> : null}
+      {summary ? <div className={`${summaryClassName} break-words`} title={summaryTitle}>{summary}</div> : null}
       {(dateTime || shouldShowTimezone) ? (
         <div className={dateTimeClassName}>
           {dateTime ? <span>{dateTime}</span> : null}

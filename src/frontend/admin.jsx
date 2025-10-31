@@ -180,7 +180,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             timezone={value.tzid || DEFAULT_TZID}
             timezoneClassName="text-xs text-zinc-400"
             description={value.description}
-            descriptionClassName="break-words text-xs text-zinc-500"
+            descriptionClassName={`text-xs text-zinc-500 ${open ? "break-words" : "whitespace-nowrap truncate max-w-[48ch]"}`}
+            descriptionTitle={open ? undefined : (value.description || "")}
             location={value.location}
             locationClassName="flex items-center gap-1 break-words text-xs text-zinc-500"
             showLocationIcon
