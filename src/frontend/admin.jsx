@@ -121,7 +121,7 @@ const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + I
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage }) {
   return (
-    <section className="w-full space-y-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1 min-w-0 basis-0 grow">
           <div className="flex items-center gap-2 min-w-0">
@@ -466,19 +466,7 @@ function OrganizerApp() {
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
 
-  // モバイル幅での横スクロール抑止（念のため全体に適用）
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlOverflowX = html.style.overflowX;
-    const prevBodyOverflowX = body.style.overflowX;
-    html.style.overflowX = "hidden";
-    body.style.overflowX = "hidden";
-    return () => {
-      html.style.overflowX = prevHtmlOverflowX;
-      body.style.overflowX = prevBodyOverflowX;
-    };
-  }, []);
+  // 横スクロール抑止のグローバル適用は不要になったため削除
 
   const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
 
@@ -1064,8 +1052,8 @@ function OrganizerApp() {
     isNonEmptyString(participantShareEntry.url);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[calc(100vw-24px)] flex-col gap-5 overflow-x-hidden px-4 py-6 text-zinc-900 sm:max-w-3xl sm:px-6">
-      <header className="w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
+      <header className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Organizer Console</p>
@@ -1119,9 +1107,9 @@ function OrganizerApp() {
         </div>
       </header>
 
-      <div className="grid w-full flex-1 grid-cols-1 gap-5 overflow-x-hidden">
+      <div className="grid flex-1 gap-5">
 
-        <main className="w-full space-y-5 overflow-x-hidden">
+        <main className="space-y-5" style={{ contain: "inline-size" }}>
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
@@ -1211,7 +1199,7 @@ function OrganizerApp() {
           </SectionCard>
         </main>
 
-        <aside className="w-full space-y-5 overflow-x-hidden">
+        <aside className="space-y-5" style={{ contain: "inline-size" }}>
           <SectionCard
             title="共有URL"
             description="参加者へ共有するリンクと管理者リンクを確認できます。"
