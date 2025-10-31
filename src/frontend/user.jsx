@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -233,40 +233,51 @@ function InlineResponseEditor({
     };
   }, []);
 
-  const commitUpdate = (nextMark, nextComment) => {
-    if (!projectId || !participantId || !schedule?.id) return;
-    try {
-      responseService.upsertResponse(projectId, {
-        participantId,
-        candidateId: schedule.id,
-        mark: nextMark || "pending",
-        comment: nextComment || ""
-      });
-      if (statusTimerRef.current) {
-        window.clearTimeout(statusTimerRef.current);
+  const commitUpdate = useCallback(
+    (nextMark, nextComment) => {
+      if (!projectId || !participantId || !schedule?.id) return;
+      try {
+        responseService.upsertResponse(projectId, {
+          participantId,
+          candidateId: schedule.id,
+          mark: nextMark || "pending",
+          comment: nextComment || ""
+        });
+        if (statusTimerRef.current) {
+          window.clearTimeout(statusTimerRef.current);
+        }
+        setStatusMessage("保存しました");
+        statusTimerRef.current = window.setTimeout(() => {
+          setStatusMessage("");
+          statusTimerRef.current = null;
+        }, 1800);
+      } catch (error) {
+        console.error("[user] inline response update failed", error);
+        if (statusTimerRef.current) {
+          window.clearTimeout(statusTimerRef.current);
+          statusTimerRef.current = null;
+        }
+        setStatusMessage("保存に失敗しました");
       }
-      setStatusMessage("保存しました");
-      statusTimerRef.current = window.setTimeout(() => {
-        setStatusMessage("");
-        statusTimerRef.current = null;
-      }, 1800);
-    } catch (error) {
-      console.error("[user] inline response update failed", error);
-      if (statusTimerRef.current) {
-        window.clearTimeout(statusTimerRef.current);
-        statusTimerRef.current = null;
-      }
-      setStatusMessage("保存に失敗しました");
-    }
-  };
+    },
+    [participantId, projectId, schedule?.id]
+  );
 
   const handleSelectMark = (markKey) => {
-    setCurrentMark((prev) => {
-      const next = prev === markKey ? null : markKey;
-      commitUpdate(next, currentComment);
-      return next;
-    });
+    setCurrentMark((prev) => (prev === markKey ? null : markKey));
   };
+
+  // Defer committing updates to after render to avoid
+  // cross-component setState during render warnings.
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (!didInitRef.current) {
+      // Skip the initial sync from props
+      didInitRef.current = true;
+      return;
+    }
+    commitUpdate(currentMark, currentComment);
+  }, [commitUpdate, currentComment, currentMark]);
 
   const handleCommentChange = (value) => {
     setCurrentComment(value);
