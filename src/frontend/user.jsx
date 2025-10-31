@@ -478,29 +478,29 @@ function ParticipantSummary({
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">
-                <span
-                  className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
-                >
-                  {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
-                </span>
-                <button
-                  type="button"
-                  className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
-                    isEditing
-                      ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
-                      : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700"
-                  }`}
-                  onClick={() => {
-                    console.log("[user] inline answer toggle", {
-                      participantId: participant.id,
-                      scheduleId: response.scheduleId,
-                      editing: !isEditing
-                    });
-                    onToggleInlineEdit?.(participant.id, response.scheduleId);
-                  }}
-                >
-                  {isEditing ? "閉じる" : "回答"}
-                </button>
+                {!isEditing && (
+                  <span
+                    className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}
+                  >
+                    {response.mark === "pending" ? "—" : MARK_SYMBOL[response.mark] ?? "？"}
+                  </span>
+                )}
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className="rounded-lg border px-2 py-1 text-[11px] font-semibold transition border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700"
+                    onClick={() => {
+                      console.log("[user] inline answer toggle", {
+                        participantId: participant.id,
+                        scheduleId: response.scheduleId,
+                        editing: true
+                      });
+                      onToggleInlineEdit?.(participant.id, response.scheduleId);
+                    }}
+                  >
+                    回答
+                  </button>
+                )}
               </div>
             </li>
           );
