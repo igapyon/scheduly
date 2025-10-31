@@ -44,3 +44,72 @@ Files Changed (overview)
 
 Stats
 - 8 files changed, 331 insertions(+), 784 deletions(-)
+
+## 2025-10-31b
+
+### 概要
+- 管理画面の操作性改善（1カード開閉、長押し展開、視覚強調、住所/説明の省略制御）
+- 参加者画面の Excel 出力（exceljs）を新規実装＋見やすさ改善多数
+- Tailwind 本番ビルド導入の足場づくり（CDNフォールバック付）
+- favicon 404 解消
+- ドキュメント（README/DEVELOPER_NOTES/SCREEN_OVERVIEW/FLOW_AND_API）を最新化
+
+### 変更点（ハイライト）
+#### 管理画面（admin.jsx）
+- 開いている日程は常に1件のみ（トグルで全閉も可）
+- サマリー部を開いた時だけ薄い緑背景で強調（閉時は白のまま）
+- タイトルは常に表示、説明と場所は閉時のみ省略表示
+  - 場所（LOCATION）閉時は40chで省略
+- 日程サマリーを長押し（500ms）で展開可能（クリックと共存）
+- ICS 詳細モーダルを撤廃し、UIDは隠し要素（data-uid）でDOMに埋め込み
+- プロジェクト情報セクションは“編集中”を示す薄緑背景へ
+
+#### 参加者画面（user.jsx）— Excel 出力（新規）
+- exceljs（MIT）でフロントからExcel生成・DL
+- 列構成
+  - A: 日付 / B: 開始 / C: 終了 / D: タイトル（SUMMARY）
+  - E: ステータス（STATUS） / F: 場所（LOCATION） / G: 説明（DESCRIPTION）
+  - H以降: 参加者ごとに2列ペア（回答 記号, コメント）
+  - 右端4列: ○ / △ / × / ー の日程別集計、最後に総合計行
+- 見た目・可読性
+  - 1行目を水色背景（太字）
+  - 記号セル（○△×ー）の文字色を緑/黄/赤/灰に着色
+  - 合計行は薄オレンジ背景（太字）
+  - 列幅を用途ごとに固定（タイトル/説明/場所は広め、記号/集計は狭め）
+- 追加仕様
+  - コメントは参加者の記号列の直後に出力（2列ペア）
+  - 日程データ直下に4行（○/△/×/ー）の参加者別カウントを縦に揃えて出力
+  - ダウンロード名: `scheduly-participant-responses_YYYY-MM-DD.xlsx`
+
+#### ビルド/配布まわり
+- Tailwind 本番ビルド用設定（tailwind.config.js / postcss.config.js / `src/styles/tailwind.css`）
+- HTML（`public/index.html`, `public/user.html`）はビルドCSSを優先、存在しない場合のみCDNを自動読込（エラー抑止）
+- favicon 404 解消（`public/favicon.ico` と `<link rel="icon">` 追加）
+
+#### ドキュメント更新
+- README.md: 参加者UIがExcel出力対応である旨を追記
+- DEVELOPER_NOTES.md: AppendixにExcel出力の仕様/列幅/見た目/導入手順を追加
+- SCREEN_OVERVIEW.md: 参加者UIのデータ入出力にExcelエクスポートを追記
+- FLOW_AND_API.md: エクスポート節にexceljsワークフローを追加
+
+### 影響範囲
+- 既存UIの挙動は後方互換（管理サマリーの長押し/単一開閉はUX改善）
+- Excel出力は新規機能（依存: `exceljs`）。未導入環境ではDL時に案内を表示
+- TailwindはビルドCSS優先だが、ビルド物が無い開発時もCDNで崩れない
+
+### 動作確認（推奨）
+- 管理
+  - 日程カードが1件のみ開くこと、閉時の省略/開時のフル表示/背景強調
+  - 長押しで展開でき、クリックと二重トグルにならない
+  - ICS詳細ボタンが無いこと、UIDがDOMに埋め込まれていること
+- 参加者
+  - 「全回答を Excelブックでダウンロード」で仕様通りのブック生成
+  - 記号セルの色・列幅・集計/総合計・ファイル名に日付が入ること
+- 共通
+  - favicon の 404 が出ない
+  - HTML読み込みで Tailwind の 404/MIME エラーが出ない
+
+### 既知事項/今後の余地（参考）
+- Excel: コメント列の折返し（wrapText）/ Freeze panes / AutoFilter は後続で追加可能
+- 参加者/管理のガイド文言（InfoBadge）は運用に合わせて調整余地あり
+

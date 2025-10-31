@@ -937,7 +937,8 @@ function AdminResponsesApp() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'responses.xlsx';
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.download = `scheduly-participant-responses_${dateStr}.xlsx`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {

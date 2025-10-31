@@ -37,7 +37,7 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 ## React / webpack 版（`src/frontend/`）
 
 - `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者向けアプリ。候補編集・ICS 入出力・プロジェクト JSON 入出力を備え、`public/index.html` から共有トークン発行後は `/a/{token}` へリダイレクトされます。
-- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者の回答閲覧・編集を一画面で提供する UI。日程別／参加者別タブのほか、カード内で直接 ○△× とコメントを更新できます。`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。
+- `user.jsx`（ビルド後は `user.bundle.js`）: 参加者の回答閲覧・編集を一画面で提供する UI。日程別／参加者別タブのほか、カード内で直接 ○△× とコメントを更新できます。`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。Excel 出力（exceljs 利用）にも対応。
 - スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
