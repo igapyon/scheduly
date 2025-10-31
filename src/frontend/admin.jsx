@@ -147,9 +147,14 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
   const [metaOpen, setMetaOpen] = useState(false);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
+  const ignoreNextClickRef = useRef(false);
 
   const handleToggle = () => {};
   const handleSummaryClick = () => {
+    if (ignoreNextClickRef.current) {
+      ignoreNextClickRef.current = false;
+      return;
+    }
     if (typeof onToggleOpen === 'function') onToggleOpen();
   };
 
@@ -162,7 +167,15 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           handleSummaryClick();
         }}
       >
-        <div className="flex min-w-0 flex-col gap-2">
+        <div
+          className="flex min-w-0 flex-col gap-2"
+          {...(!open
+            ? createLongPressHandlers(() => {
+                ignoreNextClickRef.current = true;
+                if (typeof onToggleOpen === 'function') onToggleOpen();
+              }, 500)
+            : {})}
+        >
           <div className="flex items-center gap-2 text-xs">
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${icalStatusBadgeClass(value.status)}`}>
               {formatIcalStatusLabel(value.status || "CONFIRMED")}
@@ -1597,3 +1610,32 @@ if (!container) {
 const root = ReactDOM.createRoot(container);
 root.render(<OrganizerApp />);
 export default OrganizerApp;
+
+// Long-press handlers factory (no React hooks; safe to call anywhere)
+function createLongPressHandlers(onTrigger, delayMs = 500) {
+  let timerId = null;
+  const start = (event) => {
+    if (event && event.button === 2) return; // ignore right-click
+    if (timerId) window.clearTimeout(timerId);
+    timerId = window.setTimeout(() => {
+      timerId = null;
+      try {
+        onTrigger?.();
+      } catch (e) {
+        console.warn("long-press handler failed", e);
+      }
+    }, delayMs);
+  };
+  const cancel = () => {
+    if (timerId) {
+      window.clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+  return {
+    onPointerDown: start,
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel
+  };
+}
