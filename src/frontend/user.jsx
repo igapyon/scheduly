@@ -809,12 +809,19 @@ function AdminResponsesApp() {
       });
 
       ws.getRow(1).font = { bold: true };
+      // 列幅: BとCは同じ幅（Cを基準）、Dは広め、E以降は同一幅
+      const dateColWidth = 12;
+      const timeColWidth = 10; // B, C 共通
+      const titleColWidth = 44; // D
+      const participantColWidth = 14; // E以降（E=F=...）
+      // 注意: forEach の idx は 0 始まり。ExcelJS の列番号は 1 始まり。
       ws.columns.forEach((col, idx) => {
-        let w = 12; // default for participant columns
-        if (idx === 1) w = 12; // 日付
-        else if (idx === 2) w = 8; // 開始
-        else if (idx === 3) w = 8; // 終了
-        else if (idx === 4) w = 40; // 日程ラベル
+        const n = idx + 1; // 列番号 (A=1, B=2 ...)
+        let w = participantColWidth; // default for participant columns (E以降)
+        if (n === 1) w = dateColWidth; // A: 日付
+        else if (n === 2) w = timeColWidth; // B: 開始（Cと同幅）
+        else if (n === 3) w = timeColWidth; // C: 終了（Bと同幅）
+        else if (n === 4) w = titleColWidth; // D: 日程ラベル（広め）
         col.width = w;
       });
 
