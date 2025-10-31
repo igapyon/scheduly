@@ -126,12 +126,12 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
           return (
             <li
               key={response.participantId || `${schedule.id}-resp-${index}`}
-              className={`rounded-lg bg-white px-3 py-2 shadow-sm ${
+              className={`rounded-lg bg-white px-3 py-2 shadow-sm overflow-hidden ${
                 isEditing ? "border border-emerald-300 bg-emerald-50/50" : "border border-transparent"
               }`}
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 min-w-0 space-y-2">
                   <div className="font-semibold text-zinc-800">{response.name}</div>
                   {isEditing ? (
                     <InlineResponseEditor
@@ -148,31 +148,31 @@ function ScheduleSummary({ schedule, projectId, inlineEditorTarget, onToggleInli
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <span className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}>
-                    {MARK_SYMBOL[response.mark] ?? "？"}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!canInlineEdit}
-                    onClick={() => {
-                      if (!canInlineEdit) return;
-                      console.log("[user] inline answer toggle", {
-                        source: "schedule-summary",
-                        participantId: response.participantId,
-                        scheduleId: schedule.id,
-                        editing: !isEditing
-                      });
-                      onToggleInlineEdit?.(response.participantId, schedule.id);
-                    }}
-                    className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
-                      isEditing
-                        ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
-                        : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    }`}
-                  >
-                    {isEditing ? "閉じる" : "回答"}
-                  </button>
+                <div className="flex shrink-0 items-center justify-end gap-2">
+                  {!isEditing && (
+                    <span className={`${markBadgeClass(response.mark)} flex h-6 min-w-[1.5rem] items-center justify-center text-xs font-semibold`}>
+                      {MARK_SYMBOL[response.mark] ?? "？"}
+                    </span>
+                  )}
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      disabled={!canInlineEdit}
+                      onClick={() => {
+                        if (!canInlineEdit) return;
+                        console.log("[user] inline answer toggle", {
+                          source: "schedule-summary",
+                          participantId: response.participantId,
+                          scheduleId: schedule.id,
+                          editing: true
+                        });
+                        onToggleInlineEdit?.(response.participantId, schedule.id);
+                      }}
+                      className="rounded-lg border px-2 py-1 text-[11px] font-semibold transition border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      回答
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
