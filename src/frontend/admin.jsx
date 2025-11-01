@@ -142,11 +142,14 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen }) {
+function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen, errors = {} }) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
   const ignoreNextClickRef = useRef(false);
+  const SUMMARY_MAX = 120;
+  const LOCATION_MAX = 120;
+  const DESCRIPTION_MAX = 2000;
 
   const handleToggle = () => {};
   const handleSummaryClick = () => {
@@ -220,16 +223,23 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.summary}
               onChange={(e) => onChange({ ...value, summary: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.summary ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.summary ? "true" : undefined}
               placeholder="例: 秋の合宿 調整会議 Day1"
             />
+            <div className="mt-1 text-right text-[11px]">
+              <span className={`${(value.summary || "").length > SUMMARY_MAX || errors.summary ? "text-rose-600" : "text-zinc-400"}`}>
+                {(value.summary || "").length}/{SUMMARY_MAX}
+              </span>
+            </div>
           </label>
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">ステータス（STATUS）</span>
             <select
               value={value.status}
               onChange={(e) => onChange({ ...value, status: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.status ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.status ? "true" : undefined}
             >
               <option value="CONFIRMED">確定（CONFIRMED）</option>
               <option value="TENTATIVE">仮予定（TENTATIVE）</option>
@@ -243,7 +253,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtstart}
               onChange={(e) => onChange({ ...value, dtstart: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtstart ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.dtstart ? "true" : undefined}
             />
           </label>
           <label className="block">
@@ -252,7 +263,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtend}
               onChange={(e) => onChange({ ...value, dtend: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtend ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.dtend ? "true" : undefined}
             />
           </label>
 
@@ -261,7 +273,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.tzid}
               onChange={(e) => onChange({ ...value, tzid: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.tzid ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.tzid ? "true" : undefined}
             >
               {["Asia/Tokyo", "UTC", "Asia/Seoul", "Europe/London", "America/Los_Angeles"].map((tz) => (
                 <option key={tz} value={tz}>
@@ -276,9 +289,15 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.location}
               onChange={(e) => onChange({ ...value, location: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.location ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.location ? "true" : undefined}
               placeholder="例: サントリーホール 大ホール"
             />
+            <div className="mt-1 text-right text-[11px]">
+              <span className={`${(value.location || "").length > LOCATION_MAX || errors.location ? "text-rose-600" : "text-zinc-400"}`}>
+                {(value.location || "").length}/{LOCATION_MAX}
+              </span>
+            </div>
           </label>
         </div>
 
@@ -288,9 +307,15 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             value={value.description}
             onChange={(e) => onChange({ ...value, description: e.target.value })}
             rows={3}
-            className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+            aria-invalid={errors.description ? "true" : undefined}
             placeholder="補足情報を入力"
           />
+          <div className="mt-1 text-right text-[11px]">
+            <span className={`${(value.description || "").length > DESCRIPTION_MAX || errors.description ? "text-rose-600" : "text-zinc-400"}`}>
+              {(value.description || "").length}/{DESCRIPTION_MAX}
+            </span>
+          </div>
         </label>
 
         <div className="flex justify-end">
@@ -452,6 +477,9 @@ function OrganizerApp() {
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
   const [openCandidateId, setOpenCandidateId] = useState(null);
+  const [candidateErrors, setCandidateErrors] = useState(() => ({}));
+  const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
+  const metaWarnedRef = useRef({ name: false, description: false });
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
@@ -517,6 +545,33 @@ function OrganizerApp() {
     projectService.updateMeta(projectId, { name: summary, description });
   }, [projectId, summary, description]);
 
+  // Project meta live validation (length) with visual cues and one-shot toast
+  useEffect(() => {
+    const NAME_MAX = 120;
+    const DESC_MAX = 2000;
+    const overName = (summary || "").length > NAME_MAX;
+    const overDesc = (description || "").length > DESC_MAX;
+    setMetaErrors((prev) =>
+      prev.name !== overName || prev.description !== overDesc
+        ? { name: overName, description: overDesc }
+        : prev
+    );
+    if (overName && !metaWarnedRef.current.name) {
+      metaWarnedRef.current.name = true;
+      popToast(`プロジェクト名は ${NAME_MAX} 文字以内で入力してください`);
+    }
+    if (!overName && metaWarnedRef.current.name) {
+      metaWarnedRef.current.name = false;
+    }
+    if (overDesc && !metaWarnedRef.current.description) {
+      metaWarnedRef.current.description = true;
+      popToast(`説明は ${DESC_MAX} 文字以内で入力してください`);
+    }
+    if (!overDesc && metaWarnedRef.current.description) {
+      metaWarnedRef.current.description = false;
+    }
+  }, [summary, description]);
+
   useEffect(() => {
     if (baseUrlTouchedRef.current) return;
     const derived = deriveBaseUrlFromAdminEntry(shareTokens?.admin);
@@ -543,7 +598,43 @@ function OrganizerApp() {
 
   const updateCandidate = (id, next) => {
     if (!projectId) return;
-    updateScheduleCandidate(projectId, id, next);
+    try {
+      updateScheduleCandidate(projectId, id, next);
+      // clear errors for this candidate on success
+      setCandidateErrors((prev) => ({ ...prev, [id]: {} }));
+    } catch (error) {
+      const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
+      const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
+      if (isValidation) {
+        // Validation errors are expected during editing; avoid noisy error logs
+        // but keep a lightweight trace for debugging when needed.
+        console.debug("updateCandidate validation", msg);
+      } else {
+        console.error("updateCandidate error", error);
+      }
+      popToast(msg);
+      // parse fields from message to highlight
+      let fields = [];
+      if (msg.includes(":")) {
+        const after = msg.split(":").slice(1).join(":").trim();
+        if (after.includes("must be after")) {
+          fields = ["dtstart", "dtend"];
+        } else {
+          fields = after.split(/[,\s]+/).filter(Boolean);
+        }
+      }
+      if (fields.length) {
+        setCandidateErrors((prev) => {
+          const current = prev[id] || {};
+          const nextFlags = { ...current };
+          fields.forEach((f) => {
+            const key = String(f).toLowerCase();
+            nextFlags[key] = true;
+          });
+          return { ...prev, [id]: nextFlags };
+        });
+      }
+    }
   };
 
   const removeCandidate = (id) => {
@@ -1022,6 +1113,34 @@ function OrganizerApp() {
     }
   };
 
+  const handleProjectImportFromDemo = async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    try {
+      const confirmed = window.confirm("現在のプロジェクトをデモ用データで置き換えます。よろしいですか？");
+      if (!confirmed) return;
+      const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const parsed = await res.json();
+      projectService.importState(projectId, parsed);
+      const snapshot = projectService.getState(projectId);
+      setSummary(snapshot.project?.name || "");
+      setDescription(snapshot.project?.description || "");
+      setCandidates(snapshot.candidates || []);
+      baseUrlTouchedRef.current = false;
+      refreshShareTokensState({ resetWhenMissing: true });
+      setRouteContext(projectService.getRouteContext());
+      setImportPreview(null);
+      setInitialDataLoaded(true);
+      popToast("デモ用プロジェクトをインポートしました");
+    } catch (error) {
+      console.error("Demo project import error", error);
+      popToast("デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
 
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
@@ -1110,9 +1229,12 @@ function OrganizerApp() {
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.name ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクト名を入力"
               />
+              <div className="mt-1 text-right text-[11px]">
+                <span className={`${metaErrors.name ? "text-rose-600" : "text-zinc-400"}`}>{(summary || "").length}/120</span>
+              </div>
             </label>
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">説明</span>
@@ -1120,9 +1242,12 @@ function OrganizerApp() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクトの概要を入力"
               />
+              <div className="mt-1 text-right text-[11px]">
+                <span className={`${metaErrors.description ? "text-rose-600" : "text-zinc-400"}`}>{(description || "").length}/2000</span>
+              </div>
             </label>
           </SectionCard>
 
@@ -1184,6 +1309,7 @@ function OrganizerApp() {
                   disableRemove={candidates.length === 1}
                   isOpen={openCandidateId === candidate.id}
                   onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
+                  errors={candidateErrors[candidate.id] || {}}
                 />
               ))
             )}
@@ -1306,6 +1432,13 @@ function OrganizerApp() {
                 onClick={openProjectDeleteDialog}
               >
                 プロジェクトを削除
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-blue-600 hover:border-blue-300"
+                onClick={handleProjectImportFromDemo}
+              >
+                デモ用プロジェクトをインポート
               </button>
             </div>
             <input

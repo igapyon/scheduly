@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -66,4 +67,12 @@ module.exports = {
       target: ["index.html"]
     }
   }
+  ,
+  plugins: [
+    new webpack.DefinePlugin({
+      "process.env.API_BASE_URL": JSON.stringify(process.env.API_BASE_URL || ""),
+      "process.env.BASE_URL": JSON.stringify(process.env.BASE_URL || ""),
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || (isProduction ? "production" : "development"))
+    })
+  ]
 };

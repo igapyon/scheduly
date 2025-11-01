@@ -91,30 +91,64 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- N/A
+- 動的サーバ移行の前提整備（オンメモリ/単一プロセス想定を明記）
+- 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
+- バリデーション導入（zod 等で型スキーマ定義しフロント/サーバ共用）
+- バージョニング付与（サブリソースごとに整数 version を持たせる）
+- 楽観排他の粒度設計を実装（回答=行単位、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）
+- Responses の行粒度API（`POST /api/projects/:id/responses`、bodyに version を同梱、409時は最新返却）
+- Candidates の個票更新API（`PUT /api/projects/:id/candidates/:cid`、version必須）
+- Candidates 一覧操作API（`POST /api/projects/:id/candidates:reorder`、`POST /api/projects/:id/ics/import` は `candidatesListVersion` でIf-Match）
+- Participants の個票更新API（`PUT /api/projects/:id/participants/:pid`、version必須）
+- Project メタ更新API（`PUT /api/projects/:id/meta`、`projectMeta.version` でIf-Match）
+- Share トークン回転API（`POST /api/projects/:id/share/rotate`、`shareTokens.version` でIf-Match）
+- 全体取得API（`GET /api/projects/:id` に各サブリソースの version を含める）
+- ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
+- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
+- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
+- 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
+- エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
+- `.env.example` 追加（`API_BASE_URL`/`BASE_URL`/`NODE_ENV`/CORS想定）と設定読取ユーティリティ
+- CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
+- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
+- 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
+- I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
+- サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
+- `docs/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
+- `docs/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
+- 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
+- About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
+ - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
+ - `docs/FLOW_AND_API.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+ - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
+ - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
 
 ### 優先度: 中
-- Tailwind を本番ビルドへ移行（CDN 依存を解消）。PostCSS/CLI を導入し、`tailwind.config.js` の `content` を `public/**/*.html` と `src/frontend/**/*.{js,jsx}` に設定、生成 CSS を HTML へ適用する。CDN 警告を解消する。
-- 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
-- `docs/FLOW_AND_API.md` で整理した in-memory サービス群（`projectService` / `scheduleService` / `participantService` / `responseService` / `shareService` / `tallyService` / `summaryService`）を実装し、更新処理を `projectStore` 経由に集約する。React 3 画面はこれらのファサードを経由してデータ取得・更新を行い、`projectStore.subscribe` を用いた状態同期を整える（スコープ外画面は読み取り専用ファサードに限定）。
-- `responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
-- 参加者の登録順を編集できるようにする。
-- `summary-service` の派生データを活用し、「○最多の日程」「未回答者一覧」などハイライト統計を UI に表示する。集計基盤を可視化して意思決定を支援する。
-- レガシーモック（`public/legacy/scheduly-user-edit-mock.html` ほか）を最新のインライン編集 UI／データに合わせて更新し、現行実装との乖離を解消する。
+ - 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
+ - （注: 優先度: 高の「サービス層の driver 化」の受け入れ条件として包含）`responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
+ - 参加者の登録順を編集できるようにする。
+ - `summary-service` の派生データを活用し、「○最多の日程」「未回答者一覧」などハイライト統計を UI に表示する。集計基盤を可視化して意思決定を支援する。
+ - レガシーモック（`public/legacy/scheduly-user-edit-mock.html` ほか）を最新のインライン編集 UI／データに合わせて更新し、現行実装との乖離を解消する。（これは人間が手動で操作する）
+ - 生成LLM 用の MCP（Model Context Protocol）対応を検討し、可能であれば導入方針・接続ポイント・最小PoCを作成する（優先度: 中）。
 
 ### 優先度: 低
 - ICS 生成時に `VTIMEZONE` を自動挿入するなど、タイムゾーン情報の扱いを強化する（現状は `X-SCHEDULY-TZID` のみ）。
-- `src/frontend` 側の UI 変更をレガシーモックへも随時バックポートし、見た目のギャップを最小化する。
 - 現状は `sessionStorage` を利用したオンメモリ実装だが、本番を想定したサーバー側永続化（API 経由）へ移行する。
 - 履歴や監査ログを収集できる仕組みを導入する。
 - 主要画面のレスポンシブ対応を再検討し、モバイル表示を整備する。
-- Excel 形式でのエクスポートを実装し、CSV との差別化を図る。
-- 初回利用者向けのヘルプ／オンボーディング導線を整備する。
+ - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
-- favicon 404 を解消（`public/favicon.ico` 追加、または `<link rel="icon">` を明示）。
 - InfoBadge / SectionCard の利用ガイドを本ドキュメントに整備（左列: `basis-0 grow min-w-0`、右列: `shrink-0`、テキスト: `break-words` の原則）。
-- 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+ - 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+
+---
+
+## 6.x Done（完了）
+
+- Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
+- Excel 形式でのエクスポートを実装（exceljs）
+- favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 
 ### ナビゲーション/UX 調整
 - 日程タブ／参加者タブの「回答」ボタンで開いたインライン編集が、切り替え時に意図せず閉じないようフォーカスとスクロール挙動を最適化する。
@@ -200,5 +234,52 @@ Appendix: Excel 出力（参加者 UI）
 - 依頼時の期待値
   - PR を作りたい場合は、AIは「ローカルで比較用ブランチの用意」「`pr/*.md` にPR文面ドラフト作成」「`docs/CHANGELOG.md` の更新」までを支援し、最終的な `git push` と GitHub 上の PR 作成は人間が実施する。
   - ネットワーク権限が必要な操作（パッケージの取得、GitHub CLI でのPR生成等）はスコープ外。必要に応じて実行手順のみ提示する。
-- 例（想定ワークフロー）
+  - 例（想定ワークフロー）
   - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。
+
+---
+
+## 11. 動的サーバ移行の前提（設計ノート）
+
+- ICS UID/DTSTAMP 規則（要約）
+  - UID は候補生成時に一意（変更不可）。ステータス/時刻更新時は `SEQUENCE`/`DTSTAMP` を更新し履歴性を担保する。
+  - インポート時は同 UID の候補にマージ。欠落フィールドは既存値を尊重し、破壊的上書きは行わない。
+
+- 楽観更新/ロールバック規約
+  - 送信前に対象レコードの `version` を保持。409 受信時は最新を取得→UIへ差分提示→ユーザ操作で再送。
+  - Responses は行（`participantId × candidateId`）を原子的に更新（`mark` と `comment` セット）。
+  - Candidates/Participants は個票の `version`。並び替え/ICS 一括は `candidatesListVersion` で検出。
+  - Project メタは `projectMeta.version`、共有トークンは `shareTokens.version` を用いる。
+
+- 管理スコープと回答スコープの分離原則
+  - 管理操作（メタ/候補/トークン）は参加者の回答スコープと独立。回答の更新は管理スコープのロックに影響しない。
+  - これにより参加者の同時操作が多い状況でも、管理UIの編集体験を阻害しない。
+
+- 環境変数/運用
+  - `.env.example` に `API_BASE_URL` / `BASE_URL` / `NODE_ENV` / `CORS_ALLOWED_ORIGINS` などを追加。
+  - CSP/CORS は単一オリジン前提で最小許可を基本とする。
+
+---
+
+## 12. 入力UXとバリデーション方針（フロント）
+
+- 共通原則
+  - 値は可能な限り消さない。検証NG時は赤枠＋トースト（またはステータス表示）で促す。
+  - Console の想定内エラー（422 相当）は `console.debug` に格下げし、通常の操作を邪魔しない。
+
+- 管理UI（日時編集）
+  - `datetime-local` は入力途中の未完成値を許容し、完成時のみ構造検証と順序検証（`dtend > dtstart`）。
+  - `dtend ≤ dtstart` の場合でも、ユーザ入力は保存（継続編集可能）し、トースト＋赤枠で通知。
+  - フィールド毎の軽量バリデーション（長さ・必須・列挙）は422相当で通知し、値は保持。
+
+- 参加者UI（インライン編集）
+  - マーク（○/△/×）はクリック即保存。
+  - コメントは blur 時のみ保存（編集中は保存しない）。
+  - コメントは500文字上限。超過時は保存せず赤枠＋「コメントは500文字以内で入力してください」表示。値は保持。
+  - ステータスメッセージは一定時間で自動消滅（最新入力でタイマーを更新）。
+
+実装メモ
+- バリデーションは `src/frontend/shared/validation.js` の薄いヘルパで実施（後で zod に置換可能）。
+- 管理UIの候補編集は、未完成フォーマット時は検証スキップ、完成時のみ検証。順序NG時も入力は保存し、赤枠とトーストのみ。
+
+詳細説明は `docs/VALIDATION_POLICY.md` を参照。
