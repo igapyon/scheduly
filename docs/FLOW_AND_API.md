@@ -209,3 +209,19 @@ shareService.rotate(projectId, {
 
 ### クライアントの競合処理（指針）
 - 409 時は最新を取得してマージ/やり直し導線を提示。Responses は行差分を画面へ反映、Candidates/Participants はフォーム再読込、一覧操作/ICS は同期→再試行。
+
+---
+
+## 7. エラーモデルと UI 対応（簡潔）
+
+- レスポンスの標準形（バリデーション）
+  - 422: `{ code: 422, message: string, fields?: string[] }`
+  - `fields` は UI で赤枠を付ける対象キー（例: `['summary', 'description']`）。
+- 競合・サイズ等の代表コード
+  - 409 競合、413 サイズ超過、429 レート制限、400/422 入力エラー。
+- UI 方針（要約）
+  - 値は保持、NG は赤枠＋短いメッセージ（トースト/ステータス）。
+  - Datetime は編集途中は許容、完成時のみ厳密検証。順序 NG は保存をブロックせず通知。
+- 運用メモ
+  - 422 を `console.debug` に格下げし、操作を阻害しない。
+  - 詳細は `docs/VALIDATION_POLICY.md` を参照。
