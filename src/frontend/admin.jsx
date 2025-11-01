@@ -478,6 +478,8 @@ function OrganizerApp() {
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
   const [openCandidateId, setOpenCandidateId] = useState(null);
   const [candidateErrors, setCandidateErrors] = useState(() => ({}));
+  const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
+  const metaWarnedRef = useRef({ name: false, description: false });
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
@@ -542,6 +544,33 @@ function OrganizerApp() {
     if (!projectId) return;
     projectService.updateMeta(projectId, { name: summary, description });
   }, [projectId, summary, description]);
+
+  // Project meta live validation (length) with visual cues and one-shot toast
+  useEffect(() => {
+    const NAME_MAX = 120;
+    const DESC_MAX = 2000;
+    const overName = (summary || "").length > NAME_MAX;
+    const overDesc = (description || "").length > DESC_MAX;
+    setMetaErrors((prev) =>
+      prev.name !== overName || prev.description !== overDesc
+        ? { name: overName, description: overDesc }
+        : prev
+    );
+    if (overName && !metaWarnedRef.current.name) {
+      metaWarnedRef.current.name = true;
+      popToast(`プロジェクト名は ${NAME_MAX} 文字以内で入力してください`);
+    }
+    if (!overName && metaWarnedRef.current.name) {
+      metaWarnedRef.current.name = false;
+    }
+    if (overDesc && !metaWarnedRef.current.description) {
+      metaWarnedRef.current.description = true;
+      popToast(`説明は ${DESC_MAX} 文字以内で入力してください`);
+    }
+    if (!overDesc && metaWarnedRef.current.description) {
+      metaWarnedRef.current.description = false;
+    }
+  }, [summary, description]);
 
   useEffect(() => {
     if (baseUrlTouchedRef.current) return;
@@ -1200,9 +1229,12 @@ function OrganizerApp() {
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.name ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクト名を入力"
               />
+              <div className="mt-1 text-right text-[11px]">
+                <span className={`${metaErrors.name ? "text-rose-600" : "text-zinc-400"}`}>{(summary || "").length}/120</span>
+              </div>
             </label>
             <label className="block">
               <span className="text-xs font-semibold text-zinc-500">説明</span>
@@ -1210,9 +1242,12 @@ function OrganizerApp() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクトの概要を入力"
               />
+              <div className="mt-1 text-right text-[11px]">
+                <span className={`${metaErrors.description ? "text-rose-600" : "text-zinc-400"}`}>{(description || "").length}/2000</span>
+              </div>
             </label>
           </SectionCard>
 
