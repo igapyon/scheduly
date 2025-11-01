@@ -277,3 +277,5 @@ Appendix: Excel 出力（参加者 UI）
 実装メモ
 - バリデーションは `src/frontend/shared/validation.js` の薄いヘルパで実施（後で zod に置換可能）。
 - 管理UIの候補編集は、未完成フォーマット時は検証スキップ、完成時のみ検証。順序NG時も入力は保存し、赤枠とトーストのみ。
+
+詳細説明は `docs/VALIDATION_POLICY.md` を参照。
