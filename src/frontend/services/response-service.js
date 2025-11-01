@@ -2,6 +2,7 @@
 
 const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
+const { validate, buildResponseRules } = require("../shared/validation");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
 
@@ -28,6 +29,23 @@ const getResponse = (projectId, participantId, candidateId) => {
 const upsertResponse = (projectId, payload) => {
   if (!payload || !payload.participantId || !payload.candidateId) {
     throw new Error("participantId and candidateId are required");
+  }
+  // Minimal input validation (replaceable by zod later)
+  const rules = buildResponseRules({});
+  const check = validate(
+    {
+      participantId: String(payload.participantId || ""),
+      candidateId: String(payload.candidateId || ""),
+      mark: String((payload.mark || "").toString()),
+      comment: String(payload.comment || "")
+    },
+    rules
+  );
+  if (!check.ok) {
+    const fields = check.errors.join(", ");
+    const err = new Error(`validation failed: ${fields}`);
+    err.code = 422;
+    throw err;
   }
   const candidateList = projectStore.getCandidates(projectId);
   if (candidateList && !candidateList.some((item) => item.id === payload.candidateId)) {
