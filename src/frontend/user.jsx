@@ -214,6 +214,7 @@ function InlineResponseEditor({
   const [currentMark, setCurrentMark] = useState(initialMark && initialMark !== "pending" ? initialMark : null);
   const [currentComment, setCurrentComment] = useState(initialComment || "");
   const [statusMessage, setStatusMessage] = useState("");
+  const [commentError, setCommentError] = useState(false);
   const statusTimerRef = useRef(null);
 
   useEffect(() => {
@@ -252,32 +253,38 @@ function InlineResponseEditor({
           statusTimerRef.current = null;
         }, 1800);
       } catch (error) {
-        console.error("[user] inline response update failed", error);
+        const msg = error && error.message ? String(error.message) : "保存に失敗しました";
+        const isValidation = error && (error.code === 422 || /validation/i.test(msg));
+        if (isValidation) {
+          if (/comment/i.test(msg)) {
+            setCommentError(true);
+            setStatusMessage("コメントは500文字以内で入力してください");
+          } else {
+            setStatusMessage("入力内容を確認してください");
+          }
+          console.debug("[user] validation", msg);
+        } else {
+          console.error("[user] inline response update failed", error);
+          setStatusMessage("保存に失敗しました");
+        }
         if (statusTimerRef.current) {
           window.clearTimeout(statusTimerRef.current);
           statusTimerRef.current = null;
         }
-        setStatusMessage("保存に失敗しました");
       }
     },
     [participantId, projectId, schedule?.id]
   );
 
   const handleSelectMark = (markKey) => {
-    setCurrentMark((prev) => (prev === markKey ? null : markKey));
+    setCurrentMark((prev) => {
+      const next = prev === markKey ? null : markKey;
+      commitUpdate(next, currentComment);
+      return next;
+    });
   };
 
-  // Defer committing updates to after render to avoid
-  // cross-component setState during render warnings.
-  const didInitRef = useRef(false);
-  useEffect(() => {
-    if (!didInitRef.current) {
-      // Skip the initial sync from props
-      didInitRef.current = true;
-      return;
-    }
-    commitUpdate(currentMark, currentComment);
-  }, [commitUpdate, currentComment, currentMark]);
+  // commit-on-blur for comment; mark commits immediately
 
   const handleCommentChange = (value) => {
     setCurrentComment(value);
@@ -332,7 +339,7 @@ function InlineResponseEditor({
       <label className="mt-3 block text-[11px] text-zinc-600">
         コメント（任意）
         <textarea
-          className="mt-1 w-full resize-y rounded-xl border border-zinc-200 px-3 py-2 text-sm leading-relaxed focus:border-emerald-400 focus:outline-none focus:ring focus:ring-emerald-100"
+          className={`mt-1 w-full resize-y rounded-xl border px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring focus:ring-emerald-100 ${commentError ? "border-rose-300 focus:border-rose-400" : "border-zinc-200 focus:border-emerald-400"}`}
           rows={3}
           placeholder="この日程について共有したいことがあれば入力してください…"
           value={currentComment}
@@ -341,8 +348,9 @@ function InlineResponseEditor({
         />
       </label>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-emerald-700">
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-emerald-700">
         <span>{statusMessage || "入力内容は自動保存されます"}</span>
+        <span className={`ml-auto ${commentError ? "text-rose-600" : "text-zinc-500"}`}>{currentComment.length}/500</span>
         {fallbackHref ? (
           <a
             className="rounded-lg border border-transparent px-2 py-1 text-[10px] font-semibold text-emerald-700 underline decoration-emerald-400"
