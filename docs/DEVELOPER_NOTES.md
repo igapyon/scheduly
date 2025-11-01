@@ -229,5 +229,27 @@ Appendix: Excel 出力（参加者 UI）
 - 依頼時の期待値
   - PR を作りたい場合は、AIは「ローカルで比較用ブランチの用意」「`pr/*.md` にPR文面ドラフト作成」「`docs/CHANGELOG.md` の更新」までを支援し、最終的な `git push` と GitHub 上の PR 作成は人間が実施する。
   - ネットワーク権限が必要な操作（パッケージの取得、GitHub CLI でのPR生成等）はスコープ外。必要に応じて実行手順のみ提示する。
-- 例（想定ワークフロー）
+  - 例（想定ワークフロー）
   - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。
+
+---
+
+## 11. 動的サーバ移行の前提（設計ノート）
+
+- ICS UID/DTSTAMP 規則（要約）
+  - UID は候補生成時に一意（変更不可）。ステータス/時刻更新時は `SEQUENCE`/`DTSTAMP` を更新し履歴性を担保する。
+  - インポート時は同 UID の候補にマージ。欠落フィールドは既存値を尊重し、破壊的上書きは行わない。
+
+- 楽観更新/ロールバック規約
+  - 送信前に対象レコードの `version` を保持。409 受信時は最新を取得→UIへ差分提示→ユーザ操作で再送。
+  - Responses は行（`participantId × candidateId`）を原子的に更新（`mark` と `comment` セット）。
+  - Candidates/Participants は個票の `version`。並び替え/ICS 一括は `candidatesListVersion` で検出。
+  - Project メタは `projectMeta.version`、共有トークンは `shareTokens.version` を用いる。
+
+- 管理スコープと回答スコープの分離原則
+  - 管理操作（メタ/候補/トークン）は参加者の回答スコープと独立。回答の更新は管理スコープのロックに影響しない。
+  - これにより参加者の同時操作が多い状況でも、管理UIの編集体験を阻害しない。
+
+- 環境変数/運用
+  - `.env.example` に `API_BASE_URL` / `BASE_URL` / `NODE_ENV` / `CORS_ALLOWED_ORIGINS` などを追加。
+  - CSP/CORS は単一オリジン前提で最小許可を基本とする。

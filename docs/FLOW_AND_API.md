@@ -158,3 +158,54 @@ shareService.rotate(projectId, {
 - `summary-service` の派生データを活かした UI 拡張（最多回答日・未回答者一覧など）を優先 TODO として管理。
 - バックエンド実装時は、ここで定義したサービス層を fetch/API 呼び出しへ置き換える想定。`projectStore` はキャッシュ層として流用できる。
 - アクセス制御や監査ログ、トークン失効 API は今後のサーバーサイド連携で検討。現状はフロント内で `shareService.isPlaceholderToken` を活用し、プレースホルダー値を意図的に除外している。
+
+---
+
+## 6. Server API（Minimum, In-Memory）
+
+本節は最初のオンメモリ版サーバの I/F と、楽観排他（行/個票/リスト/メタ/トークン）の前提を定義する。永続DBへ移行してもエンドポイントと I/O は維持する。
+
+- 共通事項
+  - すべて JSON。日時は ISO8601（タイムゾーン付与）、内部処理は UTC 正規化。
+  - サブリソースごとに整数 `version` を持つ。更新時はクライアントの `version` を受け取り一致しなければ 409。
+  - 失敗時の代表コード: 400/422=バリデーション、409=競合、413=サイズ超過、429=レート制限。
+
+- 取得
+  - GET `/api/projects/:id`
+    - returns: `{ meta, candidates[], candidatesListVersion, participants[], responses[], shareTokens, derived?, versions }`
+    - 各要素に `version` を含める。`responses` は `(participantId,candidateId)` 行単位の `version` を持つ。
+
+- 回答（Responses）
+  - POST `/api/projects/:id/responses`
+    - body: `{ participantId, candidateId, mark, comment, version }`
+    - 200: `{ response: {..., version: newVersion} }`
+    - 409: `{ conflict: { response: latestRow } }`
+
+- 候補（Candidates）
+  - PUT `/api/projects/:id/candidates/:cid`
+    - body: `{ ...candidateFields, version }`
+  - POST `/api/projects/:id/candidates:reorder`
+    - headers/body: `If-Match` or `{ candidatesListVersion }`
+  - POST `/api/projects/:id/ics/import`
+    - headers/body: `If-Match` or `{ candidatesListVersion }`, payload: `icsText | items[]`
+
+- 参加者（Participants）
+  - PUT `/api/projects/:id/participants/:pid`
+    - body: `{ ...participantFields, version }`
+
+- プロジェクトメタ / 共有トークン
+  - PUT `/api/projects/:id/meta`（`projectMeta.version`）
+  - POST `/api/projects/:id/share/rotate`（`shareTokens.version`）
+
+- 運用
+  - GET `/api/healthz` / GET `/api/readyz`
+
+### 楽観排他の粒度
+- Responses: 1行（participantId × candidateId）。`version` 必須。
+- Candidates: 個票ごとに `version`。一覧操作は `candidatesListVersion` を If-Match。
+- Participants: 個票ごとに `version`。
+- Project Meta: `projectMeta.version`。
+- Share Tokens: `shareTokens.version`。
+
+### クライアントの競合処理（指針）
+- 409 時は最新を取得してマージ/やり直し導線を提示。Responses は行差分を画面へ反映、Candidates/Participants はフォーム再読込、一覧操作/ICS は同期→再試行。
