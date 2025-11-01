@@ -91,7 +91,31 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- N/A
+- 動的サーバ移行の前提整備（オンメモリ/単一プロセス想定を明記）
+- 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
+- バリデーション導入（zod 等で型スキーマ定義しフロント/サーバ共用）
+- バージョニング付与（サブリソースごとに整数 version を持たせる）
+- 楽観排他の粒度設計を実装（回答=行単位、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）
+- Responses の行粒度API（`POST /api/projects/:id/responses`、bodyに version を同梱、409時は最新返却）
+- Candidates の個票更新API（`PUT /api/projects/:id/candidates/:cid`、version必須）
+- Candidates 一覧操作API（`POST /api/projects/:id/candidates:reorder`、`POST /api/projects/:id/ics/import` は `candidatesListVersion` でIf-Match）
+- Participants の個票更新API（`PUT /api/projects/:id/participants/:pid`、version必須）
+- Project メタ更新API（`PUT /api/projects/:id/meta`、`projectMeta.version` でIf-Match）
+- Share トークン回転API（`POST /api/projects/:id/share/rotate`、`shareTokens.version` でIf-Match）
+- 全体取得API（`GET /api/projects/:id` に各サブリソースの version を含める）
+- ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
+- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
+- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
+- 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
+- エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
+- `.env.example` 追加（`API_BASE_URL`/`BASE_URL`/`NODE_ENV`/CORS想定）と設定読取ユーティリティ
+- CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
+- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
+- 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
+- I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
+- サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
+- `docs/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
+- `docs/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
 
 ### 優先度: 中
  - 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
