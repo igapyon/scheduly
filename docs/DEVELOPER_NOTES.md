@@ -117,7 +117,11 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `docs/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
 - 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
- - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
+- About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
+ - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
+ - `docs/FLOW_AND_API.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+ - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
+ - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
 
 ### 優先度: 中
  - 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
