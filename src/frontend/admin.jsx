@@ -147,6 +147,9 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
   const ignoreNextClickRef = useRef(false);
+  const SUMMARY_MAX = 120;
+  const LOCATION_MAX = 120;
+  const DESCRIPTION_MAX = 2000;
 
   const handleToggle = () => {};
   const handleSummaryClick = () => {
@@ -224,6 +227,11 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               aria-invalid={errors.summary ? "true" : undefined}
               placeholder="例: 秋の合宿 調整会議 Day1"
             />
+            <div className="mt-1 text-right text-[11px]">
+              <span className={`${(value.summary || "").length > SUMMARY_MAX || errors.summary ? "text-rose-600" : "text-zinc-400"}`}>
+                {(value.summary || "").length}/{SUMMARY_MAX}
+              </span>
+            </div>
           </label>
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">ステータス（STATUS）</span>
@@ -285,6 +293,11 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               aria-invalid={errors.location ? "true" : undefined}
               placeholder="例: サントリーホール 大ホール"
             />
+            <div className="mt-1 text-right text-[11px]">
+              <span className={`${(value.location || "").length > LOCATION_MAX || errors.location ? "text-rose-600" : "text-zinc-400"}`}>
+                {(value.location || "").length}/{LOCATION_MAX}
+              </span>
+            </div>
           </label>
         </div>
 
@@ -298,6 +311,11 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             aria-invalid={errors.description ? "true" : undefined}
             placeholder="補足情報を入力"
           />
+          <div className="mt-1 text-right text-[11px]">
+            <span className={`${(value.description || "").length > DESCRIPTION_MAX || errors.description ? "text-rose-600" : "text-zinc-400"}`}>
+              {(value.description || "").length}/{DESCRIPTION_MAX}
+            </span>
+          </div>
         </label>
 
         <div className="flex justify-end">
