@@ -142,7 +142,7 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen }) {
+function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen, errors = {} }) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
@@ -220,7 +220,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.summary}
               onChange={(e) => onChange({ ...value, summary: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.summary ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.summary ? "true" : undefined}
               placeholder="例: 秋の合宿 調整会議 Day1"
             />
           </label>
@@ -229,7 +230,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.status}
               onChange={(e) => onChange({ ...value, status: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.status ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.status ? "true" : undefined}
             >
               <option value="CONFIRMED">確定（CONFIRMED）</option>
               <option value="TENTATIVE">仮予定（TENTATIVE）</option>
@@ -243,7 +245,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtstart}
               onChange={(e) => onChange({ ...value, dtstart: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtstart ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.dtstart ? "true" : undefined}
             />
           </label>
           <label className="block">
@@ -252,7 +255,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtend}
               onChange={(e) => onChange({ ...value, dtend: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtend ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.dtend ? "true" : undefined}
             />
           </label>
 
@@ -261,7 +265,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.tzid}
               onChange={(e) => onChange({ ...value, tzid: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.tzid ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.tzid ? "true" : undefined}
             >
               {["Asia/Tokyo", "UTC", "Asia/Seoul", "Europe/London", "America/Los_Angeles"].map((tz) => (
                 <option key={tz} value={tz}>
@@ -276,7 +281,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.location}
               onChange={(e) => onChange({ ...value, location: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.location ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+              aria-invalid={errors.location ? "true" : undefined}
               placeholder="例: サントリーホール 大ホール"
             />
           </label>
@@ -288,7 +294,8 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             value={value.description}
             onChange={(e) => onChange({ ...value, description: e.target.value })}
             rows={3}
-            className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
+            aria-invalid={errors.description ? "true" : undefined}
             placeholder="補足情報を入力"
           />
         </label>
@@ -452,6 +459,7 @@ function OrganizerApp() {
   const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
   const [openCandidateId, setOpenCandidateId] = useState(null);
+  const [candidateErrors, setCandidateErrors] = useState(() => ({}));
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
@@ -543,7 +551,43 @@ function OrganizerApp() {
 
   const updateCandidate = (id, next) => {
     if (!projectId) return;
-    updateScheduleCandidate(projectId, id, next);
+    try {
+      updateScheduleCandidate(projectId, id, next);
+      // clear errors for this candidate on success
+      setCandidateErrors((prev) => ({ ...prev, [id]: {} }));
+    } catch (error) {
+      const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
+      const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
+      if (isValidation) {
+        // Validation errors are expected during editing; avoid noisy error logs
+        // but keep a lightweight trace for debugging when needed.
+        console.debug("updateCandidate validation", msg);
+      } else {
+        console.error("updateCandidate error", error);
+      }
+      popToast(msg);
+      // parse fields from message to highlight
+      let fields = [];
+      if (msg.includes(":")) {
+        const after = msg.split(":").slice(1).join(":").trim();
+        if (after.includes("must be after")) {
+          fields = ["dtstart", "dtend"];
+        } else {
+          fields = after.split(/[,\s]+/).filter(Boolean);
+        }
+      }
+      if (fields.length) {
+        setCandidateErrors((prev) => {
+          const current = prev[id] || {};
+          const nextFlags = { ...current };
+          fields.forEach((f) => {
+            const key = String(f).toLowerCase();
+            nextFlags[key] = true;
+          });
+          return { ...prev, [id]: nextFlags };
+        });
+      }
+    }
   };
 
   const removeCandidate = (id) => {
@@ -1212,6 +1256,7 @@ function OrganizerApp() {
                   disableRemove={candidates.length === 1}
                   isOpen={openCandidateId === candidate.id}
                   onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
+                  errors={candidateErrors[candidate.id] || {}}
                 />
               ))
             )}

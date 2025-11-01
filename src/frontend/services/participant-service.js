@@ -1,6 +1,7 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const projectStore = require("../store/project-store");
+const { validate, buildParticipantRules } = require("../shared/validation");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -70,6 +71,14 @@ const addParticipant = (projectId, payload) => {
   const preferredId = payload?.id;
   const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
   const displayName = payload?.displayName || "";
+  // Minimal validation
+  const rules = buildParticipantRules({});
+  const check = validate({ displayName, email: payload?.email || "", comment: payload?.comment || "" }, rules);
+  if (!check.ok) {
+    const err = new Error(`participant validation failed: ${check.errors.join(", ")}`);
+    err.code = 422;
+    throw err;
+  }
   if (isDuplicateDisplayName(projectId, displayName)) {
     throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
   }
@@ -95,6 +104,17 @@ const updateParticipant = (projectId, participantId, changes) => {
     throw new Error("Participant not found");
   }
   const nextDisplayName = changes?.displayName ?? existing.displayName;
+  const rules = buildParticipantRules({});
+  const check = validate({
+    displayName: String(nextDisplayName || ""),
+    email: String(changes?.email ?? existing.email ?? ""),
+    comment: String(changes?.comment ?? existing.comment ?? "")
+  }, rules);
+  if (!check.ok) {
+    const err = new Error(`participant validation failed: ${check.errors.join(", ")}`);
+    err.code = 422;
+    throw err;
+  }
   if (isDuplicateDisplayName(projectId, nextDisplayName, participantId)) {
     throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
   }
