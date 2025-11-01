@@ -1406,19 +1406,35 @@ function AdminResponsesApp() {
               </p>
               <label className="block text-xs text-zinc-500">
                 新しい参加者名
-                <input
-                  type="text"
-                  value={renameName}
-                  onChange={(event) => {
-                    setRenameName(event.target.value);
-                    if (renameError) setRenameError("");
-                  }}
-                  placeholder="参加者名"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  autoFocus
-                  autoComplete="off"
-                  disabled={renameInProgress}
-                />
+                {(() => {
+                  const NAME_MAX = 80;
+                  const over = (renameName || "").length > NAME_MAX;
+                  const className = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${
+                    over || renameError ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"
+                  }`;
+                  return (
+                    <>
+                      <input
+                        type="text"
+                        value={renameName}
+                        onChange={(event) => {
+                          setRenameName(event.target.value);
+                          if (renameError) setRenameError("");
+                        }}
+                        placeholder="参加者名"
+                        className={className}
+                        autoFocus
+                        autoComplete="off"
+                        disabled={renameInProgress}
+                      />
+                      <div className="mt-1 text-right text-[11px]">
+                        <span className={`${over || renameError ? "text-rose-600" : "text-zinc-400"}`}>
+                          {(renameName || "").length}/{NAME_MAX}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </label>
               {renameError && (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">{renameError}</div>
