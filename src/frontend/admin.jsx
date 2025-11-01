@@ -1022,6 +1022,34 @@ function OrganizerApp() {
     }
   };
 
+  const handleProjectImportFromDemo = async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    try {
+      const confirmed = window.confirm("現在のプロジェクトをデモ用データで置き換えます。よろしいですか？");
+      if (!confirmed) return;
+      const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const parsed = await res.json();
+      projectService.importState(projectId, parsed);
+      const snapshot = projectService.getState(projectId);
+      setSummary(snapshot.project?.name || "");
+      setDescription(snapshot.project?.description || "");
+      setCandidates(snapshot.candidates || []);
+      baseUrlTouchedRef.current = false;
+      refreshShareTokensState({ resetWhenMissing: true });
+      setRouteContext(projectService.getRouteContext());
+      setImportPreview(null);
+      setInitialDataLoaded(true);
+      popToast("デモ用プロジェクトをインポートしました");
+    } catch (error) {
+      console.error("Demo project import error", error);
+      popToast("デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
 
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
@@ -1306,6 +1334,13 @@ function OrganizerApp() {
                 onClick={openProjectDeleteDialog}
               >
                 プロジェクトを削除
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-blue-600 hover:border-blue-300"
+                onClick={handleProjectImportFromDemo}
+              >
+                デモ用プロジェクトをインポート
               </button>
             </div>
             <input
