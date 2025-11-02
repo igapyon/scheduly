@@ -72,7 +72,8 @@ module.exports = {
     new webpack.DefinePlugin({
       "process.env.API_BASE_URL": JSON.stringify(process.env.API_BASE_URL || ""),
       "process.env.BASE_URL": JSON.stringify(process.env.BASE_URL || ""),
-      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || (isProduction ? "production" : "development"))
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || (isProduction ? "production" : "development")),
+      "process.env.CORS_ALLOWED_ORIGINS": JSON.stringify(process.env.CORS_ALLOWED_ORIGINS || "")
     })
   ]
 };
