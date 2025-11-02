@@ -2,6 +2,8 @@
 
 Scheduly の候補管理は iCalendar (ICS) を中心に構成され、React / webpack 版では `schedule-service` と `projectStore` が候補・ICS テキストを一元管理しています。ここでは最新のデータフローと運用パターンをまとめます。
 
+> 補足: 通常のWebアプリと異なる方式上の特徴（秘密URLによるアクセス、リアルタイム保存、揮発前提など）は外部仕様にまとめています。`docs/EXTERNAL_SPEC.md` を参照してください。
+
 ## 1. ワークフロー概要
 
 - 管理画面は `/index.html` から `/a/{adminToken}` にリダイレクトされ、`admin.jsx` を通じて `scheduleService` を利用します。

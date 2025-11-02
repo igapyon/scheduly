@@ -21,6 +21,7 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): コントリビューション手引き
 - [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md): コントリビューター一覧
 - [docs/CHANGELOG.md](docs/CHANGELOG.md): 変更履歴のメモ
+- [docs/EXTERNAL_SPEC.md](docs/EXTERNAL_SPEC.md): 外部仕様（通常と異なる方式上の特徴）
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
@@ -38,7 +39,7 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 
 - `admin.jsx`（ビルド後は `index.bundle.js`）: 管理者向けアプリ。候補編集・ICS 入出力・プロジェクト JSON 入出力を備え、`public/index.html` から共有トークン発行後は `/a/{token}` へリダイレクトされます。
 - `user.jsx`（ビルド後は `user.bundle.js`）: 参加者の回答閲覧・編集を一画面で提供する UI。日程別／参加者別タブのほか、カード内で直接 ○△× とコメントを更新できます。`public/user.html` から共有トークン利用時は `/p/{token}` へ遷移します。Excel 出力（exceljs 利用）にも対応。
-- スタイルは当面 HTML テンプレートで読み込む Tailwind CDN と最小限のインライン CSS で賄っています。必要に応じて順次整理予定です。
+ - スタイルは Tailwind を PostCSS/CLI でビルドして適用します（出力: `public/assets/tailwind.css`）。セットアップや運用は `docs/DEVELOPER_NOTES.md` を参照してください。
 - 開発フロー
   1. 依存関係のインストール（初回のみ）: `npm install`
   2. 開発サーバー起動: `npm run dev`（Webpack Dev Server, ポート 5173）

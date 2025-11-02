@@ -237,6 +237,9 @@ Appendix: Excel 出力（参加者 UI）
   - 例（想定ワークフロー）
   - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。
 
+関連ドキュメント
+- 通常のWebアプリと異なる方式上の特徴は外部仕様に集約しています。`docs/EXTERNAL_SPEC.md` を参照してください。
+
 ---
 
 ## 11. 動的サーバ移行の前提（設計ノート）
