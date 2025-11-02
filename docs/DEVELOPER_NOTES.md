@@ -1,6 +1,6 @@
 # Developer Notes
 
-Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。UI の全体像は README に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/VERIFY_CHECKLIST.md` を参照してください。
+Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。全体像は README.md に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/VERIFY_CHECKLIST.md` を参照してください。
 
 外部仕様（方式面・画面挙動・ICS運用）の参照先
 - `docs/EXTERNAL_SPEC.md`
@@ -9,7 +9,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ---
 
-## 1. モック構成と開発環境
+## 1. アプリ構成と開発環境
 
 ### 1.1 React / webpack 版（開発中）
 - 位置: `src/frontend/`
@@ -35,8 +35,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 1.3 その他の運用メモ
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
-- UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
+- UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 
 ---
 
@@ -51,6 +51,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ---
 
 ## 3. レガシーモック更新ワークフロー
+
+この更新作業は自動化しておらず、人手で実施します（DOM のコピーは手動、整形や見栄えの微調整は生成AIと協力して行う）。
 
 1. `npm run dev` で React 版を起動し、対象画面を開く（例: `http://localhost:5173/index.html`）。
 2. Chrome DevTools の Elements タブで対象 DOM を `Copy outerHTML`。
