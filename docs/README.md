@@ -17,6 +17,7 @@
   - アーキテクチャ: `docs/internal/ARCHITECTURE.md`
   - データモデル: `docs/internal/DATA_MODEL.md`
   - フローと API 草案: `docs/internal/FLOW_AND_API.md`
+  - 画面の技術概要: `docs/internal/SCREEN_TECHNICAL_OVERVIEW.md`
   - サーバ統合（WIP）: `docs/internal/SERVER_INTEGRATION.md`
   - 開発メモ/TODO: `docs/internal/DEVELOPER_NOTES.md`
   - 開発プロセス定義: `docs/internal/DEVELOPMENT_JOURNEY.md`
