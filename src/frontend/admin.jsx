@@ -11,7 +11,7 @@ import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
-import { ClipboardIcon } from "@heroicons/react/24/outline";
+import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 
@@ -19,6 +19,7 @@ void Fragment;
 void EventMeta;
 void InfoBadge;
 void ClipboardIcon;
+void CheckIcon;
 
 const {
   addCandidate: addScheduleCandidate,
@@ -119,15 +120,17 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
-function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "" }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName, titleClassName, iconClassName, headerBadge }) {
+  const outerClass = containerClassName || "space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm";
   return (
-    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className={outerClass}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1 min-w-0 basis-0 grow">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-700">
-              <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
+            <h2 className={`flex min-w-0 items-center gap-2 text-sm font-semibold ${titleClassName || "text-zinc-700"}`}>
+              <span aria-hidden="true" className={iconClassName}>{title.includes("日程") ? "🗓️" : "📝"}</span>
               <span className="break-words">{title}</span>
+              {headerBadge ? <span className="shrink-0">{headerBadge}</span> : null}
             </h2>
             {infoMessage && (
               <InfoBadge ariaLabel={`${title} の説明`} title={infoTitle || title} message={infoMessage} />
@@ -1016,6 +1019,14 @@ function OrganizerApp() {
     try {
       await copyTextToClipboard(targetEntry.url);
       popToast("URLをコピーしました");
+      setCopied((prev) => ({ ...prev, [type]: true }));
+      try {
+        if (copiedTimersRef.current[type]) clearTimeout(copiedTimersRef.current[type]);
+      } catch (_) {}
+      copiedTimersRef.current[type] = setTimeout(() => {
+        setCopied((prev) => ({ ...prev, [type]: false }));
+        copiedTimersRef.current[type] = null;
+      }, 1800);
     } catch (error) {
       console.error("Copy share URL error", error);
       popToast("URLのコピーに失敗しました");
@@ -1151,6 +1162,8 @@ function OrganizerApp() {
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
   const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
+  const [copied, setCopied] = useState({ admin: false, participant: false });
+  const copiedTimersRef = useRef({ admin: null, participant: null });
   const canCopyAdminUrl =
     adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token) && isNonEmptyString(adminShareEntry.url);
   const canCopyParticipantUrl =
@@ -1217,6 +1230,115 @@ function OrganizerApp() {
       <div className="grid flex-1 gap-5">
 
         <main className="space-y-5" style={{ contain: "inline-size" }}>
+          <SectionCard
+            title="共有URL"
+            description="管理者リンクと参加者へ共有するリンクを設定および確認します。Schedulyでは管理者リンクは大切なものですので、管理者の方は管理者リンクを確実に保管してください。"
+            infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
+            containerClassName="space-y-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
+            titleClassName="text-amber-700"
+            iconClassName="text-amber-600"
+            headerBadge={<span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">重要</span>}
+            action={
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
+                onClick={handleShareLinkAction}
+              >
+                {shareActionLabel}
+              </button>
+            }
+          >
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs font-semibold text-zinc-500">基準URL</span>
+                <input
+                  type="url"
+                  value={baseUrl}
+                  onChange={(event) => {
+                    baseUrlTouchedRef.current = true;
+                    setBaseUrl(event.target.value);
+                  }}
+                  onBlur={handleBaseUrlBlur}
+                  placeholder="https://scheduly.app"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-zinc-600">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={navigateAfterGenerate}
+                  onChange={(event) => setNavigateAfterGenerate(event.target.checked)}
+                />
+                発行後に管理者URLを開く
+              </label>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">管理者URL</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className="flex-1 truncate text-sm text-zinc-800"
+                    title={adminShareEntry?.url || ""}
+                  >
+                    {adminUrlDisplay}
+                  </span>
+                  <button
+                    type="button"
+                    className={`inline-flex shrink-0 items-center justify-center rounded-lg border p-1 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      copied.admin
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
+                    onClick={() => handleCopyShareUrl("admin")}
+                    disabled={!canCopyAdminUrl}
+                    title={copied.admin ? "コピーしました" : "コピー"}
+                  >
+                    {copied.admin ? (
+                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">参加者URL</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className="flex-1 truncate text-sm text-zinc-800"
+                    title={participantShareEntry?.url || ""}
+                  >
+                    {participantUrlDisplay}
+                  </span>
+                  <button
+                    type="button"
+                    className={`inline-flex shrink-0 items-center justify-center rounded-lg border p-1 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      copied.participant
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
+                    onClick={() => handleCopyShareUrl("participant")}
+                    disabled={!canCopyParticipantUrl}
+                    title={copied.participant ? "コピーしました" : "コピー"}
+                  >
+                    {copied.participant ? (
+                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-zinc-500">最終更新</span>
+                <div className="mt-1 break-words text-sm text-zinc-800">{issuedAtDisplay}</div>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500">
+              管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。必要に応じて基準URLを変更し、再発行してください。
+            </p>
+          </SectionCard>
           <SectionCard
             title="プロジェクト情報"
             description="プロジェクトの基本情報を編集します。"
@@ -1317,95 +1439,6 @@ function OrganizerApp() {
         </main>
 
         <aside className="space-y-5" style={{ contain: "inline-size" }}>
-          <SectionCard
-            title="共有URL"
-            description="参加者へ共有するリンクと管理者リンクを確認できます。"
-            infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
-            action={
-              <button
-                type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
-                onClick={handleShareLinkAction}
-              >
-                {shareActionLabel}
-              </button>
-            }
-          >
-            <div className="space-y-3">
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-500">基準URL</span>
-                <input
-                  type="url"
-                  value={baseUrl}
-                  onChange={(event) => {
-                    baseUrlTouchedRef.current = true;
-                    setBaseUrl(event.target.value);
-                  }}
-                  onBlur={handleBaseUrlBlur}
-                  placeholder="https://scheduly.app"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                  checked={navigateAfterGenerate}
-                  onChange={(event) => setNavigateAfterGenerate(event.target.checked)}
-                />
-                発行後に管理者URLを開く
-              </label>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <span className="text-xs font-semibold text-zinc-500">管理者URL</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <span
-                    className="flex-1 truncate text-sm text-zinc-800"
-                    title={adminShareEntry?.url || ""}
-                  >
-                    {adminUrlDisplay}
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={() => handleCopyShareUrl("admin")}
-                    disabled={!canCopyAdminUrl}
-                    title="コピー"
-                  >
-                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-zinc-500">参加者URL</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <span
-                    className="flex-1 truncate text-sm text-zinc-800"
-                    title={participantShareEntry?.url || ""}
-                  >
-                    {participantUrlDisplay}
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={() => handleCopyShareUrl("participant")}
-                    disabled={!canCopyParticipantUrl}
-                    title="コピー"
-                  >
-                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-zinc-500">最終更新</span>
-                <div className="mt-1 break-words text-sm text-zinc-800">{issuedAtDisplay}</div>
-              </div>
-            </div>
-            <p className="text-xs text-zinc-500">
-              管理者URLを知っている人だけがプロジェクト内容を更新できます。参加者URLは参加者に共有します。必要に応じて基準URLを変更し、再発行してください。
-            </p>
-          </SectionCard>
 
           <SectionCard
             title="管理アクション"

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "webpack serve --config webpack.config.js --mode development",
     "start": "npm run dev",
+    "prebuild": "npm run css:build",
     "build": "webpack --config webpack.config.js --mode production",
     "postbuild": "node scripts/copy-static.js",
     "css:build": "tailwindcss -c tailwind.config.js -i ./src/styles/tailwind.css -o ./public/assets/tailwind.css --minify",
