@@ -119,16 +119,17 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
-function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName, titleClassName, iconClassName, headerBadge }) {
   const outerClass = containerClassName || "space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm";
   return (
     <section className={outerClass}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1 min-w-0 basis-0 grow">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-700">
-              <span aria-hidden="true">{title.includes("日程") ? "🗓️" : "📝"}</span>
+            <h2 className={`flex min-w-0 items-center gap-2 text-sm font-semibold ${titleClassName || "text-zinc-700"}`}>
+              <span aria-hidden="true" className={iconClassName}>{title.includes("日程") ? "🗓️" : "📝"}</span>
               <span className="break-words">{title}</span>
+              {headerBadge ? <span className="shrink-0">{headerBadge}</span> : null}
             </h2>
             {infoMessage && (
               <InfoBadge ariaLabel={`${title} の説明`} title={infoTitle || title} message={infoMessage} />
@@ -1223,6 +1224,9 @@ function OrganizerApp() {
             description="管理者リンクと参加者へ共有するリンクを設定および確認します。Schedulyでは管理者リンクは大切なものですので、管理者の方は管理者リンクを確実に保管してください。"
             infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
             containerClassName="space-y-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
+            titleClassName="text-amber-700"
+            iconClassName="text-amber-600"
+            headerBadge={<span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">重要</span>}
             action={
               <button
                 type="button"
