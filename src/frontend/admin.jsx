@@ -11,7 +11,7 @@ import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
-import { ClipboardIcon } from "@heroicons/react/24/outline";
+import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 
@@ -19,6 +19,7 @@ void Fragment;
 void EventMeta;
 void InfoBadge;
 void ClipboardIcon;
+void CheckIcon;
 
 const {
   addCandidate: addScheduleCandidate,
@@ -1018,6 +1019,14 @@ function OrganizerApp() {
     try {
       await copyTextToClipboard(targetEntry.url);
       popToast("URLをコピーしました");
+      setCopied((prev) => ({ ...prev, [type]: true }));
+      try {
+        if (copiedTimersRef.current[type]) clearTimeout(copiedTimersRef.current[type]);
+      } catch (_) {}
+      copiedTimersRef.current[type] = setTimeout(() => {
+        setCopied((prev) => ({ ...prev, [type]: false }));
+        copiedTimersRef.current[type] = null;
+      }, 1800);
     } catch (error) {
       console.error("Copy share URL error", error);
       popToast("URLのコピーに失敗しました");
@@ -1153,6 +1162,8 @@ function OrganizerApp() {
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
   const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
+  const [copied, setCopied] = useState({ admin: false, participant: false });
+  const copiedTimersRef = useRef({ admin: null, participant: null });
   const canCopyAdminUrl =
     adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token) && isNonEmptyString(adminShareEntry.url);
   const canCopyParticipantUrl =
@@ -1274,12 +1285,20 @@ function OrganizerApp() {
                   </span>
                   <button
                     type="button"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`inline-flex shrink-0 items-center justify-center rounded-lg border p-1 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      copied.admin
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
                     onClick={() => handleCopyShareUrl("admin")}
                     disabled={!canCopyAdminUrl}
-                    title="コピー"
+                    title={copied.admin ? "コピーしました" : "コピー"}
                   >
-                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    {copied.admin ? (
+                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -1294,12 +1313,20 @@ function OrganizerApp() {
                   </span>
                   <button
                     type="button"
-                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`inline-flex shrink-0 items-center justify-center rounded-lg border p-1 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      copied.participant
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                        : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-300 hover:text-emerald-600"
+                    }`}
                     onClick={() => handleCopyShareUrl("participant")}
                     disabled={!canCopyParticipantUrl}
-                    title="コピー"
+                    title={copied.participant ? "コピーしました" : "コピー"}
                   >
-                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    {copied.participant ? (
+                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+                    )}
                   </button>
                 </div>
               </div>
