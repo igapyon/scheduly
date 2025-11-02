@@ -2,6 +2,11 @@
 
 Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。UI の全体像は README に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/VERIFY_CHECKLIST.md` を参照してください。
 
+外部仕様（方式面・画面挙動・ICS運用）の参照先
+- `docs/EXTERNAL_SPEC.md`
+- `docs/SCREEN_OVERVIEW.md`
+- `docs/ICAL_WORKFLOW.md`
+
 ---
 
 ## 1. モック構成と開発環境
