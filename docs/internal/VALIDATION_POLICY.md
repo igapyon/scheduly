@@ -1,62 +1,62 @@
-# Validation Policy (Frontend UX)
+# バリデーション方針（フロントエンド UX）
 
-This document outlines how Scheduly applies input validation in the current in-memory frontend (React/webpack) implementation, with a focus on string length checks and user experience. It is intended to keep the UX consistent while being easy to port to server/API later.
+この文書は、現行のオンメモリ実装（React/webpack）における入力バリデーションの扱いを整理します。特に文字数上限とユーザー体験（UX）を中心に、将来のサーバ/API 移行時にも整合性を保てる方針を示します。
 
-## Principles
-- Do not destroy user input. Never clear a field on validation failure.
-- Validate softly during editing. Block as little as possible; validate strictly only when values are complete.
-- Communicate clearly. Highlight fields in red and show a toast or inline status instead of throwing disruptive errors.
-- Keep client and server aligned. Use the same limits and schemas so that API migration is seamless.
+## 原則
+- ユーザー入力を破壊しない（検証エラーでも値は消さない）。
+- 編集中はソフトに検証し、可能な限りブロックしない（値が完成した時のみ厳密に）。
+- 明確に伝える（赤枠ハイライト＋トースト/インライン表示。例外で画面を遮らない）。
+- クライアント/サーバで整合させる（上限やスキーマを共通化し移行容易に）。
 
-## Behavior Model
-- Visual cues
-  - Field highlight: add a red border (invalid) and keep the current value intact.
-  - Text counter: show current length/max for relevant text inputs; turn red when exceeding the limit.
-  - Status/Toast: short message indicating what to fix (e.g., "コメントは500文字以内で入力してください").
-- When validation runs
-  - Text inputs: evaluate on every change for counters and red border; actual persistence follows each screen’s policy (see below).
-  - Datetime (datetime-local): allow incomplete values while typing; run structural rules only for complete values. For schedule order, allow saving even if dtend ≤ dtstart, but highlight + toast.
-- Error logging
-  - Foreseeable validation failures (422) are logged with `console.debug` (not `console.error`) to avoid noisy overlays.
+## 振る舞いモデル
+- 視覚的フィードバック
+  - フィールド: 無効時は赤枠（値は保持）。
+  - 文字カウンタ: 現在/最大を表示。上限超過で赤表示。
+  - ステータス/トースト: 短いメッセージで修正点を案内（例: 「コメントは500文字以内で入力してください」）。
+- 検証の実行タイミング
+  - テキスト入力: 入力のたびにカウンタ・赤枠評価。保存タイミングは各画面ポリシーに従う（後述）。
+  - 日時（datetime-local）: 入力途中の未完成値を許容。完成時のみ構造検証。順序（dtend ≤ dtstart）は保存を許容しつつ、ハイライト＋トースト。
+- ログ出力
+  - 予期される検証失敗（422）は `console.debug` に記録（`console.error` は避ける）。
 
-## Field Limits (current)
-- Project
-  - name: 120 chars
-  - description: 2000 chars
-- Candidate (schedule)
-  - summary: 120 chars
-  - location: 120 chars
-  - description: 2000 chars
+## フィールド上限（現行）
+- プロジェクト
+  - name: 120 文字
+  - description: 2000 文字
+- 候補（スケジュール）
+  - summary: 120 文字
+  - location: 120 文字
+  - description: 2000 文字
   - status: enum [CONFIRMED, TENTATIVE, CANCELLED]
-  - datetime: `datetime-local` complete format `YYYY-MM-DDTHH:MM` for strict checks
-- Participant
-  - displayName: 80 chars, required, unique within project
-- Response
-  - comment: 500 chars
+  - datetime: 厳密チェックは `YYYY-MM-DDTHH:MM`（`datetime-local`）形式で実施
+- 参加者
+  - displayName: 80 文字、必須、プロジェクト内で一意
+- 回答
+  - comment: 500 文字
   - mark: enum [o, d, x, pending]
 
-## Screen-Specific Save Policy
-- Admin (organizer)
-  - Project name/description: live updates; show counters and red border on overflow; do not block save.
-  - Candidates (schedules):
-    - Text fields: update immediately; counters and red border on overflow.
-    - Datetime: allow incomplete interim values; on complete values, run structural checks. For order (`dtend` ≤ `dtstart`), keep the user input, highlight fields, and show a toast.
-- Participant (user inline editor)
-  - Mark (○/△/×): save immediately on click.
-  - Comment: save on blur only; show red border and message when > 500; keep the text.
-  - Rename participant: show counter (0/80); red border on overflow or service error; error message inline.
+## 画面別の保存ポリシー
+- 管理（主催者）
+  - プロジェクト名/説明: ライブ更新。上限超過はカウンタ/赤枠で示す。保存はブロックしない。
+  - 候補（スケジュール）：
+    - テキスト: 即時更新。上限超過はカウンタ/赤枠。
+    - 日時: 入力途中は許容。完成時に構造チェック。順序（`dtend` ≤ `dtstart`）は入力を保持しつつハイライト＋トースト。
+- 参加者（インライン編集）
+  - マーク（○/△/×）: クリック即保存。
+  - コメント: フォーカスアウト時に保存。500超は赤枠＋メッセージ。値は保持。
+  - 参加者名変更: カウンタ表示（0/80）。上限超過やサービスエラー時は赤枠＋インラインエラー。
 
-## Implementation Notes
-- Schemas live in `src/frontend/shared/validation.js` (lightweight helpers; replaceable by zod later):
-  - `buildResponseRules`, `buildCandidateRules`, `buildParticipantRules`, common primitives (maxLength, enum, etc.)
-- Service layer throws `Error` with `code = 422` on validation failure. UI maps these to red border + toast.
-- Admin UI catches errors and parses field names from messages to set per-field error flags.
+## 実装ノート
+- スキーマは `src/frontend/shared/validation.js`（軽量ヘルパ。将来的に zod へ置換可）
+  - `buildResponseRules`、`buildCandidateRules`、`buildParticipantRules`、共通プリミティブ（maxLength, enum 等）
+- サービス層は検証失敗で `code = 422` の `Error` を投げる。UI は赤枠＋トーストにマッピング。
+- 管理 UI はメッセージからフィールド名を抽出し、項目別エラーフラグを設定。
 
-## Mapping Validation → UI
-- 422 (comment): toast "コメントは500文字以内で入力してください"; red border; counter turns red.
-- 422 (summary/location/description/name): toast "<field> は <limit> 文字以内で入力してください" (or generic); red border; counter red.
-- Datetime order: toast "dtend must be after dtstart"; both fields highlighted; input preserved.
+## 検証結果 → UI のマッピング
+- 422（comment）: トースト「コメントは500文字以内で入力してください」＋赤枠＋カウンタ赤。
+- 422（summary/location/description/name）: トースト「<field> は <limit> 文字以内で入力してください」（または一般メッセージ）＋赤枠＋カウンタ赤。
+- 日時順序: トースト「dtend must be after dtstart」＋両フィールドをハイライト。入力は保持。
 
-## Future Server/API
-- Keep same max lengths and enums server-side and return 422 with structured details.
-- Consider echoing the offending field list to simplify UI mapping.
+## 将来のサーバ/API
+- 同じ上限と列挙をサーバ側でも適用し、422 を構造化詳細付きで返却。
+- UI マッピングを簡素化するため、違反フィールド一覧のエコーバックを検討。
