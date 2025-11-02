@@ -29,7 +29,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 ## 外部仕様
 
 外部仕様を理解するための主要ドキュメントは次の3つです。
-- [docs/external/EXTERNAL_SPEC.md](docs/external/EXTERNAL_SPEC.md)
+- [docs/external/EXTERNAL_ASSUMPTIONS.md](docs/external/EXTERNAL_ASSUMPTIONS.md)
 - [docs/external/SCREEN_OVERVIEW.md](docs/external/SCREEN_OVERVIEW.md)
 - [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md)
 
@@ -53,7 +53,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - [docs/external/CONTRIBUTING.md](docs/external/CONTRIBUTING.md): コントリビューション手引き
 - [docs/external/CONTRIBUTORS.md](docs/external/CONTRIBUTORS.md): コントリビューター一覧
 - [docs/external/CHANGELOG.md](docs/external/CHANGELOG.md): 変更履歴のメモ
-- [docs/external/EXTERNAL_SPEC.md](docs/external/EXTERNAL_SPEC.md): 外部仕様（通常と異なる方式上の特徴）
+- [docs/external/EXTERNAL_ASSUMPTIONS.md](docs/external/EXTERNAL_ASSUMPTIONS.md): 外部仕様の前提・制約（通常と異なる方式）
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
