@@ -1,7 +1,22 @@
-# scheduly
+# Scheduly
 
-Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整アプリです。現在は React / webpack 版アプリを主導で開発しており、以前の HTML モックは最新アプリのスナップショットを確認する静的コンテンツとして最小限保守しています。  
-全体像は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、各画面の役割は [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)、データ構造は [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、フローと内部 API の草案は [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md) を参照してください。
+Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有・回答収集・配布を素早く行える軽量なスケジュール調整アプリです。管理者用と参加者用の秘密URLでシンプルに共有でき、ブラウザだけで完結します。
+
+## 主な特徴
+- ICS のインポート/エクスポートで外部カレンダーと連携
+- 管理者URL・参加者URL（秘密URL）で簡易に共有・アクセス
+- 回答のインライン編集とリアルタイム反映、Excel 出力に対応
+- インメモリ運用（短期利用向け）。必要に応じて ICS/JSON で外部保全
+
+> セキュリティ注意: 秘密URLを前提とした簡易モデルです。URLの取り扱いにはご注意ください。認証・承認が必要な運用では別途の仕組みを導入してください。
+
+## はじめに（ローカル動作）
+1) `npm install`
+2) `npm run dev`（http://localhost:5173）
+   - 管理者: `/index.html`、参加者: `/user.html`
+3) 本番ビルド: `npm run build` → 静的資産コピー: `npm run postbuild`
+
+## 外部仕様
 
 外部仕様を理解するための主要ドキュメントは次の3つです。
 - [docs/EXTERNAL_SPEC.md](docs/EXTERNAL_SPEC.md)
@@ -62,12 +77,6 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 - ICS 生成が失敗した場合は `console.error` に候補データを出力しているため、Console が最短の手掛かりになります。
 - レガシーモックはリロードだけで変更を反映できます。Webpack 版はホットリロードしつつ Console をウォッチしてください。
 
-## 現状の課題メモ
-
-- (優先度低) `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
-- 参加者回答一覧（`user.jsx`）の実データ連携／マトリクス表示の整備。
-- レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
-
 ## レガシーモック（`public/legacy/`）
 
 - React 18（UMD 版）・Tailwind CDN・Babel Standalone による静的モック。ビルドやサーバーなしでブラウザから直接開けますが、**動作は「見栄え再現」が主目的**であり、React 版と同等の機能は搭載していません。
@@ -81,4 +90,4 @@ Scheduly は、ICS（iCalendar）連携を軸としたスケジュール調整�
 
 ## ライセンス
 
-このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。
+このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。利用上の注意事項や免責については `docs/DISCLAIMER.md` も参照してください。
