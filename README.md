@@ -52,8 +52,10 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 ### Sample Data
 
-- ICS: `public/ics/scheduly-ics-sampledata-001.ics`
+まずは触ってみたい方向けに、すぐに使えるデモデータを用意しています。管理画面からプロジェクトJSONを読み込むか、ICSをインポートすれば即座に体験できます。
+
 - Project JSON: `public/proj/scheduly-project-sampledata-001.json`
+- ICS: `public/ics/scheduly-ics-sampledata-001.ics`
 
 ## React / webpack 版（`src/frontend/`）
 
