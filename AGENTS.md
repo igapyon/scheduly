@@ -8,13 +8,13 @@
   - GitHub CLI (`gh`) 等を用いたPR生成・操作も行わない。
 - 許可される操作（ローカル限定）
   - ブランチ作成、ローカルコミット、差分抽出、タグ・ブランチの比較調査。
-  - ドキュメント更新（`docs/CHANGELOG.md`、`docs/DEVELOPER_NOTES.md` など）。
+  - ドキュメント更新（`docs/external/CHANGELOG.md`、`docs/internal/DEVELOPER_NOTES.md` など）。
   - PR 用文面ドラフトの作成（`pr/*.md`）。
 - 承認/権限
   - ネットワークアクセスやグローバル設定変更が必要な操作は実施しない。必要な場合は手順を提示する。
   - 破壊的操作（履歴改変、大規模削除）は明示的な依頼がない限り行わない。
 
-補足: この方針は `docs/DEVELOPER_NOTES.md` の「Codex（支援AI）の権限と作業範囲」にも重ねて記載しています。
+補足: この方針は `docs/internal/DEVELOPER_NOTES.md` の「Codex（支援AI）の権限と作業範囲」にも重ねて記載しています。
 
 ## 典型ワークフロー
 
@@ -26,13 +26,13 @@
    - 例: `release/after-<tag>` を `<tag>` から作成し、必要なコミットのみ cherry-pick。
 3) ドラフト作成
    - `pr/release-after-<tag>.md` に要約（概要、コミット一覧、変更ファイル、diffstat、注意点）を作成。
-   - `docs/CHANGELOG.md` に同内容のエントリを追記。
+   - `docs/external/CHANGELOG.md` に同内容のエントリを追記。
 4) ハンドオフ
    - 人間が `git push -u origin release/after-<tag>` → GitHub 上で PR 作成。
 
 ### 変更ドキュメントの更新
-- 変更概要は `docs/CHANGELOG.md` に日付単位で追記。
-- 開発ルールや運用フローは `docs/DEVELOPER_NOTES.md` に追記。
+- 変更概要は `docs/external/CHANGELOG.md` に日付単位で追記。
+- 開発ルールや運用フローは `docs/internal/DEVELOPER_NOTES.md` に追記。
 
 ## 命名・運用の指針
 - ブランチ: `release/after-<tagYYYYMMDD>`、`fix/<topic>`、`feat/<topic>` 等。
@@ -51,4 +51,3 @@
 ## コミュニケーション
 - 実行前に簡潔な予告（やること/狙い）→ 実施 → 要約報告（結果/次の一手）。
 - 長時間処理や大きな変更の前に意図を共有し、合意形成を優先。
-

@@ -2,7 +2,7 @@
 
 Scheduly における iCalendar (ICS) の取り扱いについて、外部仕様のみを記載します（内部実装・未実装の構想は含みません）。
 
-> 補足: 通常のWebアプリと異なる方式上の特徴（秘密URLによるアクセス、リアルタイム保存、揮発前提など）は外部仕様にまとめています。`docs/EXTERNAL_SPEC.md` を参照してください。
+> 補足: 通常のWebアプリと異なる方式上の特徴（秘密URLによるアクセス、リアルタイム保存、揮発前提など）は外部仕様にまとめています。`docs/external/EXTERNAL_SPEC.md` を参照してください。
 
 ## 1. ワークフロー概要（外部仕様）
 
@@ -46,4 +46,4 @@ Scheduly における iCalendar (ICS) の取り扱いについて、外部仕様
 
 ---
 
-内部実装の詳細は `docs/ICAL_INTERNALS.md` を参照してください。未実装・将来検討中の事項は `docs/DEVELOPER_NOTES.md` に集約しています。
+内部実装の詳細は `docs/internal/ICAL_INTERNALS.md` を参照してください。未実装・将来検討中の事項は `docs/internal/DEVELOPER_NOTES.md` に集約しています。

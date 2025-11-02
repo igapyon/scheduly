@@ -6,7 +6,7 @@
 
 ## スコープ
 - 本書は方式の特徴のみを列挙し、内部構造・データモデル・画面仕様の詳細は扱わない。
-- 参照先（内部仕様）: `docs/ARCHITECTURE.md`、`docs/DATA_MODEL.md`、`docs/FLOW_AND_API.md`、`docs/DEVELOPER_NOTES.md`。
+- 参照先（内部仕様）: `docs/internal/ARCHITECTURE.md`、`docs/internal/DATA_MODEL.md`、`docs/internal/FLOW_AND_API.md`、`docs/internal/DEVELOPER_NOTES.md`。
 
 ---
 
@@ -56,4 +56,3 @@
 - 恒久的なデータ永続化・強固な履歴管理。
 - 組織的ユーザ管理（SSO、権限ロール、監査ログ等）。
 - 厳格なトランザクション分離レベルや強い整合性保証。
-

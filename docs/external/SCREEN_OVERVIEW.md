@@ -1,6 +1,6 @@
 # Screen Overview
 
-Scheduly の React 版 UI は現状、次の 2 画面で構成されます。ここでは役割と主要要素、画面間の関係を簡潔に整理します。すべて `src/frontend/` に JSX 実装があり、`public/*.html` からエントリーポイントとして読み込まれます。アクセス方式や保存ポリシーなど、通常のWebアプリと異なる前提は `docs/EXTERNAL_SPEC.md` を参照。
+Scheduly の React 版 UI は現状、次の 2 画面で構成されます。ここでは役割と主要要素、画面間の関係を簡潔に整理します。すべて `src/frontend/` に JSX 実装があり、`public/*.html` からエントリーポイントとして読み込まれます。アクセス方式や保存ポリシーなど、通常のWebアプリと異なる前提は `docs/external/EXTERNAL_SPEC.md` を参照。
 
 ## 管理画面（Admin Console）
 
@@ -36,4 +36,4 @@ Scheduly の React 版 UI は現状、次の 2 画面で構成されます。こ
 2. 参加者は共有された **参加者 UI** で概要を確認し、カード内のインライン編集で自身の回答（○△×／コメント）を更新する。
 3. 回答更新は即時集計され、タブ/カードに反映される。
 
-現状は `projectStore` を中心とした in-memory データレイヤーで 2 画面が同期しており、共有トークンや URL パラメータを経由して状態を切り替える。保存方針やバリデーション原則は `docs/EXTERNAL_SPEC.md` と `docs/VALIDATION_POLICY.md` を参照。今後サーバー/API を導入する際は、このデータモデル（Project / Candidate / Participant / Response）を REST などに移行し、同じ参照構造を維持する想定。
+現状は `projectStore` を中心とした in-memory データレイヤーで 2 画面が同期しており、共有トークンや URL パラメータを経由して状態を切り替える。保存方針やバリデーション原則は `docs/external/EXTERNAL_SPEC.md` と `docs/internal/VALIDATION_POLICY.md` を参照。今後サーバー/API を導入する際は、このデータモデル（Project / Candidate / Participant / Response）を REST などに移行し、同じ参照構造を維持する想定。

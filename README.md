@@ -24,41 +24,43 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - 一覧やサマリーで回答状況を確認し、必要に応じて Excel/ICS をエクスポート
 - 確定した日程を ICS として配布する（外部カレンダーで利用可能）
 
-より詳しい説明は `docs/ICAL_WORKFLOW.md` を参照してください。
+より詳しい説明は `docs/external/ICAL_WORKFLOW.md` を参照してください。
 
 ## 外部仕様
 
 外部仕様を理解するための主要ドキュメントは次の3つです。
-- [docs/EXTERNAL_SPEC.md](docs/EXTERNAL_SPEC.md)
-- [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md)
-- [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md)
+- [docs/external/EXTERNAL_SPEC.md](docs/external/EXTERNAL_SPEC.md)
+- [docs/external/SCREEN_OVERVIEW.md](docs/external/SCREEN_OVERVIEW.md)
+- [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md)
 
 > ⚠ **匿名アクセスの注意**  
 > 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
 
 ## Documentation Index
 
-- [docs/DEVELOPMENT_JOURNEY.md](docs/DEVELOPMENT_JOURNEY.md): ローカルモックから現在までの開発プロセスを俯瞰
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): 画面構成とバンドル構造
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md): オンメモリ前提のデータモデル整理
-- [docs/FLOW_AND_API.md](docs/FLOW_AND_API.md): in-memory サービスと API 草案
-- [docs/SCREEN_OVERVIEW.md](docs/SCREEN_OVERVIEW.md): 画面役割と回答管理 UI の詳細
-- [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md): ICS 連携の運用メモ
-- [docs/VERIFY_CHECKLIST.md](docs/VERIFY_CHECKLIST.md): QA・目視確認の手順
-- [docs/DEVELOPER_NOTES.md](docs/DEVELOPER_NOTES.md): 作業メモと TODO の整理
-- [docs/SERVER_INTEGRATION.md](docs/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
-- [docs/DISCLAIMER.md](docs/DISCLAIMER.md): 免責事項と利用時の注意点
-- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): コントリビューション手引き
-- [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md): コントリビューター一覧
-- [docs/CHANGELOG.md](docs/CHANGELOG.md): 変更履歴のメモ
-- [docs/EXTERNAL_SPEC.md](docs/EXTERNAL_SPEC.md): 外部仕様（通常と異なる方式上の特徴）
+- ドキュメントの読み方と読者別索引: `docs/README.md`
+
+- [docs/internal/DEVELOPMENT_JOURNEY.md](docs/internal/DEVELOPMENT_JOURNEY.md): ローカルモックから現在までの開発プロセスを俯瞰
+- [docs/internal/ARCHITECTURE.md](docs/internal/ARCHITECTURE.md): 画面構成とバンドル構造
+- [docs/internal/DATA_MODEL.md](docs/internal/DATA_MODEL.md): オンメモリ前提のデータモデル整理
+- [docs/internal/FLOW_AND_API.md](docs/internal/FLOW_AND_API.md): in-memory サービスと API 草案
+- [docs/external/SCREEN_OVERVIEW.md](docs/external/SCREEN_OVERVIEW.md): 画面役割と回答管理 UI の詳細
+- [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md): ICS 連携の運用メモ
+- [docs/internal/VERIFY_CHECKLIST.md](docs/internal/VERIFY_CHECKLIST.md): QA・目視確認の手順
+- [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
+- [docs/internal/SERVER_INTEGRATION.md](docs/internal/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
+- [docs/external/DISCLAIMER.md](docs/external/DISCLAIMER.md): 免責事項と利用時の注意点
+- [docs/external/CONTRIBUTING.md](docs/external/CONTRIBUTING.md): コントリビューション手引き
+- [docs/external/CONTRIBUTORS.md](docs/external/CONTRIBUTORS.md): コントリビューター一覧
+- [docs/external/CHANGELOG.md](docs/external/CHANGELOG.md): 変更履歴のメモ
+- [docs/external/EXTERNAL_SPEC.md](docs/external/EXTERNAL_SPEC.md): 外部仕様（通常と異なる方式上の特徴）
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
 | React / webpack 版 | 本番想定のアプリ実装（共有トークンで `/a/{token}` / `/p/{token}` へリダイレクト。`/r/{token}` は後方互換で `/p/{token}` に転送） | `src/frontend/` | `npm run dev` / `npm run build` |
 | レガシーモック | 最新アプリ UI のスナップショット確認用静的コンテンツ | `public/legacy/` | ブラウザで直接開くだけ |
 
-どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/ICAL_WORKFLOW.md](docs/ICAL_WORKFLOW.md) にまとめています。
+どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md) にまとめています。
 
 ### Sample Data
 
@@ -71,8 +73,8 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 開発手順やビルド、レガシーモックの詳細は開発者向けドキュメントにまとめています。開発・運用に関わる方は以下を参照してください。
 
-- `docs/DEVELOPER_NOTES.md`
+- `docs/internal/DEVELOPER_NOTES.md`
 
 ## ライセンス
 
-このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。利用上の注意事項や免責については `docs/DISCLAIMER.md` も参照してください。
+このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。利用上の注意事項や免責については `docs/external/DISCLAIMER.md` も参照してください。
