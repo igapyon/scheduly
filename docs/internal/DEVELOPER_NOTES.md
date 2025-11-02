@@ -1,10 +1,15 @@
 # Developer Notes
 
-Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。UI の全体像は README に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/VERIFY_CHECKLIST.md` を参照してください。
+Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。全体像は README.md に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/internal/VERIFY_CHECKLIST.md` を参照してください。
+
+外部仕様（方式面・画面挙動・ICS運用）の参照先
+- `docs/external/EXTERNAL_SPEC.md`
+- `docs/external/SCREEN_OVERVIEW.md`
+- `docs/external/ICAL_WORKFLOW.md`
 
 ---
 
-## 1. モック構成と開発環境
+## 1. アプリ構成と開発環境
 
 ### 1.1 React / webpack 版（開発中）
 - 位置: `src/frontend/`
@@ -30,8 +35,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 1.3 その他の運用メモ
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
-- UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
+- UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 
 ---
 
@@ -46,6 +51,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ---
 
 ## 3. レガシーモック更新ワークフロー
+
+この更新作業は自動化しておらず、人手で実施します（DOM のコピーは手動、整形や見栄えの微調整は生成AIと協力して行う）。
 
 1. `npm run dev` で React 版を起動し、対象画面を開く（例: `http://localhost:5173/index.html`）。
 2. Chrome DevTools の Elements タブで対象 DOM を `Copy outerHTML`。
@@ -114,12 +121,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
 - I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
-- `docs/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
-- `docs/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
+- `docs/internal/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
+- `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
 - 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
 - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
- - `docs/FLOW_AND_API.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+ - `docs/internal/FLOW_AND_API.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
  - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
  - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
 
@@ -158,7 +165,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ### 継続タスク・メモ
 - 管理・参加者 UI の間でデータ構造や表示ロジックに齟齬がないか定期的に点検する（説明文・ステータス・タイムゾーンなど）。
 - 管理画面で「ICS インポート or 手入力 → 参加者登録 → 回答入力」という一連フローが破綻なく成立するか継続的に検証する。
-- `docs/FLOW_AND_API.md` に記載のサービス分離は優先度: 中の TODO として進行中。
+- `docs/internal/FLOW_AND_API.md` に記載のサービス分離は優先度: 中の TODO として進行中。
 - 参加者画面でのインライン編集時に参加者選択が途切れる問題は常駐ログで監視中（削除禁止）。
 
 ---
@@ -237,6 +244,9 @@ Appendix: Excel 出力（参加者 UI）
   - 例（想定ワークフロー）
   - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。
 
+関連ドキュメント
+- 通常のWebアプリと異なる方式上の特徴は外部仕様に集約しています。`docs/external/EXTERNAL_SPEC.md` を参照してください。
+
 ---
 
 ## 11. 動的サーバ移行の前提（設計ノート）
@@ -282,4 +292,53 @@ Appendix: Excel 出力（参加者 UI）
 - バリデーションは `src/frontend/shared/validation.js` の薄いヘルパで実施（後で zod に置換可能）。
 - 管理UIの候補編集は、未完成フォーマット時は検証スキップ、完成時のみ検証。順序NG時も入力は保存し、赤枠とトーストのみ。
 
-詳細説明は `docs/VALIDATION_POLICY.md` を参照。
+詳細説明は `docs/internal/VALIDATION_POLICY.md` を参照。
+
+---
+
+## 13. 将来計画: 参加者回答管理ビュー
+
+- 位置付け: `user.jsx`（参加者一覧）を拡張し、管理者が回答状況を俯瞰・編集できるビューを追加する構想。ファーストリリースからは除外し、将来計画として維持。現行仕様では、回答更新は即時集計されタブ/カードへ反映されるが、管理者向けのマトリクス編集や確定操作の強化は今後の改善項目に留める。
+
+- 目的
+  - 参加者ごとの回答を検索・フィルタリングし、候補別の賛否を素早く把握する。
+  - 確定候補を決める際の判断材料として、マトリクス集計や詳細カードを提供する。
+  - 必要に応じて管理者が回答を修正したりコメントを追記したりできる導線を用意する。
+
+- レイアウト案
+  1. 上部コントロールにプロジェクト概要・フィルター・検索。
+  2. メイン領域に「参加者 × 候補」のマトリクス＋クリックで開く詳細カード。
+  3. サイドパネルに候補ごとの集計（○△×数、コメント有無、確定操作）。モバイルでは縦積み＋横スクロール対応。
+
+- データモデルのメモ
+  - `Participant` / `Response` / `Candidate` を組み合わせてマトリクスを構成。`Response.mark` は `'o' | 'd' | 'x' | null`。
+  - 現状は `projectStore` 上に派生データ（サマリー・タリー）を保持。将来的に REST API で永続化する際も同様モデルを提供する想定。
+
+- 段階的実装ステップ（候補）
+  1. React state による UI モック作成（既存データの可視化）。
+  2. 管理者が回答を修正できるアクションの追加。
+  3. ICS 連携・通知フローとの連動を整理。
+  4. サーバー/API 実装時に CRUD と認証を整備。
+
+- 補足
+  - 参加者が自己編集できる前提の場合、履歴管理やアラートの検討が必要になる可能性。
+  - 大規模データ向けに仮想スクロールやページネーション等のパフォーマンス対策を検討。
+
+---
+
+## 14. ICS に関する今後の検討事項（外部仕様外の計画）
+
+- `VTIMEZONE` の自動付与（海外メンバー向けの適切なタイムゾーン情報配布）。
+- 外部 ICS との差分通知や、定期的な再インポートのための UI/スケジューラ整備。
+- ICS 入出力時の検証強化（不正フォーマット防止、`TZID` バリデーションなど）。
+- バックエンド導入時に ICS を API で配布する仕組み（署名付き URL 等）の設計。
+
+関連: 内部の実装詳細は `docs/internal/ICAL_INTERNALS.md` に整理。
+
+---
+
+## 15. 現状の課題メモ（概要）
+
+- (優先度低) `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
+- 参加者回答一覧（`user.jsx`）の実データ連携／マトリクス表示の整備。
+- レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。

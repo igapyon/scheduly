@@ -18,7 +18,7 @@ Scheduly の変更履歴を記録するドキュメントです。まだ公式�
 - admin.jsx / user.jsx / user-edit.jsx を新サービス経由の購読に差し替え、共通ストアからの同期とタリー更新を統一。
 - 参加者画面→回答編集画面で選択が失われないよう最後に選んだ参加者 ID を保持しつつ、恒久的に利用するデバッグログをコードとドキュメントに明記。
 - project-store.js を拡張して派生タリーを永続化し、新しいゲッター／ルートコンテキストの連携を整備。
-- 共有コンポーネントの JSX ランタイム移行に伴う import 整理と displayName 付与を実施し、永久ログの注意書きを docs/DEVELOPER_NOTES.md に追記。
+- 共有コンポーネントの JSX ランタイム移行に伴う import 整理と displayName 付与を実施し、永久ログの注意書きを docs/internal/DEVELOPER_NOTES.md に追記。
 
 ## 2025-10-31
 
@@ -33,7 +33,7 @@ Highlights
 - Update developer notes.
 
 Files Changed (overview)
-- docs/DEVELOPER_NOTES.md
+- docs/internal/DEVELOPER_NOTES.md
 - public/legacy/scheduly-admin-mock.html
 - public/legacy/scheduly-user-byschedule-mock.html (added)
 - public/legacy/scheduly-user-byuser-mock.html
@@ -112,4 +112,3 @@ Stats
 ### 既知事項/今後の余地（参考）
 - Excel: コメント列の折返し（wrapText）/ Freeze panes / AutoFilter は後続で追加可能
 - 参加者/管理のガイド文言（InfoBadge）は運用に合わせて調整余地あり
-

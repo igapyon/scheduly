@@ -60,4 +60,3 @@ This document outlines how Scheduly applies input validation in the current in-m
 ## Future Server/API
 - Keep same max lengths and enums server-side and return 422 with structured details.
 - Consider echoing the offending field list to simplify UI mapping.
-
