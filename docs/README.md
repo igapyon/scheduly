@@ -20,7 +20,7 @@
   - 画面の技術概要: `docs/internal/SCREEN_TECHNICAL_OVERVIEW.md`
   - サーバ統合（WIP）: `docs/internal/SERVER_INTEGRATION.md`
   - 開発メモ/TODO: `docs/internal/DEVELOPER_NOTES.md`
-  - 開発プロセス定義: `docs/internal/DEVELOPMENT_JOURNEY.md`
+  - 開発プロセス定義（WIP）: `docs/internal/DEVELOPMENT_PROCESS.md`
   - QA/目視確認: `docs/internal/VERIFY_CHECKLIST.md`
   - バリデーション方針: `docs/internal/VALIDATION_POLICY.md`
   - ICS 内部仕様: `docs/internal/ICAL_INTERNALS.md`

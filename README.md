@@ -40,7 +40,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 - ドキュメントの読み方と読者別索引: `docs/README.md`
 
-- [docs/internal/DEVELOPMENT_JOURNEY.md](docs/internal/DEVELOPMENT_JOURNEY.md): ローカルモックから現在までの開発プロセスを俯瞰
+- [docs/internal/DEVELOPMENT_PROCESS.md](docs/internal/DEVELOPMENT_PROCESS.md): 現行の開発プロセス定義（WIP）と経緯の要点
 - [docs/internal/ARCHITECTURE.md](docs/internal/ARCHITECTURE.md): 画面構成とバンドル構造
 - [docs/internal/DATA_MODEL.md](docs/internal/DATA_MODEL.md): オンメモリ前提のデータモデル整理
 - [docs/internal/FLOW_AND_API.md](docs/internal/FLOW_AND_API.md): in-memory サービスと API 草案
