@@ -119,9 +119,10 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
 
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
-function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "" }) {
+function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName }) {
+  const outerClass = containerClassName || "space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm";
   return (
-    <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <section className={outerClass}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1 min-w-0 basis-0 grow">
           <div className="flex items-center gap-2 min-w-0">
@@ -1221,6 +1222,7 @@ function OrganizerApp() {
             title="共有URL"
             description="管理者リンクと参加者へ共有するリンクを設定および確認します。Schedulyでは管理者リンクは大切なものですので、管理者の方は管理者リンクを確実に保管してください。"
             infoMessage="Scheduly の重要な情報である管理者URL・参加者URLを操作します。特に管理者URLは紛失しないように注意して保管するようにしてください。参加者URLはコピーして必要な人にのみ共有してください。"
+            containerClassName="space-y-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
             action={
               <button
                 type="button"
