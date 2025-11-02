@@ -18,26 +18,15 @@
 
 ## 典型ワークフロー
 
-### タグ以降の変更を基に PR ドラフトを用意する
+### タグ以降の変更を基に PR のテキストを用意する
 1) 変更調査
    - `git log <tag>..HEAD --oneline --decorate --graph` で差分コミットを列挙。
    - `git show --name-status <commit>` でファイル影響を確認。
-2) 作業ブランチ（ローカル）
-   - 例: `release/after-<tag>` を `<tag>` から作成し、必要なコミットのみ cherry-pick。
-3) ドラフト作成
-   - `pr/release-after-<tag>.md` に要約（概要、コミット一覧、変更ファイル、diffstat、注意点）を作成。
-   - `docs/external/CHANGELOG.md` に同内容のエントリを追記。
-4) ハンドオフ
-   - 人間が `git push -u origin release/after-<tag>` → GitHub 上で PR 作成。
+2) PR のテキストを訪奥する。
 
 ### 変更ドキュメントの更新
 - 変更概要は `docs/external/CHANGELOG.md` に日付単位で追記。
 - 開発ルールや運用フローは `docs/internal/DEVELOPER_NOTES.md` に追記。
-
-## 命名・運用の指針
-- ブランチ: `release/after-<tagYYYYMMDD>`、`fix/<topic>`、`feat/<topic>` 等。
-- PR ドラフト: `pr/<topic>.md`（タイトル、概要、変更点、影響範囲、テスト観点、注意事項）。
-- コミット: 和文主体で可。短い要約 + 必要なら本文に背景と影響範囲。
 
 ## 実装・修正方針
 - 既存スタイルに合わせ最小限・局所的に修正する。
