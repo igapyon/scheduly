@@ -342,6 +342,3 @@ Appendix: Excel 出力（参加者 UI）
 - (優先度低) `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
 - 参加者回答一覧（`user.jsx`）の実データ連携／マトリクス表示の整備。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
-Audience: developer
-Status: draft
-Last-Updated: 2025-11-02

@@ -25,22 +25,6 @@
   - ICS 内部仕様: `docs/internal/ICAL_INTERNALS.md`
   - 共有 URL 仕様: `docs/internal/SHARE_URL_GENERATION.md`
 
-## ドキュメントメタデータ（運用ルール）
-
-各ドキュメントの先頭に、以下のメタ情報（自由記述）を推奨します。
-
-- Audience: user | operator | developer | contributor
-- Status: stable | draft | WIP
-- Last-Updated: YYYY-MM-DD
-
-例:
-
-```
-Audience: developer
-Status: draft
-Last-Updated: 2025-11-02
-```
-
 ## 将来の構成（提案）
 
 すべての対象ドキュメントを `docs/external/` と `docs/internal/` に移動済みです。
