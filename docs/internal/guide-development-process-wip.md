@@ -20,10 +20,10 @@
      - `ARCHITECTURE.md`: 画面構成とバンドルの関係  
      - `DATA_MODEL.md`: オンメモリ前提のプロジェクト/候補/回答データ  
      - `FLOW_AND_API.md`: ProjectState と各サービスの役割  
-     - `SCREEN_OVERVIEW.md`: 3 画面の目的・入力/出力  
-     - `ICAL_WORKFLOW.md`: ICS を中心とした運用方針  
+     - `index-screens.md`: 3 画面の目的・入力/出力  
+     - `guide-ical-workflow.md`: ICS を中心とした運用方針  
      - `RESPONSE_MANAGEMENT.md`: 回答管理 UI の構想  
-     - `VERIFY_CHECKLIST.md`: モック確認の習慣化  
+     - `ref-verify-checklist.md`: モック確認の習慣化  
      - `DEVELOPER_NOTES.md`: 作業メモと TODO  
    - 背景: 仕様が Markdown に落ちたことで、実装以降も迷わず参照できる知識ベースが出来上がった。
 

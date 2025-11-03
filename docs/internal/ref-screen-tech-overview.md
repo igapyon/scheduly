@@ -1,6 +1,6 @@
 # Screen Technical Overview
 
-この文書は、Scheduly の画面構成の技術的観点をまとめた内部向けガイドです。外部向けの概要は `docs/external/SCREEN_OVERVIEW.md` を参照してください。
+この文書は、Scheduly の画面構成の技術的観点をまとめた内部向けガイドです。外部向けの概要は `docs/external/index-screens.md` を参照してください。
 
 ## 1. エントリポイントとルーティング
 
@@ -51,7 +51,6 @@
 
 ## 5. 参考
 
-- 外部仕様の前提・制約: `docs/external/EXTERNAL_ASSUMPTIONS.md`
-- バリデーション方針: `docs/internal/VALIDATION_POLICY.md`
-- ICS 内部仕様: `docs/internal/ICAL_INTERNALS.md`
-
+- 外部仕様の前提・制約: `docs/external/concept-assumptions.md`
+- バリデーション方針: `docs/internal/spec-validation-policy.md`
+- ICS 内部仕様: `docs/internal/spec-ical-internals.md`

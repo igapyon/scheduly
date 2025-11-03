@@ -1,12 +1,11 @@
 # 外部仕様の前提・制約（通常のWebアプリと異なる方式）
-
 本ドキュメントは、Scheduly の「外部仕様」観点で、一般的なWebアプリと比較して異なる方式（非機能・設計原則）に限定して要点をまとめる。内部実装やAPI詳細、UIフローの説明は含めない。
 
 ---
 
 ## スコープ
 - 本書は方式の特徴のみを列挙し、内部構造・データモデル・画面仕様の詳細は扱わない。
-- 参照先（内部仕様）: `docs/internal/ARCHITECTURE.md`、`docs/internal/DATA_MODEL.md`、`docs/internal/FLOW_AND_API.md`、`docs/internal/DEVELOPER_NOTES.md`。
+- 参照先（内部仕様）: `docs/internal/concept-architecture.md`、`docs/internal/spec-data-model.md`、`docs/internal/spec-api-flow.md`、`docs/internal/DEVELOPER_NOTES.md`。
 
 ---
 

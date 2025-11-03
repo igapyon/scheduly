@@ -24,14 +24,14 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - 一覧やサマリーで回答状況を確認し、必要に応じて Excel/ICS をエクスポート
 - 確定した日程を ICS として配布する（外部カレンダーで利用可能）
 
-より詳しい説明は `docs/external/ICAL_WORKFLOW.md` を参照してください。
+より詳しい説明は `docs/external/guide-ical-workflow.md` を参照してください。
 
 ## 外部仕様
 
 外部仕様を理解するための主要ドキュメントは次の3つです。
-- [docs/external/EXTERNAL_ASSUMPTIONS.md](docs/external/EXTERNAL_ASSUMPTIONS.md)
-- [docs/external/SCREEN_OVERVIEW.md](docs/external/SCREEN_OVERVIEW.md)
-- [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md)
+- [docs/external/concept-assumptions.md](docs/external/concept-assumptions.md)
+- [docs/external/index-screens.md](docs/external/index-screens.md)
+- [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md)
 
 > ⚠ **匿名アクセスの注意**  
 > 現状のモック実装は匿名でログインでき、管理画面・参加者画面ともに誰でもデータを書き換え可能な仕様です。ハッシュ値付き URL で画面を出し分けるのみで認証やアクセス制御は行っていません。セキュアな運用が必要な場合は必ず別途認証・承認の仕組みを導入してください。
@@ -40,27 +40,27 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 - ドキュメントの読み方と読者別索引: `docs/README.md`
 
-- [docs/internal/DEVELOPMENT_PROCESS.md](docs/internal/DEVELOPMENT_PROCESS.md): 現行の開発プロセス定義（WIP）と経緯の要点
-- [docs/internal/ARCHITECTURE.md](docs/internal/ARCHITECTURE.md): 画面構成とバンドル構造
-- [docs/internal/DATA_MODEL.md](docs/internal/DATA_MODEL.md): オンメモリ前提のデータモデル整理
-- [docs/internal/FLOW_AND_API.md](docs/internal/FLOW_AND_API.md): in-memory サービスと API 草案
-- [docs/external/SCREEN_OVERVIEW.md](docs/external/SCREEN_OVERVIEW.md): 画面役割と回答管理 UI の詳細
-- [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md): ICS 連携の運用メモ
-- [docs/internal/VERIFY_CHECKLIST.md](docs/internal/VERIFY_CHECKLIST.md): QA・目視確認の手順
+- [docs/internal/guide-development-process-wip.md](docs/internal/guide-development-process-wip.md): 現行の開発プロセス定義（WIP）と経緯の要点
+- [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
+- [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
+- [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案
+- [docs/external/index-screens.md](docs/external/index-screens.md): 画面役割と回答管理 UI の詳細
+- [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md): ICS 連携の運用メモ
+- [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
 - [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
-- [docs/internal/SERVER_INTEGRATION.md](docs/internal/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
-- [docs/external/DISCLAIMER.md](docs/external/DISCLAIMER.md): 免責事項と利用時の注意点
-- [docs/external/CONTRIBUTING.md](docs/external/CONTRIBUTING.md): コントリビューション手引き
-- [docs/external/CONTRIBUTORS.md](docs/external/CONTRIBUTORS.md): コントリビューター一覧
-- [docs/external/CHANGELOG.md](docs/external/CHANGELOG.md): 変更履歴のメモ
-- [docs/external/EXTERNAL_ASSUMPTIONS.md](docs/external/EXTERNAL_ASSUMPTIONS.md): 外部仕様の前提・制約（通常と異なる方式）
+- [docs/internal/spec-server-integration-wip.md](docs/internal/spec-server-integration-wip.md): サーバー導入時の検討事項（WIP）
+- [docs/external/ref-disclaimer.md](docs/external/ref-disclaimer.md): 免責事項と利用時の注意点
+- [docs/external/guide-contributing.md](docs/external/guide-contributing.md): コントリビューション手引き
+- [docs/external/ref-contributors.md](docs/external/ref-contributors.md): コントリビューター一覧
+- [docs/external/ref-changelog.md](docs/external/ref-changelog.md): 変更履歴のメモ
+- [docs/external/concept-assumptions.md](docs/external/concept-assumptions.md): 外部仕様の前提・制約（通常と異なる方式）
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
 | React / webpack 版 | 本番想定のアプリ実装（共有トークンで `/a/{token}` / `/p/{token}` へリダイレクト。`/r/{token}` は後方互換で `/p/{token}` に転送） | `src/frontend/` | `npm run dev` / `npm run build` |
 | レガシーモック | 最新アプリ UI のスナップショット確認用静的コンテンツ | `public/legacy/` | ブラウザで直接開くだけ |
 
-どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/external/ICAL_WORKFLOW.md](docs/external/ICAL_WORKFLOW.md) にまとめています。
+どの構成でも、動作確認時には Chrome DevTools の Console を開き、警告やエラーを把握する習慣を徹底してください。ICS まわりの詳細な運用は [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md) にまとめています。
 
 ### Sample Data
 
@@ -77,4 +77,4 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 ## ライセンス
 
-このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。利用上の注意事項や免責については `docs/external/DISCLAIMER.md` も参照してください。
+このリポジトリは [Apache License 2.0](LICENSE) の下で配布されています。利用上の注意事項や免責については `docs/external/ref-disclaimer.md` も参照してください。

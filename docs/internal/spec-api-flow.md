@@ -224,4 +224,4 @@ shareService.rotate(projectId, {
   - Datetime は編集途中は許容、完成時のみ厳密検証。順序 NG は保存をブロックせず通知。
 - 運用メモ
   - 422 を `console.debug` に格下げし、操作を阻害しない。
-  - 詳細は `docs/internal/VALIDATION_POLICY.md` を参照。
+  - 詳細は `docs/internal/spec-validation-policy.md` を参照。
