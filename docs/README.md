@@ -5,8 +5,8 @@
 ## 読者別の入口
 
 - 利用者/運用者（外部仕様・運用ガイド）
-  - 画面概要: `docs/external/SCREEN_OVERVIEW.md`
-  - 外部仕様の前提・制約: `docs/external/EXTERNAL_ASSUMPTIONS.md`
+  - 画面概要: `docs/external/index-screens.md`
+  - 外部仕様の前提・制約: `docs/external/concept-assumptions.md`
   - ICS 連携・運用: `docs/external/guide-ical-workflow.md`
   - 免責事項: `docs/external/ref-disclaimer.md`
   - 変更履歴: `docs/external/ref-changelog.md`

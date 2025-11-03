@@ -3,8 +3,8 @@
 Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。全体像は README.md に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/internal/ref-verify-checklist.md` を参照してください。
 
 外部仕様（方式面・画面挙動・ICS運用）の参照先
-- `docs/external/EXTERNAL_ASSUMPTIONS.md`
-- `docs/external/SCREEN_OVERVIEW.md`
+- `docs/external/concept-assumptions.md`
+- `docs/external/index-screens.md`
 - `docs/external/guide-ical-workflow.md`
 
 ---
@@ -245,7 +245,7 @@ Appendix: Excel 出力（参加者 UI）
   - タグ `tagYYYYMMDD` 以降の変更を調査 → ローカルで `release/after-tagYYYYMMDD` を作成 → cherry-pick で差分を限定 → `pr/release-after-tagYYYYMMDD.md` を生成 → 人間が `git push` と PR 作成を実行。
 
 関連ドキュメント
-- 通常のWebアプリと異なる方式上の特徴は外部仕様に集約しています。`docs/external/EXTERNAL_ASSUMPTIONS.md` を参照してください。
+- 通常のWebアプリと異なる方式上の特徴は外部仕様に集約しています。`docs/external/concept-assumptions.md` を参照してください。
 
 ---
 
