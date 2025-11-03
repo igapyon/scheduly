@@ -61,3 +61,4 @@ Scheduly は Apache License 2.0 の下で公開されるオープンソースソ
 ---
 
 本ソフトウェアを利用することで、利用者は上記の免責条項に同意したものとみなされます。ご了承のうえ、Scheduly をご利用ください。
+<!-- file moved to ref-disclaimer.md by docs prefix policy -->

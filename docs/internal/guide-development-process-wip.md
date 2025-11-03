@@ -3,6 +3,7 @@
 この文書は、Scheduly の開発プロセス定義を示す内部向けガイドです。現在の開発を通じて継続的に更新する WIP 文書です。歴史的経緯の要素も含みますが、原則として「今の進め方」を第一に記載します。
 
 ## フェーズ一覧
+<!-- file moved to guide-development-process-wip.md by docs prefix policy -->
 
 1. **ローカル HTML モックによる UI プロトタイピング**  
    - 目的: 「見栄えと仕様を画面で語れる状態」にする。  
@@ -21,9 +22,9 @@
      - `DATA_MODEL.md`: オンメモリ前提のプロジェクト/候補/回答データ  
      - `FLOW_AND_API.md`: ProjectState と各サービスの役割  
      - `SCREEN_OVERVIEW.md`: 3 画面の目的・入力/出力  
-     - `ICAL_WORKFLOW.md`: ICS を中心とした運用方針  
+     - `guide-ical-workflow.md`: ICS を中心とした運用方針  
      - `RESPONSE_MANAGEMENT.md`: 回答管理 UI の構想  
-     - `VERIFY_CHECKLIST.md`: モック確認の習慣化  
+     - `ref-verify-checklist.md`: モック確認の習慣化  
      - `DEVELOPER_NOTES.md`: 作業メモと TODO  
    - 背景: 仕様が Markdown に落ちたことで、実装以降も迷わず参照できる知識ベースが出来上がった。
 

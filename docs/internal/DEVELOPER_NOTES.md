@@ -1,11 +1,11 @@
 # Developer Notes
 
-Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。全体像は README.md に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/internal/VERIFY_CHECKLIST.md` を参照してください。
+Scheduly のアプリ開発（React/webpack 版）を進める際に参照する開発メモです。全体像は README.md に委譲し、ここでは実装の裏側、デバッグ観点、運用手順、TODO をまとめています。QA 手順は `docs/internal/ref-verify-checklist.md` を参照してください。
 
 外部仕様（方式面・画面挙動・ICS運用）の参照先
 - `docs/external/EXTERNAL_ASSUMPTIONS.md`
 - `docs/external/SCREEN_OVERVIEW.md`
-- `docs/external/ICAL_WORKFLOW.md`
+- `docs/external/guide-ical-workflow.md`
 
 ---
 
@@ -342,3 +342,47 @@ Appendix: Excel 出力（参加者 UI）
 - (優先度低) `TZID` 付きの `VTIMEZONE` を自動付与するなど、タイムゾーン情報の扱いを強化する。
 - 参加者回答一覧（`user.jsx`）の実データ連携／マトリクス表示の整備。
 - レガシーモックの UI を React 版へ段階的に移植し、最終的に `public/legacy/` を整理する。
+
+---
+
+## 16. ドキュメント命名規約（docs/ 配下）
+
+ドキュメントは外部（利用者/運用者向け）と内部（開発/運用設計向け）に分け、さらに種別プレフィックスで命名を統一する。索引は `docs/README.md` を入口とし、必要に応じて `docs/external/README.md` / `docs/internal/README.md` を設ける。
+
+### 16.1 種別プレフィックス
+- `concept-` 概念・背景・設計思想
+- `spec-` 仕様（契約・I/F・制約）
+- `guide-` 手順・ハウツー（セットアップ/操作/開発手順）
+- `runbook-` 運用・障害対応・定常手順
+- `adr-` 意思決定（Architecture Decision Record）
+- `ref-` 参照資料（ポリシー、一覧、チェックリスト、免責等）
+- `index-` 目次/索引（エリアの入口）
+
+補足ルール
+- 単語区切りはハイフン、英語ベースで簡潔にする。
+- 対象領域は末尾に付与（例: `-ics`, `-ui`, `-server`）。
+- 下書き/WIP は末尾に `-wip` を付ける（例: `spec-server-integration-wip.md`）。
+- 既存の拡張子や相対リンクは維持する（拡張子は `.md`）。
+
+例
+- `spec-api-flow.md`
+- `guide-local-dev.md`
+- `runbook-ical-ops.md`
+- `ref-verify-checklist.md`
+
+### 16.2 既存ファイルのリネーム指針（段階移行）
+リポジトリ運用への影響を抑えるため、バッチ一括ではなく段階的に進める。
+
+1) 命名規約の合意（本節）。
+2) `docs/README.md` から新旧名称の入口を併記してブリッジ期間を設ける。
+3) 衝突の少ないものから順次リネームし、参照リンクを更新。
+4) 変更は外部向けは `docs/external/ref-changelog.md`、内部メモは本ファイルに簡易ログとして残す。
+
+（主な対応候補例）
+- `docs/internal/DATA_MODEL.md` → `docs/internal/spec-data-model.md`
+- `docs/internal/FLOW_AND_API.md` → `docs/internal/spec-api-flow.md`
+- `docs/internal/VALIDATION_POLICY.md` → `docs/internal/spec-validation-policy.md`
+- `docs/external/ICAL_WORKFLOW.md` → `docs/external/guide-ical-workflow.md`
+- `docs/external/CONTRIBUTING.md` → `docs/external/guide-contributing.md`
+
+必要になれば、`docs/internal/DOCS_NAMING.md` として本節を独立させ、テンプレート（`docs/internal/_TEMPLATE_SPEC.md` など）を追加する。
