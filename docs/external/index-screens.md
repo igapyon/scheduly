@@ -29,4 +29,3 @@ Scheduly の UI は次の 2 画面で構成されます。ここでは「何が�
 3. 回答更新は即時集計され、タブ/カードに反映される。
 
 保存方針やバリデーションの前提は `docs/external/concept-assumptions.md` を参照。技術的なデータフローや再計算の仕組みは `docs/internal/ref-screen-tech-overview.md` に記載しています。
-<!-- file moved to index-screens.md by docs prefix policy -->

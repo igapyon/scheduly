@@ -1,7 +1,6 @@
 # iCal (ICS) Internals
 
 この文書は、Scheduly における ICS（iCalendar）処理の内部構成・依存・主要関数の概要を開発者向けにまとめたものです。外部仕様は `docs/external/guide-ical-workflow.md` を参照してください。
-<!-- file moved to spec-ical-internals.md by docs prefix policy -->
 
 ## コンポーネントと責務
 

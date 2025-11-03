@@ -1,7 +1,6 @@
 # Screen Technical Overview
 
 この文書は、Scheduly の画面構成の技術的観点をまとめた内部向けガイドです。外部向けの概要は `docs/external/index-screens.md` を参照してください。
-<!-- file moved to ref-screen-tech-overview.md by docs prefix policy -->
 
 ## 1. エントリポイントとルーティング
 

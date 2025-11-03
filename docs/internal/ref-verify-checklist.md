@@ -8,7 +8,6 @@ Scheduly のモックを目視確認するときに使う QA チェックリス�
 - Chrome DevTools（mac: `⌥ ⌘ I`, Windows: `Ctrl` + `Shift` + `I` or `F12`）の Console を開き、ログを常時確認できる状態にしておく。
 
 ## 共通チェック
-<!-- file moved to ref-verify-checklist.md by docs prefix policy -->
 
 - [ ] 初期表示で UI が崩れていないか、候補一覧・共有 URL・プロジェクト設定など主要セクションが描画されているか。
 - [ ] 画面を操作した際に Console にエラーや警告が出ていないか。

@@ -33,7 +33,6 @@ Highlights
 - Update developer notes.
 
 Files Changed (overview)
-<!-- file moved to ref-changelog.md by docs prefix policy -->
 - docs/internal/DEVELOPER_NOTES.md
 - public/legacy/scheduly-admin-mock.html
 - public/legacy/scheduly-user-byschedule-mock.html (added)

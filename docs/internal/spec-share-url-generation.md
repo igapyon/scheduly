@@ -1,5 +1,4 @@
 # Share URL Generation Spec
-<!-- file moved to spec-share-url-generation.md by docs prefix policy -->
 
 共有 URL（管理者用・参加者用）とそれを構成するシークレットトークン（`adminToken` / `participantToken`）の最新仕様。React / webpack 版では `src/frontend/services/share-service.js` と `projectStore` が実装済みで、本ドキュメントはその挙動と今後の拡張ポイントをまとめる。
 

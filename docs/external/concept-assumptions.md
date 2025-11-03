@@ -1,5 +1,4 @@
 # 外部仕様の前提・制約（通常のWebアプリと異なる方式）
-<!-- file moved to concept-assumptions.md by docs prefix policy -->
 本ドキュメントは、Scheduly の「外部仕様」観点で、一般的なWebアプリと比較して異なる方式（非機能・設計原則）に限定して要点をまとめる。内部実装やAPI詳細、UIフローの説明は含めない。
 
 ---

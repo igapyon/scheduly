@@ -1,5 +1,4 @@
 # Flow & API Sketch
-<!-- file moved to spec-api-flow.md by docs prefix policy -->
 
 React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。オンメモリ構成（`projectStore` + sessionStorage）を前提に、管理者／参加者の画面遷移と主要サービスの責務を整理する。
 
