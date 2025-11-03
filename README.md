@@ -48,6 +48,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - **外部向け** [docs/external/guide-contributing.md](docs/external/guide-contributing.md): コントリビューション手引き
 - **外部向け** [docs/external/ref-contributors.md](docs/external/ref-contributors.md): コントリビューター一覧
 - **外部向け** [docs/external/glossary.md](docs/external/glossary.md): 用語集
+- **内部向け** `docs/internal/README.md`: 内部仕様の読み方と依存関係ガイド
 - **内部向け** [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
 - **内部向け** [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
 - **内部向け** [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案

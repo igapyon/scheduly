@@ -16,6 +16,7 @@
   - 用語集: `docs/external/glossary.md`
 
 - 開発者/運用設計（内部仕様・設計・手順）
+  - 内部ドキュメント入口: `docs/internal/README.md`
   - アーキテクチャ: `docs/internal/concept-architecture.md`
   - データモデル: `docs/internal/spec-data-model.md`
   - フローと API 草案: `docs/internal/spec-api-flow.md`
