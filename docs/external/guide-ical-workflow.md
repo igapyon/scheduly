@@ -47,4 +47,4 @@ Scheduly における iCalendar (ICS) の取り扱いについて、外部仕様
 
 ---
 
-内部実装の詳細は `docs/internal/ICAL_INTERNALS.md` を参照してください。未実装・将来検討中の事項は `docs/internal/DEVELOPER_NOTES.md` に集約しています。
+内部実装の詳細は `docs/internal/spec-ical-internals.md` を参照してください。未実装・将来検討中の事項は `docs/internal/DEVELOPER_NOTES.md` に集約しています。

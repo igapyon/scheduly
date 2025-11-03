@@ -1,4 +1,5 @@
 # Architecture Overview
+<!-- file moved to concept-architecture.md by docs prefix policy -->
 
 Scheduly のフロントエンド構成と今後想定している拡張ポイントを簡潔にまとめます。現在は React / webpack 版アプリを主軸に開発しており、初期モックだった HTML 版は最新アプリのスナップショットを確認する静的コンテンツとして最小限維持しています。サーバーとの連携は今後の実装タスクであり、フロントとサーバーを同じ JavaScript スタック（Node.js）で統一する方針を採ります。
 

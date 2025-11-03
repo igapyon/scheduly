@@ -1,4 +1,5 @@
 # バリデーション方針（フロントエンド UX）
+<!-- file moved to spec-validation-policy.md by docs prefix policy -->
 
 この文書は、現行のオンメモリ実装（React/webpack）における入力バリデーションの扱いを整理します。特に文字数上限とユーザー体験（UX）を中心に、将来のサーバ/API 移行時にも整合性を保てる方針を示します。
 

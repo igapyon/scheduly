@@ -6,7 +6,7 @@
 
 ## スコープ
 - 本書は方式の特徴のみを列挙し、内部構造・データモデル・画面仕様の詳細は扱わない。
-- 参照先（内部仕様）: `docs/internal/ARCHITECTURE.md`、`docs/internal/DATA_MODEL.md`、`docs/internal/FLOW_AND_API.md`、`docs/internal/DEVELOPER_NOTES.md`。
+- 参照先（内部仕様）: `docs/internal/concept-architecture.md`、`docs/internal/spec-data-model.md`、`docs/internal/spec-api-flow.md`、`docs/internal/DEVELOPER_NOTES.md`。
 
 ---
 

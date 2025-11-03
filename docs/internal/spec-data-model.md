@@ -1,4 +1,5 @@
 # Data Model
+<!-- file moved to spec-data-model.md by docs prefix policy -->
 
 React 版 Scheduly は、**オンメモリのみ**でデータを保持する前提（アプリ終了で揮発、永続 DB なし）で設計を進めます。必要になったときにサーバーやストレージへ移行できるよう、扱う構造だけ整理しておきます。
 

@@ -41,14 +41,14 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - ドキュメントの読み方と読者別索引: `docs/README.md`
 
 - [docs/internal/guide-development-process-wip.md](docs/internal/guide-development-process-wip.md): 現行の開発プロセス定義（WIP）と経緯の要点
-- [docs/internal/ARCHITECTURE.md](docs/internal/ARCHITECTURE.md): 画面構成とバンドル構造
-- [docs/internal/DATA_MODEL.md](docs/internal/DATA_MODEL.md): オンメモリ前提のデータモデル整理
-- [docs/internal/FLOW_AND_API.md](docs/internal/FLOW_AND_API.md): in-memory サービスと API 草案
+- [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
+- [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
+- [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案
 - [docs/external/index-screens.md](docs/external/index-screens.md): 画面役割と回答管理 UI の詳細
 - [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md): ICS 連携の運用メモ
 - [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
 - [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
-- [docs/internal/SERVER_INTEGRATION.md](docs/internal/SERVER_INTEGRATION.md): サーバー導入時の検討事項（WIP）
+- [docs/internal/spec-server-integration-wip.md](docs/internal/spec-server-integration-wip.md): サーバー導入時の検討事項（WIP）
 - [docs/external/ref-disclaimer.md](docs/external/ref-disclaimer.md): 免責事項と利用時の注意点
 - [docs/external/guide-contributing.md](docs/external/guide-contributing.md): コントリビューション手引き
 - [docs/external/ref-contributors.md](docs/external/ref-contributors.md): コントリビューター一覧

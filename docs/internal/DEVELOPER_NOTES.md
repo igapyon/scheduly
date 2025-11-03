@@ -121,12 +121,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
 - I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
-- `docs/internal/FLOW_AND_API.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
+- `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
 - 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
 - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
- - `docs/internal/FLOW_AND_API.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+ - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
  - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
  - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
 
@@ -165,7 +165,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ### 継続タスク・メモ
 - 管理・参加者 UI の間でデータ構造や表示ロジックに齟齬がないか定期的に点検する（説明文・ステータス・タイムゾーンなど）。
 - 管理画面で「ICS インポート or 手入力 → 参加者登録 → 回答入力」という一連フローが破綻なく成立するか継続的に検証する。
-- `docs/internal/FLOW_AND_API.md` に記載のサービス分離は優先度: 中の TODO として進行中。
+- `docs/internal/spec-api-flow.md` に記載のサービス分離は優先度: 中の TODO として進行中。
 - 参加者画面でのインライン編集時に参加者選択が途切れる問題は常駐ログで監視中（削除禁止）。
 
 ---
@@ -292,7 +292,7 @@ Appendix: Excel 出力（参加者 UI）
 - バリデーションは `src/frontend/shared/validation.js` の薄いヘルパで実施（後で zod に置換可能）。
 - 管理UIの候補編集は、未完成フォーマット時は検証スキップ、完成時のみ検証。順序NG時も入力は保存し、赤枠とトーストのみ。
 
-詳細説明は `docs/internal/VALIDATION_POLICY.md` を参照。
+詳細説明は `docs/internal/spec-validation-policy.md` を参照。
 
 ---
 
@@ -333,7 +333,7 @@ Appendix: Excel 出力（参加者 UI）
 - ICS 入出力時の検証強化（不正フォーマット防止、`TZID` バリデーションなど）。
 - バックエンド導入時に ICS を API で配布する仕組み（署名付き URL 等）の設計。
 
-関連: 内部の実装詳細は `docs/internal/ICAL_INTERNALS.md` に整理。
+関連: 内部の実装詳細は `docs/internal/spec-ical-internals.md` に整理。
 
 ---
 

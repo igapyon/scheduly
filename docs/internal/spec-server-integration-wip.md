@@ -1,4 +1,5 @@
 # Server Integration Plan (Draft)
+<!-- file moved to spec-server-integration-wip.md by docs prefix policy -->
 
 このドキュメントは、Scheduly がクライアントサイド完結の実装からサーバー連携へ移行する際に検討すべきポイントを整理するためのたたき台です。現時点では詳細が未確定のため、TBD 項目を含むラフな構成になっています。
 

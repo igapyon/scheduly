@@ -53,5 +53,5 @@
 ## 5. 参考
 
 - 外部仕様の前提・制約: `docs/external/concept-assumptions.md`
-- バリデーション方針: `docs/internal/VALIDATION_POLICY.md`
-- ICS 内部仕様: `docs/internal/ICAL_INTERNALS.md`
+- バリデーション方針: `docs/internal/spec-validation-policy.md`
+- ICS 内部仕様: `docs/internal/spec-ical-internals.md`
