@@ -4,8 +4,8 @@ React 版 Scheduly は、**オンメモリのみ**でデータを保持する前
 
 データ領域は次の 3 つに大別されます。
 
-1. **Project** – プロジェクト（調整対象）のメタ情報と共通設定  
-2. **Schedule Candidates (ICS)** – 候補日／イベント情報。ICS（iCalendar）との相互変換を前提にする  
+1. **Project** – プロジェクト（調整対象）のメタ情報と共通設定
+2. **Schedule Candidates (ICS)** – 候補日／イベント情報。ICS（iCalendar）との相互変換を前提にする
 3. **Participant Responses** – 参加者ごとの出欠／コメント
 
 ## 1. Project
@@ -19,7 +19,7 @@ React 版 Scheduly は、**オンメモリのみ**でデータを保持する前
 | `shareTokens` | { `admin`, `guest` } \| null | △ | 共有 URL 作成時に一時的に生成。オンメモリ保持で十分 |
 | `createdAt` / `updatedAt` | ISO string | ◯ | 表示用途・ソートなどで使用。オンメモリでも毎回生成する |
 
-> **備考**  
+> **備考**
 > 今回はオンメモリ運用のため `owner` や追加 `settings` は持たず、必要になった時点で拡張する。
 
 ## 2. Schedule Candidates
@@ -39,9 +39,9 @@ type ProjectState = {
 
 `icsText` が常にプロジェクトの「正」となる。初期ロード時や編集後は、`icsText` をパースして `candidates` を再生成する。UI 操作で候補を追加・編集した場合は、`ScheduleCandidate` を更新 → `rawVevent` を再構築 → `icsText` 全体を書き換える、というサイクルを徹底することで、ICS 文字列と UI 表示が乖離しない。
 
-> **ポイント**  
-> - `candidates` / `participants` / `responses` は UI レンダリングや操作用の派生データ。必要になればいつでも再生成できる。  
-> - プロジェクト単位でこの `ProjectState` を丸ごと保持／廃棄すればよい（オンメモリ運用）。  
+> **ポイント**
+> - `candidates` / `participants` / `responses` は UI レンダリングや操作用の派生データ。必要になればいつでも再生成できる。
+> - プロジェクト単位でこの `ProjectState` を丸ごと保持／廃棄すればよい（オンメモリ運用）。
 > - ICS のインポートは `icsText` 差し替え → 再パース、エクスポートは `icsText` をそのまま書き出すだけで済む。
 
 ### ScheduleCandidate (derived)
@@ -62,7 +62,7 @@ type ProjectState = {
 | `dtend` | ISO string | ◯ | `DTEND` | 同上 |
 | `rawVevent` | string (ICS) or JSON | ◯ | VEVENT 全体 | **正規データ**。再出力時に利用 |
 
-> **編集方針**  
+> **編集方針**
 > UI で編集 → `ScheduleCandidate` を更新 → `rawVevent` を再生成 → `icsText` を再構築、という順で処理すれば ICS を常に最新状態で保持できる。
 
 ### 2.1 Tally / 集計
@@ -136,10 +136,10 @@ type ParticipantSummary = {
 
 ## 4. 関係性まとめ
 
-- `Project` 1 件に対し、`ScheduleCandidate` が N 件  
-- `Project` 1 件に対し、`Participant` が N 件  
-- `Response` は (`projectId`, `participantId`, `candidateId`) の組で一意  
-- `ScheduleCandidate` ↔ `Response` 間の集計から `CandidateTally` を算出  
+- `Project` 1 件に対し、`ScheduleCandidate` が N 件
+- `Project` 1 件に対し、`Participant` が N 件
+- `Response` は (`projectId`, `participantId`, `candidateId`) の組で一意
+- `ScheduleCandidate` ↔ `Response` 間の集計から `CandidateTally` を算出
 - ICS のインポート／エクスポートは `ScheduleCandidate` を基に行い、`uid` / `sequence` / `dtstamp` をキーとして更新判定する
 
 ## 5. 実装メモ
@@ -162,3 +162,24 @@ UI からの派生出力として、参加者画面（user.jsx）は Excel 形�
 - 右端: ○/△/×/ー の日程別集計 + 最終行に総合計
 
 > 実装メモ: 記号セルは○=緑/△=黄/×=赤/ー=灰のフォント色で出力。ヘッダ行は薄い青、合計行は薄いオレンジ背景で視認性を高めている。
+
+## 7. Data Protection & Privacy（GDPR 等への配慮）
+
+このプロジェクトでは参加者名やコメントに個人情報が含まれる可能性があるため、開発段階でも次の指針を前提とする。
+
+- **保管期間**
+  - 現行の sessionStorage 実装はブラウザを閉じると揮発するため恒久保存は行わない。
+  - 将来サーバー導入時はプロジェクト単位で任意の保管期限（例: 90 日）を設定できるようにし、期限到達時は Project/Participants/Responses をまとめて削除するアーカイブジョブを用意する。
+  - エクスポートした ICS/JSON/Excel を保管する場合は利用者自身が組織のデータ保持規程に従う。
+
+- **アクセス権限・スコープ**
+  - 管理者 URL は運用担当に限定し、参加者 URL からは Responses と Candidate の読み書きに絞る。
+  - バックエンド化する場合はプロジェクト ID + 管理者トークンで権限を判定し、他プロジェクトのデータへ到達できないよう API ルータでスコープチェックを必須化する。
+  - プロジェクト削除やデモインポートなど上書き操作は必ず確認ダイアログを挟む。
+
+- **ログ／監査**
+  - ブラウザ／サーバーのログにはトークン値・参加者コメント・メールアドレスなどの生データを書き込まない。必要があればハッシュ化またはマスク（例: `abcd****`）して記録する。
+  - アクセスログを保存する場合は最小限のメタデータ（タイムスタンプ、操作種別、ハッシュ化したプロジェクト ID）に留め、保存期間を短く管理する（目安 30 日）。
+  - 参加者からの削除／訂正要請には、管理者画面から対象回答を更新するか、サポート窓口経由でプロジェクトごと削除する手順を用意する。
+
+これらのガイドラインは `docs/external/ref-disclaimer.md` で参加者へ周知し、サーバー構成へ移行する際には再確認のうえ必要な機能（保管期限設定、アクセススコープ検証、監査ログ管理など）を実装する。
