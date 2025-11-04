@@ -38,6 +38,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
+- フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。
 
 ---
 
@@ -105,6 +106,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
 - 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
 - API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
+- `projectService` 以外のサービス層（候補/参加者/回答など）を driver 化し、API ドライバ有効時は fetch 経由で CRUD を実行する（`src/frontend/services/*-service.js` の各操作を段階的に置換。既存の store 操作は local driver として温存する）。
+- API ドライバ利用時の初期スナップショット同期完了を UI に伝える仕組みと、競合/更新失敗時のロールバック・トースト連携（`admin.jsx` / `user.jsx`）を整備する。現状は `projectService` での `/meta` 同期のみのため、他操作でも 409/422 をユーザーに通知できるよう統一する。
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
