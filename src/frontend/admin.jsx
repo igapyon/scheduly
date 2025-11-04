@@ -990,6 +990,12 @@ function OrganizerApp() {
     return unsubscribe;
   }, [projectId, popToast]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][admin] metaSyncStatus", metaSyncStatus);
+    }
+  }, [metaSyncStatus]);
+
   const copyTextToClipboard = async (value) => {
     if (!isNonEmptyString(value)) throw new Error("empty");
     if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {

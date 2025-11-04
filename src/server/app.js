@@ -9,6 +9,24 @@ const createApp = ({ store }) => {
 
   const app = express();
   app.disable("x-powered-by");
+
+  const allowOrigin = process.env.SCHEDULY_API_ALLOW_ORIGIN || process.env.SCHEDULY_CORS_ALLOWED_ORIGINS || "*";
+  app.use((req, res, next) => {
+    if (allowOrigin === "*") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", allowOrigin);
+    }
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, If-Match");
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   app.use(express.json());
 
   app.use("/api/projects", createProjectsRouter(store));

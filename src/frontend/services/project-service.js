@@ -168,6 +168,9 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
   if (!force && apiSyncState.snapshotPromises.has(projectId)) {
     return apiSyncState.snapshotPromises.get(projectId);
   }
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[Scheduly][projectService] syncProjectSnapshot start", { projectId, reason });
+  }
   emitSyncEvent({ scope: "snapshot", phase: "start", projectId, meta: { reason } });
   const promise = (async () => {
     try {
@@ -175,6 +178,9 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
       if (snapshot && snapshot.project) {
         projectStore.replaceStateFromApi(projectId, snapshot);
         apiSyncState.readyProjects.add(projectId);
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[Scheduly][projectService] syncProjectSnapshot success", { projectId, reason });
+        }
         emitSyncEvent({ scope: "snapshot", phase: "success", projectId, payload: snapshot, meta: { reason } });
       }
       return snapshot;
@@ -209,6 +215,9 @@ const scheduleMetaSync = (projectId) => {
   }
   const timer = setTimeout(() => {
     apiSyncState.metaTimers.delete(projectId);
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][projectService] persistProjectMeta scheduled", { projectId });
+    }
     persistProjectMeta(projectId);
   }, META_SYNC_DELAY_MS);
   apiSyncState.metaTimers.set(projectId, timer);
@@ -217,6 +226,9 @@ const scheduleMetaSync = (projectId) => {
 const persistProjectMeta = async (projectId) => {
   try {
     emitSyncEvent({ scope: "meta", phase: "sending", projectId });
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][projectService] persistProjectMeta sending", { projectId });
+    }
     const state = projectStore.getProjectStateSnapshot(projectId);
     if (!state) return;
     const versions = state.versions || {};
@@ -247,12 +259,21 @@ const persistProjectMeta = async (projectId) => {
       projectStore.updateProjectVersions(projectId, { metaVersion: response.version });
     }
     emitSyncEvent({ scope: "meta", phase: "success", projectId });
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][projectService] persistProjectMeta success", { projectId });
+    }
   } catch (error) {
     if (error && error.status === 409) {
       emitSyncEvent({ scope: "meta", phase: "conflict", projectId, error });
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Scheduly][projectService] persistProjectMeta conflict", { projectId, error });
+      }
       syncProjectSnapshot(projectId, { force: true, reason: "conflict" });
     } else if (error && error.status === 422) {
       emitSyncEvent({ scope: "meta", phase: "validation-error", projectId, error });
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Scheduly][projectService] persistProjectMeta validation error", { projectId, error });
+      }
     } else {
       emitSyncEvent({ scope: "meta", phase: "error", projectId, error });
       console.warn("[Scheduly] Failed to persist project meta", error);

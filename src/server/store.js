@@ -381,9 +381,11 @@ class InMemoryProjectStore {
   }
 
   getSnapshot(projectId) {
-    const state = this.projects.get(projectId);
+    let state = this.projects.get(projectId);
     if (!state) {
-      throw new NotFoundError("Project not found");
+      state = createInitialProjectState(projectId, {});
+      this.projects.set(projectId, state);
+      return this.#serializeProject(projectId);
     }
     return this.#serializeProject(projectId);
   }
