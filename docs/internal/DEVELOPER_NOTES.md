@@ -105,7 +105,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - サブリソースごとの version 付与と楽観排他の粒度（回答=行、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）を定義する
 - 主要エンドポイント（Responses/Candidates/Participants/Project/ShareTokens/全体取得）で version を必須にし、409 時の最新データ・再送導線を明記する
 - ICS/JSON のサーバ生成パスを用意し、アクセス制御と生成ジョブのキューイング方針を決める
-- フロントは当面ポーリング（定期リロード）で同期し、API 側で競合検知・ロールバックを担保する
 - 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
 - GDPR / 個人情報保護観点の整理（保管期間・アクセス権限・ログ扱い）を行う
 - 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
@@ -158,6 +157,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
+- ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記
 - Excel 形式でのエクスポートを実装（exceljs）
 - favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 

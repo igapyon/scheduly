@@ -130,6 +130,13 @@ projectService.subscribe(projectId, (state) => {
 });
 ```
 
+### 同期方式と競合処理
+
+- フロントは当面、ポーリングまたは画面リロードによる定期同期とする（※API 導入後の構成を想定した計画であり、現行 sessionStorage 実装では未対応）。初期フェーズでは WebSocket 等の常時接続は導入せず、UI 側は 30〜60 秒間隔で `GET /api/projects/:id` を呼び出して最新状態に追随する。参加者画面も回答送信後に `projectStore.rehydrateFromServer()`（仮称・未実装）でサーバー値へ寄せる。
+- API 層は各リソース（Participants/Candidates/Responses/ShareTokens/ProjectMeta）に `version` を持たせ、更新時にクライアントの `version` と比較する。差異がある場合は 409 を返却し、レスポンスに最新レコードを含める。
+- フロントは 409 を受けたらローカルの楽観更新をロールバックし（`projectStore.rollbackPending()` など）、直後に全体再取得を実行。UI 上では最新値を表示しつつ「最新データに更新しました。再入力してください。」等のトーストで利用者へ案内する。
+- 楽観更新ヘルパーはサービス層で共通化し、通信失敗時も同じロールバック→再取得→再入力促しのパターンを適用する。
+
 ### 参加者が回答を送信
 
 ```ts
