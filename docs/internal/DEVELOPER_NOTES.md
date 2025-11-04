@@ -98,25 +98,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- 揮発性バックエンドの初期実装方針を固める（プロジェクト情報＋ICS候補＋参加者回答の分離、重複を最小化しつつ永続化は行わない）
-- API 層でのバリデーションと整合性管理を実装する（zod 等でスキーマ定義しフロント/サーバ共用、リクエスト検証と制約違反時のエラー整形）
-- REST ベースの API 設計を確定し、Project/Candidate/Participant/Response の CRUD とサマリー取得エンドポイントを定義する
-- 入力制約と並行更新時の振る舞い（version/Timestamp を使った楽観ロック）を仕様化し、エンドポイント単位でドキュメント化
-- サブリソースごとの version 付与と楽観排他の粒度（回答=行、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）を定義する
-- 主要エンドポイント（Responses/Candidates/Participants/Project/ShareTokens/全体取得）で version を必須にし、409 時の最新データ・再送導線を明記する
-- ICS/JSON のサーバ生成パスを用意し、アクセス制御と生成ジョブのキューイング方針を決める
-- フロントは当面ポーリング（定期リロード）で同期し、API 側で競合検知・ロールバックを担保する
-- 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
-- GDPR / 個人情報保護観点の整理（保管期間・アクセス権限・ログ扱い）を行う
-- 参加者コメントが個人情報に該当する場合の扱いを `docs/external/ref-disclaimer.md` に追記し、公開時点の FAQ/ディスクレーマへ反映する
-- 動的サーバ移行の前提整備（オンメモリ/単一プロセス想定を明記）
-- 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
-- ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
-- 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
-- エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
-- API エラーログとアクセス監視を含むログ／モニタリング基盤（構造化ログ出力、保存期間、モニタリング方法）を整備する
-- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
-- 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
+- API バックエンド（揮発性 Node.js in-memory）を実装する（`docs/internal/spec-server-integration-wip.md` の構成・エンドポイントに沿って CRUD/HW/ログを整備）
+- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する（`docs/internal/spec-api-flow.md` 6.8 参照）
+- 共有データ型を `src/shared/types.ts` に集約し、JSDoc/TS 型チェックを導入する（`docs/internal/spec-api-flow.md` 6.9 参照）
+- 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
+- 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
+- API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
@@ -158,6 +145,22 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6.x Done（完了）
 
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
+- `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
+- サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
+- 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理
+- REST API の CRUD/サマリーエンドポイント仕様を `docs/internal/spec-api-flow.md` に定義
+- 入力制約と並行更新時の振る舞い（version/timestamp/409 ハンドリング）を `docs/internal/spec-api-flow.md` に整理
+- エラーハンドリング標準化（409/413/401/403/ネットワーク）を `docs/internal/spec-api-flow.md` に整理
+- バリデーション共通スキーマ導入計画（Zod ベースの shared/schema）を `docs/internal/spec-api-flow.md` に記載
+- ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
+- 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
+- サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
+- 楽観更新ヘルパー設計（共通ヘルパー/ロールバック/再試行フロー）を `docs/internal/spec-api-flow.md` に記載
+- API エラーログとアクセス監視基盤の方針を `docs/internal/spec-server-integration-wip.md` に記載
+- 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
+- サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
+- ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記
+- GDPR 対応方針（保管期間・アクセス制御・ログ扱い）を `docs/internal/spec-data-model.md` に整理
 - Excel 形式でのエクスポートを実装（exceljs）
 - favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 
