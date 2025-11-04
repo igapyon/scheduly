@@ -109,7 +109,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
 - GDPR / 個人情報保護観点の整理（保管期間・アクセス権限・ログ扱い）を行う
 - 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
-- ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
 - 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
 - エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
 - API エラーログとアクセス監視を含むログ／モニタリング基盤（構造化ログ出力、保存期間、モニタリング方法）を整備する
@@ -158,6 +157,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
+- サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
 - Excel 形式でのエクスポートを実装（exceljs）
 - favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 
