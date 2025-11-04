@@ -319,6 +319,53 @@ shareService.rotate(projectId, {
   - 型ファイルは純粋なデータ構造のみを扱い、副作用やロジックを含めない。
   - エイリアス（例: `@shared/types`）を `vite.config.js` と `tsconfig.json` に設定し、参照パスを簡潔にする。
 
+### 6.10 楽観更新ヘルパーの設計
+
+- **目的**  
+  フロントエンドでの更新操作（参加者回答、候補編集、参加者編集、共有トークン操作）が API 呼び出しより先に UI に反映される “optimistic update” を安全に扱う仕組みを提供する。成功時はそのまま維持し、409 やネットワーク失敗時は自動でロールバック→再取得→ユーザーへの再入力促しを行う。
+
+- **抽象ヘルパー**  
+  `src/frontend/shared/optimistic-helpers.js`（仮称）に以下の関数を定義する。
+  ```js
+  export async function runOptimisticUpdate({
+    applyLocal,        // () => rollbackToken
+    request,           // () => Promise<ResponsePayload>
+    onSuccess,         // (payload) => void
+    onConflict,        // (payload) => void
+    onNetError,        // (error) => void
+    refetch,           // () => Promise<void>
+    toast,             // { success(msg), warn(msg), error(msg) }
+    labels,            // { success, conflict, netError }
+    onSettled,         // () => void
+  }) { /* ... */ }
+  ```
+  - `applyLocal` はストア更新を行い、後で呼び出せる `rollback` 関数（またはトークン）を返す。
+  - `request` で API を呼び出し、成功時は `onSuccess` を実行し `toast.success(labels.success)` を表示。
+  - 409/422 など競合時は `rollback()` → `refetch()` → `onConflict(payload)` → `toast.warn(labels.conflict)` の順に処理。
+  - ネットワーク/5xx 時は `rollback()` → `toast.error(labels.netError)`、必要に応じて「再試行」ボタンが露出する UI コンポーネントに通知。
+  - `onSettled` はローディング解除やフォーカス制御用に常に呼び出す。
+
+- **サービス層での利用**
+  - `responseService.upsert`, `scheduleService.updateCandidate`, `participantService.updateParticipant`, `shareService.rotate` など、現在個別に実装している処理を `runOptimisticUpdate` でラップする。
+  - 成功シナリオではレスポンスに含まれる最新 `version` をストアへ反映するロジックを共通化できる。
+  - 409 競合時はヘルパーが `conflict.latest` を UI に渡し、差分ハイライトや再入力促しを行う。
+
+- **ロールバック実装**
+  - `applyLocal` 内で `const snapshot = projectStore.getState()` を取得し、更新後に `return () => projectStore.replaceState(snapshot)` を返す方式を想定。
+  - 大規模なコピーを避けるため、`projectStore` に `captureSnapshot()` / `restoreSnapshot(snapshot)` ユーティリティを追加する。
+
+- **UI 連携**
+  - ネットワークエラー時はグローバルな「再試行」パネルを開き、`retry()` で同じ `runOptimisticUpdate` を再実行。
+  - 409 時にはトーストに「最新データに更新しました。再度入力してください。」を表示し、該当フォームをフォーカス。
+
+- **テスト計画**
+  - 単体テスト: jest でヘルパーを直接呼び出し、成功・409・ネットワーク例外の副作用を検証。
+  - E2E テスト: Playwright 等で競合再現シナリオを用意し、ロールバック → 再取得 → 再入力案内の流れを確認。
+
+- **ドキュメント連携**
+  - `docs/internal/spec-validation-policy.md` に「409/ネットワークエラー時の挙動は楽観更新ヘルパーに統一」と追記する。
+  - `docs/internal/ref-verify-checklist.md` に QA 項目（競合発生 → ロールバック → 再入力案内）を追加する。
+
 ---
 
 ## 7. エラーモデルと UI 対応（標準化）
