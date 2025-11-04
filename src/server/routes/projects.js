@@ -67,6 +67,56 @@ const createProjectsRouter = (store) => {
     }
   });
 
+  router.post("/:projectId/candidates", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const candidateInput = body.candidate || body;
+      const created = store.createCandidate(req.params.projectId, candidateInput);
+      res.status(201).json({
+        candidate: created.candidate
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/:projectId/candidates/:candidateId", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const updated = store.updateCandidate(req.params.projectId, req.params.candidateId, body);
+      res.json({
+        candidate: updated.candidate
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/:projectId/candidates/:candidateId", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      store.removeCandidate(req.params.projectId, req.params.candidateId, body);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:projectId/candidates:reorder", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const order = Array.isArray(body.order) ? body.order : body.candidates;
+      const version = body.version ?? body.candidatesListVersion;
+      const result = store.reorderCandidates(req.params.projectId, order, version);
+      res.json({
+        candidates: result.candidates,
+        candidatesListVersion: result.version
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 };
 
