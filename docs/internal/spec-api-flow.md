@@ -290,6 +290,35 @@ shareService.rotate(projectId, {
   - Zod を採用しない方針になった場合でも同モジュール構造を保ち、`typebox` や `yup` など別ライブラリで代替できるよう抽象化（インターフェース）を提供する。
   - スキーマバージョン管理が必要になった場合は `schemaVersion`（数値）を `Snapshot` に含め、サーバが互換性判断を行う。
 
+### 6.9 データ型の一本化（`src/shared/types.ts`）
+
+- **目的**  
+  ドメインモデルの型を単一ファイルに集約し、フロント／サーバ／検証スキーマで同じソースを参照する。現状は JS の慣習と個別定義に依存しており、齟齬が起きやすい。
+
+- **構成案**
+  - `src/shared/types.ts` を新規作成し、`ProjectMeta`, `ProjectState`, `ScheduleCandidate`, `Participant`, `Response`, `ShareTokens`, `ProjectSnapshot`, `Versioned<T>`, `ConflictReason`, `ApiErrorResponse` 等を TypeScript で定義。
+  - `tsconfig.json` を追加して `allowJs: true`, `checkJs: true`, `declaration: false` とし、JSDoc からの型チェックを有効化。ビルド時は Vite/ESBuild が TS ファイルをトランスパイルするよう設定。
+  - JS ファイルでは `/** @typedef {import('../shared/types').ScheduleCandidate} ScheduleCandidate */` のように JSDoc 参照を追加し、エディタの補完と型検証を活用する。
+
+- **フロント側適用**
+  - `projectStore`, `responseService`, `share-service`, `summaryService` などで重複している構造体定義を削除し、JSDoc import に置換。
+  - `demo-data.js` は `/** @type {ProjectSnapshot} */` を付け、サンプルデータの整合性を保つ。
+  - `validation.js` やコンポーネントで `import type` もしくは JSDoc 参照を利用し、引数・戻り値の型を共有する。
+
+- **サーバ側適用**
+  - Express ルートで `import type` を用い、Zod スキーマから `z.infer` した型と `types.ts` を一致させる。  
+  - OpenAPI 生成などを行う場合は `ts-json-schema-generator` から JSON Schema を抽出し、ドキュメント生成に活用する。
+
+- **移行ステップ**
+  1. `src/shared/types.ts` を追加し、`npm run typecheck`（`tsc --project tsconfig.json --noEmit`）をセットアップ。
+  2. 主要サービスから順に JSDoc 型参照を追加。既存の `PropTypes` や ad-hoc コメントは削除。
+  3. CI に型チェックを組み込み、PR 時の型崩れを検知。
+  4. 将来的に `.tsx` へ移行する場合は段階的にファイル拡張子を変更し、Vite 設定を更新する。
+
+- **補足**
+  - 型ファイルは純粋なデータ構造のみを扱い、副作用やロジックを含めない。
+  - エイリアス（例: `@shared/types`）を `vite.config.js` と `tsconfig.json` に設定し、参照パスを簡潔にする。
+
 ---
 
 ## 7. エラーモデルと UI 対応（標準化）
