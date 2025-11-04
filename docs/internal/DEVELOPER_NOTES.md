@@ -108,7 +108,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - フロントは当面ポーリング（定期リロード）で同期し、API 側で競合検知・ロールバックを担保する
 - 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
 - GDPR / 個人情報保護観点の整理（保管期間・アクセス権限・ログ扱い）を行う
-- 参加者コメントが個人情報に該当する場合の扱いを `docs/external/ref-disclaimer.md` に追記し、公開時点の FAQ/ディスクレーマへ反映する
 - 動的サーバ移行の前提整備（オンメモリ/単一プロセス想定を明記）
 - 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
 - ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
@@ -158,6 +157,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6.x Done（完了）
 
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
+- `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - Excel 形式でのエクスポートを実装（exceljs）
 - favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 
