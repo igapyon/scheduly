@@ -234,6 +234,23 @@ shareService.rotate(projectId, {
 | POST | `/api/projects/:projectId/import/json` | JSON スナップショットを上書き。body=`{ snapshot, version }`。200: 新しい `snapshot`。 |
 | GET | `/api/healthz` / `/api/readyz` | 健全性エンドポイント。body=`{ status: 'ok'|'ready'|'starting', meta? }`。 |
 
+### 6.7 入力制約と並行更新ポリシー
+
+- 文字数や必須条件は `docs/internal/spec-validation-policy.md` をサーバ側でもそのまま踏襲する。
+  - Project name / Candidate summary: 120 文字以内、空文字不可。description は 2000 文字まで。
+  - Participant displayName: 80 文字以内でプロジェクト内ユニーク、comment は 500 文字以内。
+  - Responses の `mark` は `'o' | 'd' | 'x'` のみ受け付ける。その他は 422。
+  - `dtstart` < `dtend` を必須チェックとし、タイムゾーンは `tzid` が IANA TZ 形式か `X-SCHEDULY-*` の許容リストに一致すること。
+- サーバは入力検証に失敗した場合 422 を返し、`fields` に NG 項目を列挙する。複数フィールドが同時に失敗した場合は配列で返す（例: `['summary','dtstart']`）。
+- 書き込み成功時は対象リソースの `version` と `updatedAt`（または ICS の場合は `dtstamp`）をサーバで再計算する。クライアント送信値は信用しない。
+- 409 競合時はレスポンスに最新レコードを含め、`conflictReason`（`'version_mismatch' | 'deleted' | 'list_mismatch'`）を付与する。クライアントは
+  1. ローカルの楽観更新をロールバック
+  2. `GET /snapshot` もしくは対象エンティティの再取得で最新を同期
+  3. ユーザに再入力/再送信を促す
+- リスト系（`candidates:reorder`, `import/json`, `ics/import`）は `candidatesListVersion` を `If-Match` または body で必須とし、差分マージは行わず 409 による再取得 → 再送を基本とする。
+- 参加者トークンからのアクセスで 409 が発生した場合は、最新レスポンスだけを返す（管理者向け詳細は含めない）。メッセージは UI で「他の参加者が更新しました。最新に更新してから再度送信してください。」等に合わせる。
+- サーバは `updatedAt` と `version` をもとに並行更新の監査ログ（タイムスタンプ＋トークン種別＋操作種別）を残す前提で設計する。オンメモリ版ではログをコンソール出力し、永続版では構造化ログへ切り替える。
+
 ### 楽観排他の粒度
 - Responses: 1行（participantId × candidateId）。`version` 必須。
 - Candidates: 個票ごとに `version`。一覧操作は `candidatesListVersion` を If-Match。

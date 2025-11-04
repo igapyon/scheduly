@@ -99,7 +99,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 優先度: 最高
 - API 層でのバリデーションと整合性管理を実装する（zod 等でスキーマ定義しフロント/サーバ共用、リクエスト検証と制約違反時のエラー整形）
-- 入力制約と並行更新時の振る舞い（version/Timestamp を使った楽観ロック）を仕様化し、エンドポイント単位でドキュメント化
 - サブリソースごとの version 付与と楽観排他の粒度（回答=行、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）を定義する
 - 主要エンドポイント（Responses/Candidates/Participants/Project/ShareTokens/全体取得）で version を必須にし、409 時の最新データ・再送導線を明記する
 - ICS/JSON のサーバ生成パスを用意し、アクセス制御と生成ジョブのキューイング方針を決める
@@ -153,6 +152,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理
 - REST API の CRUD/サマリーエンドポイント仕様を `docs/internal/spec-api-flow.md` に定義
+- 入力制約と並行更新時の振る舞い（version/timestamp/409 ハンドリング）を `docs/internal/spec-api-flow.md` に整理
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
 - ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記
