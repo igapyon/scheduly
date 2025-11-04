@@ -98,8 +98,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
-- 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）※実装要件は `docs/internal/spec-api-flow.md` 6.10 参照
+- API バックエンド（揮発性 Node.js in-memory）を実装する（`docs/internal/spec-server-integration-wip.md` の構成・エンドポイントに沿って CRUD/HW/ログを整備）
+- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する（`docs/internal/spec-api-flow.md` 6.8 参照）
+- 共有データ型を `src/shared/types.ts` に集約し、JSDoc/TS 型チェックを導入する（`docs/internal/spec-api-flow.md` 6.9 参照）
+- 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
+- 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
+- API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
