@@ -261,6 +261,35 @@ shareService.rotate(projectId, {
 ### クライアントの競合処理（指針）
 - 409 時は最新を取得してマージ/やり直し導線を提示。Responses は行差分を画面へ反映、Candidates/Participants はフォーム再読込、一覧操作/ICS は同期→再試行。
 
+### 6.8 バリデーション実装計画（Zod 共通スキーマ）
+
+> TODO から移行: フロント/サーバ共通のスキーマ管理と実行時検証を段階的に導入する。
+
+- **モジュール構成**
+  - `src/shared/schema/index.ts`（新規）に Zod スキーマをまとめる。`ProjectMetaSchema`, `CandidateSchema`, `ParticipantSchema`, `ResponseSchema`, `ShareTokensSchema`, `SnapshotSchema` など。
+  - `src/shared/types.ts` はスキーマから `z.infer<typeof CandidateSchema>` で型を生成し、既存の型定義を置き換える。
+  - クライアント側の軽量ヘルパ `src/frontend/shared/validation.js` は Zod ベースへリファクタし、UI 向けの `safeParseWithFriendlyErrors(schema, data)` を提供する。
+
+- **サーバ側パイプライン**
+  - Express ミドルウェア `validateBody(schema)` / `validateQuery(schema)` を用意し、各ルートで適用。
+  - 成功時は `req.validatedBody` をセットし、エンドポイントロジックでは型安全にアクセス。
+  - 失敗時は `{ code: 422, message, fields }` を構築し `next(new ValidationError(...))` でエラーハンドラへ委譲。
+  - レスポンス生成時も必要に応じて `SnapshotSchema.parse()` を通し、バグがあれば即座に検知する。
+
+- **エラーフォーマッタ**
+  - 共通ユーティリティ `mapZodIssuesToFields(issues)` を実装し、`['summary','dtstart']` のようなフィールド配列へ変換。
+  - UI のトースト文言に合わせて `messageCatalog`（`summary: '日程タイトルは120文字以内で入力してください'` 等）を `shared/schema/messages.ts` へまとめる。サーバは `messageCatalog[field]` を使用し、併せて英語 fallback を持つ。
+
+- **移行ステップ**
+  1. 既存のフロントバリデーションを Zod に置換（`build*Rules` を削除）。
+  2. API サーバのルートごとにミドルウェアを組み込み、旧来の手書きチェックを削除。
+  3. テスト: `schema.test.ts` で代表的な成功/失敗ケースを `z.parse` で検証。API では supertest 等で 422/409 パスを確認。
+  4. ドキュメント (`spec-validation-policy.md`) を更新し、スキーマの単一ソースを `shared/schema` と明記。
+
+- **補足**
+  - Zod を採用しない方針になった場合でも同モジュール構造を保ち、`typebox` や `yup` など別ライブラリで代替できるよう抽象化（インターフェース）を提供する。
+  - スキーマバージョン管理が必要になった場合は `schemaVersion`（数値）を `Snapshot` に含め、サーバが互換性判断を行う。
+
 ---
 
 ## 7. エラーモデルと UI 対応（標準化）
