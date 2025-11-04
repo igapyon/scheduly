@@ -7,6 +7,8 @@ const {
 
 const DEFAULT_TZID = "Asia/Tokyo";
 const VALID_CANDIDATE_STATUS = new Set(["CONFIRMED", "TENTATIVE", "CANCELLED"]);
+const PARTICIPANT_STATUS = new Set(["active", "archived"]);
+const VALID_RESPONSE_MARKS = new Set(["o", "d", "x"]);
 
 const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
 const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
@@ -23,6 +25,12 @@ const sanitizeString = (input, { fallback = "" } = {}) => {
   if (typeof input !== "string") return fallback;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const isValidDateTime = (value) => {
+  if (typeof value !== "string" || !value.trim()) return false;
+  const parsed = Date.parse(value);
+  return !Number.isNaN(parsed);
 };
 
 const sanitizeMetaInput = (meta = {}) => {
@@ -139,6 +147,103 @@ const sanitizeCandidateInput = (input = {}, { allowPartial = false } = {}) => {
   };
 };
 
+const sanitizeParticipantInput = (
+  input = {},
+  { allowPartial = false, participants = [], currentId = null } = {}
+) => {
+  if (!input || typeof input !== "object") {
+    throw new ValidationError("participant payload is required", ["participant"]);
+  }
+
+  const errors = [];
+  const hasDisplayName = Object.prototype.hasOwnProperty.call(input, "displayName");
+  const hasEmail = Object.prototype.hasOwnProperty.call(input, "email");
+  const hasStatus = Object.prototype.hasOwnProperty.call(input, "status");
+
+  const displayName = hasDisplayName ? sanitizeString(input.displayName) : undefined;
+  const email = hasEmail ? sanitizeString(input.email) : undefined;
+  const statusValue = hasStatus
+    ? sanitizeString(input.status, { fallback: "active" }).toLowerCase()
+    : "active";
+
+  if (!allowPartial || hasDisplayName) {
+    if (!displayName) {
+      errors.push("displayName");
+    } else if (displayName.length > 80) {
+      errors.push("displayName");
+    } else {
+      const normalized = displayName.toLowerCase();
+      const conflict = participants.some(
+        (entry) =>
+          entry &&
+          entry.participantId !== currentId &&
+          typeof entry.displayName === "string" &&
+          entry.displayName.toLowerCase() === normalized
+      );
+      if (conflict) {
+        errors.push("displayName");
+      }
+    }
+  }
+
+  if (!allowPartial || hasStatus) {
+    if (statusValue && !PARTICIPANT_STATUS.has(statusValue)) {
+      errors.push("status");
+    }
+  }
+
+  if (errors.length) {
+    throw new ValidationError("Participant validation failed", Array.from(new Set(errors)));
+  }
+
+  const result = {};
+  if (!allowPartial || hasDisplayName) {
+    result.displayName = displayName;
+  }
+  if (!allowPartial || hasEmail) {
+    result.email = email || "";
+  }
+  if (!allowPartial || hasStatus) {
+    result.status = statusValue || "active";
+  }
+  return result;
+};
+
+const sanitizeResponseInput = (input = {}) => {
+  if (!input || typeof input !== "object") {
+    throw new ValidationError("response payload is required", ["response"]);
+  }
+  const errors = [];
+  const participantId = sanitizeString(input.participantId);
+  const candidateId = sanitizeString(input.candidateId);
+  const markValue = sanitizeString(input.mark).toLowerCase();
+  const comment = typeof input.comment === "string" ? input.comment : "";
+
+  if (!participantId) {
+    errors.push("participantId");
+  }
+  if (!candidateId) {
+    errors.push("candidateId");
+  }
+  if (!VALID_RESPONSE_MARKS.has(markValue)) {
+    errors.push("mark");
+  }
+  if (comment && comment.length > 500) {
+    errors.push("comment");
+  }
+
+  if (errors.length) {
+    throw new ValidationError("Response validation failed", Array.from(new Set(errors)));
+  }
+
+  return {
+    participantId,
+    candidateId,
+    mark: markValue,
+    comment
+  };
+};
+
 const createShareTokenEntry = (type) => {
   const issuedAt = new Date().toISOString();
   const token = generateId(`scheduly-${type}`);
@@ -180,6 +285,87 @@ const createInitialProjectState = (projectId, metaInput = {}) => {
 };
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+const createEmptyTally = () => ({
+  o: 0,
+  d: 0,
+  x: 0,
+  total: 0
+});
+
+const tallyMark = (tally, mark) => {
+  if (!VALID_RESPONSE_MARKS.has(mark)) return;
+  tally[mark] += 1;
+  tally.total += 1;
+};
+
+const cloneTally = (tally) => {
+  if (!tally) {
+    return createEmptyTally();
+  }
+  return {
+    o: tally.o || 0,
+    d: tally.d || 0,
+    x: tally.x || 0,
+    total: tally.total || 0
+  };
+};
+
+const computeCandidateTallyFor = (responses, candidateId) => {
+  const tally = createEmptyTally();
+  responses.forEach((item) => {
+    if (item && item.candidateId === candidateId) {
+      tallyMark(tally, item.mark);
+    }
+  });
+  return cloneTally(tally);
+};
+
+const computeParticipantTallyFor = (responses, participantId) => {
+  const tally = createEmptyTally();
+  responses.forEach((item) => {
+    if (item && item.participantId === participantId) {
+      tallyMark(tally, item.mark);
+    }
+  });
+  return cloneTally(tally);
+};
+
+const computeResponsesSummary = (state) => {
+  const candidateMap = new Map();
+  const participantMap = new Map();
+
+  state.candidates.forEach((candidate) => {
+    if (!candidate) return;
+    candidateMap.set(candidate.candidateId, createEmptyTally());
+  });
+  state.participants.forEach((participant) => {
+    if (!participant) return;
+    participantMap.set(participant.participantId, createEmptyTally());
+  });
+
+  state.responses.forEach((response) => {
+    if (!response) return;
+    const candidateTally = candidateMap.get(response.candidateId) || createEmptyTally();
+    tallyMark(candidateTally, response.mark);
+    candidateMap.set(response.candidateId, candidateTally);
+
+    const participantTally = participantMap.get(response.participantId) || createEmptyTally();
+    tallyMark(participantTally, response.mark);
+    participantMap.set(response.participantId, participantTally);
+  });
+
+  return {
+    candidates: state.candidates.map((candidate) => ({
+      candidateId: candidate.candidateId,
+      tally: cloneTally(candidateMap.get(candidate.candidateId))
+    })),
+    participants: state.participants.map((participant) => ({
+      participantId: participant.participantId,
+      tallies: cloneTally(participantMap.get(participant.participantId))
+    }))
+  };
+};
 
 class InMemoryProjectStore {
   constructor() {
@@ -383,6 +569,245 @@ class InMemoryProjectStore {
     };
   }
 
+  createParticipant(projectId, participantInput = {}) {
+    const state = this.#requireProject(projectId);
+    const sanitized = sanitizeParticipantInput(participantInput, {
+      participants: state.participants
+    });
+    const participantId = sanitizeString(participantInput.participantId) || generateId("part");
+    const now = new Date().toISOString();
+    const duplicateId = state.participants.find((item) => item.participantId === participantId);
+    if (duplicateId) {
+      throw new ConflictError("Participant ID already exists", {
+        entity: "participant",
+        reason: "version_mismatch",
+        latest: clone(duplicateId)
+      });
+    }
+    const participant = {
+      participantId,
+      displayName: sanitized.displayName,
+      email: sanitized.email || "",
+      status: sanitized.status || "active",
+      createdAt: now,
+      updatedAt: now,
+      version: 1
+    };
+    state.participants.push(participant);
+    state.versions.participantsVersion += 1;
+    return {
+      participant: clone(participant)
+    };
+  }
+
+  updateParticipant(projectId, participantId, payload = {}) {
+    const state = this.#requireProject(projectId);
+    const index = this.#findParticipantIndex(state, participantId);
+    const participant = state.participants[index];
+
+    if (!payload || typeof payload !== "object") {
+      throw new ValidationError("participant payload is required", ["participant"]);
+    }
+
+    const expectedVersion = Number(payload.version);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    if (expectedVersion !== participant.version) {
+      throw new ConflictError("Participant version mismatch", {
+        entity: "participant",
+        reason: "version_mismatch",
+        latest: clone(participant)
+      });
+    }
+
+    const sanitized = sanitizeParticipantInput(payload.participant || payload, {
+      allowPartial: true,
+      participants: state.participants,
+      currentId: participant.participantId
+    });
+    const now = new Date().toISOString();
+    const nextParticipant = {
+      ...participant,
+      ...(Object.prototype.hasOwnProperty.call(sanitized, "displayName")
+        ? { displayName: sanitized.displayName }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(sanitized, "email")
+        ? { email: sanitized.email || "" }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(sanitized, "status")
+        ? { status: sanitized.status || "active" }
+        : {}),
+      updatedAt: now,
+      version: participant.version + 1
+    };
+    state.participants[index] = nextParticipant;
+    state.versions.participantsVersion += 1;
+    return {
+      participant: clone(nextParticipant)
+    };
+  }
+
+  removeParticipant(projectId, participantId, payload = {}) {
+    const state = this.#requireProject(projectId);
+    const index = this.#findParticipantIndex(state, participantId);
+    const participant = state.participants[index];
+    const expectedVersion = Number(payload?.version);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    if (expectedVersion !== participant.version) {
+      throw new ConflictError("Participant version mismatch", {
+        entity: "participant",
+        reason: "version_mismatch",
+        latest: clone(participant)
+      });
+    }
+    state.participants.splice(index, 1);
+    state.versions.participantsVersion += 1;
+
+    const beforeResponses = state.responses.length;
+    state.responses = state.responses.filter((item) => item.participantId !== participant.participantId);
+    if (state.responses.length !== beforeResponses) {
+      state.versions.responsesVersion += 1;
+    }
+  }
+
+  getParticipantResponses(projectId, participantId) {
+    const state = this.#requireProject(projectId);
+    const index = this.#findParticipantIndex(state, participantId);
+    const participant = state.participants[index];
+    const candidateLookup = new Map(state.candidates.map((item) => [item.candidateId, item]));
+
+    const responses = state.responses
+      .filter((item) => item.participantId === participant.participantId)
+      .map((item) => {
+        const candidate = candidateLookup.get(item.candidateId);
+        return {
+          response: clone(item),
+          candidate: candidate
+            ? {
+                candidateId: candidate.candidateId,
+                summary: candidate.summary,
+                dtstart: candidate.dtstart,
+                dtend: candidate.dtend,
+                tzid: candidate.tzid,
+                status: candidate.status,
+                location: candidate.location,
+                description: candidate.description
+              }
+            : null
+        };
+      });
+    const tallies = computeParticipantTallyFor(state.responses, participant.participantId);
+    return {
+      participant: clone(participant),
+      responses,
+      tallies
+    };
+  }
+
+  upsertResponse(projectId, payload = {}) {
+    const state = this.#requireProject(projectId);
+    const body = payload.response || payload;
+    const sanitized = sanitizeResponseInput(body);
+    this.#findParticipantIndex(state, sanitized.participantId);
+    this.#findCandidateIndex(state, sanitized.candidateId);
+
+    const existingIndex = state.responses.findIndex(
+      (item) =>
+        item.participantId === sanitized.participantId && item.candidateId === sanitized.candidateId
+    );
+    const now = new Date().toISOString();
+    let created = false;
+    let responseRecord;
+
+    if (existingIndex >= 0) {
+      const existing = state.responses[existingIndex];
+      const expectedVersion = Number(payload.version);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        throw new ValidationError("version must be a positive integer", ["version"]);
+      }
+      if (expectedVersion !== existing.version) {
+        throw new ConflictError("Response version mismatch", {
+          entity: "response",
+          reason: "version_mismatch",
+          latest: clone(existing)
+        });
+      }
+      responseRecord = {
+        ...existing,
+        mark: sanitized.mark,
+        comment: sanitized.comment,
+        updatedAt: now,
+        version: existing.version + 1
+      };
+      state.responses[existingIndex] = responseRecord;
+    } else {
+      created = true;
+      responseRecord = {
+        responseId: generateId("resp"),
+        participantId: sanitized.participantId,
+        candidateId: sanitized.candidateId,
+        mark: sanitized.mark,
+        comment: sanitized.comment,
+        createdAt: now,
+        updatedAt: now,
+        version: 1
+      };
+      state.responses.push(responseRecord);
+    }
+    state.versions.responsesVersion += 1;
+
+    const candidateTally = computeCandidateTallyFor(state.responses, sanitized.candidateId);
+    const participantTally = computeParticipantTallyFor(state.responses, sanitized.participantId);
+
+    return {
+      response: clone(responseRecord),
+      created,
+      candidateTally,
+      participantTally
+    };
+  }
+
+  removeResponse(projectId, payload = {}) {
+    const state = this.#requireProject(projectId);
+    const body = payload.response || payload;
+    const participantId = sanitizeString(body?.participantId);
+    const candidateId = sanitizeString(body?.candidateId);
+    if (!participantId || !candidateId) {
+      throw new ValidationError("participantId and candidateId are required", [
+        "participantId",
+        "candidateId"
+      ]);
+    }
+    const index = state.responses.findIndex(
+      (item) => item.participantId === participantId && item.candidateId === candidateId
+    );
+    if (index === -1) {
+      throw new NotFoundError("Response not found");
+    }
+    const record = state.responses[index];
+    const expectedVersion = Number(body?.version);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    if (expectedVersion !== record.version) {
+      throw new ConflictError("Response version mismatch", {
+        entity: "response",
+        reason: "version_mismatch",
+        latest: clone(record)
+      });
+    }
+    state.responses.splice(index, 1);
+    state.versions.responsesVersion += 1;
+  }
+
+  getResponsesSummary(projectId) {
+    const state = this.#requireProject(projectId);
+    return computeResponsesSummary(state);
+  }
+
   rotateShareTokens(projectId, { rotatedBy } = {}) {
     const state = this.#requireProject(projectId);
     const now = new Date().toISOString();
@@ -442,13 +867,20 @@ class InMemoryProjectStore {
     }
     return index;
   }
+
+  #findParticipantIndex(state, participantId) {
+    const id = sanitizeString(participantId);
+    if (!id) {
+      throw new ValidationError("participantId is required", ["participantId"]);
+    }
+    const index = state.participants.findIndex((item) => item.participantId === id);
+    if (index === -1) {
+      throw new NotFoundError("Participant not found");
+    }
+    return index;
+  }
 }
 
 module.exports = {
   InMemoryProjectStore
-};
-const isValidDateTime = (value) => {
-  if (typeof value !== "string" || !value.trim()) return false;
-  const parsed = Date.parse(value);
-  return !Number.isNaN(parsed);
 };
