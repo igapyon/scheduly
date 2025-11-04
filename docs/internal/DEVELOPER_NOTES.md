@@ -37,6 +37,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
+- オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティングのみを提供し、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
 
 ---
 
