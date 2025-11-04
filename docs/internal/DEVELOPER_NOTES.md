@@ -113,7 +113,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
 - エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
 - API エラーログとアクセス監視を含むログ／モニタリング基盤（構造化ログ出力、保存期間、モニタリング方法）を整備する
-- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
 - 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
 
 ### 優先度: 高
@@ -158,6 +157,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
+- 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - Excel 形式でのエクスポートを実装（exceljs）
 - favicon 404 を解消（`public/favicon.ico` 追加 + `<link rel="icon">` 明示）
 
