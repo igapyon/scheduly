@@ -170,42 +170,69 @@ shareService.rotate(projectId, {
 
 ## 6. Server API（Minimum, In-Memory）
 
-本節は最初のオンメモリ版サーバの I/F と、楽観排他（行/個票/リスト/メタ/トークン）の前提を定義する。永続DBへ移行してもエンドポイントと I/O は維持する。
+最初のオンメモリ版サーバで提供する REST I/F をまとめる。クライアントは管理者トークン（全操作可）または参加者トークン（スナップショット取得と自身の回答のみ）でアクセスする想定。
 
-- 共通事項
-  - すべて JSON。日時は ISO8601（タイムゾーン付与）、内部処理は UTC 正規化。
-  - サブリソースごとに整数 `version` を持つ。更新時はクライアントの `version` を受け取り一致しなければ 409。
-  - 失敗時の代表コード: 400/422=バリデーション、409=競合、413=サイズ超過、429=レート制限。
+### 6.1 共通事項
 
-- 取得
-  - GET `/api/projects/:id`
-    - returns: `{ meta, candidates[], candidatesListVersion, participants[], responses[], shareTokens, derived?, versions }`
-    - 各要素に `version` を含める。`responses` は `(participantId,candidateId)` 行単位の `version` を持つ。
+- すべて JSON（日時は ISO8601+TZ）。内部処理は UTC で正規化。
+- 書き込み系 API は `version`（または `If-Match`）を要求する。サーバ側の `version` と不一致なら 409 を返し、レスポンスに最新レコードを含める。
+- エラーレスポンスの基本形: `{ code, message, fields?, conflict? }`。`fields` は 422、`conflict` は 409 時のみ利用。
+- 標準ステータスコード: 200/201/204 正常、400/422 入力エラー、404 不存在、409 競合、413 サイズ超過、429 レート制限。
 
-- 回答（Responses）
-  - POST `/api/projects/:id/responses`
-    - body: `{ participantId, candidateId, mark, comment, version }`
-    - 200: `{ response: {..., version: newVersion} }`
-    - 409: `{ conflict: { response: latestRow } }`
+### 6.2 プロジェクト（Meta / Snapshot）
 
-- 候補（Candidates）
-  - PUT `/api/projects/:id/candidates/:cid`
-    - body: `{ ...candidateFields, version }`
-  - POST `/api/projects/:id/candidates:reorder`
-    - headers/body: `If-Match` or `{ candidatesListVersion }`
-  - POST `/api/projects/:id/ics/import`
-    - headers/body: `If-Match` or `{ candidatesListVersion }`, payload: `icsText | items[]`
+- `ProjectMetaInput` = `{ name, description?, defaultTzid }`
 
-- 参加者（Participants）
-  - PUT `/api/projects/:id/participants/:pid`
-    - body: `{ ...participantFields, version }`
+| Method | Path | 説明 |
+| ------ | ---- | ---- |
+| POST | `/api/projects` | 空のプロジェクトを作成。body=`{ meta: ProjectMetaInput }`。201: `{ projectId, meta: {..., version} }`。 |
+| GET | `/api/projects/:projectId/snapshot` | 管理者/参加者共用の一括取得。レスポンス: `{ project, candidates, participants, responses, shareTokens, versions }`。 |
+| PUT | `/api/projects/:projectId/meta` | メタ情報更新。body=`{ meta: ProjectMetaInput, version }`。200: `{ meta: {..., version: newVersion} }`。409: `{ conflict: { meta: latestMeta } }`。 |
 
-- プロジェクトメタ / 共有トークン
-  - PUT `/api/projects/:id/meta`（`projectMeta.version`）
-  - POST `/api/projects/:id/share/rotate`（`shareTokens.version`）
+### 6.3 候補（Candidates）
 
-- 運用
-  - GET `/api/healthz` / GET `/api/readyz`
+- `ScheduleCandidateInput` = `{ candidateId?, summary, description?, location?, dtstart, dtend, tzid, status, version? }`
+
+| Method | Path | 説明 |
+| ------ | ---- | ---- |
+| POST | `/api/projects/:projectId/candidates` | 候補追加。body=`{ candidate: ScheduleCandidateInput }`。201: `{ candidate: {..., version} }`。 |
+| PUT | `/api/projects/:projectId/candidates/:candidateId` | 候補更新。body=`{ candidate: ScheduleCandidateInput, version }`。200: `{ candidate: {..., version: newVersion} }`。409: `{ conflict: { candidate: latestCandidate } }`。 |
+| DELETE | `/api/projects/:projectId/candidates/:candidateId` | 候補削除。`If-Match` or body.version 必須。204: 成功。409: `{ conflict: { candidate: latestCandidate } }`。 |
+| POST | `/api/projects/:projectId/candidates:reorder` | 並び順更新。body=`{ order: string[], version: candidatesListVersion }`。200: `{ candidates: [...], candidatesListVersion: newVersion }`。 |
+| POST | `/api/projects/:projectId/ics/import` | ICS 取り込み。body=`{ source: 'ics', icsText }` または multipart。`version`= `candidatesListVersion`。200: `{ candidates: [...], summary: { added, updated, skipped }, candidatesListVersion: newVersion }`。422: `{ fields: ['icsText'], message }`。 |
+| GET | `/api/projects/:projectId/candidates/:candidateId/summary` | 候補単位の派生情報。200: `{ candidate, tally, participants: [...] }`。 |
+
+### 6.4 参加者（Participants）
+
+- `ParticipantInput` = `{ participantId?, displayName, email?, status?, version? }`
+
+| Method | Path | 説明 |
+| ------ | ---- | ---- |
+| POST | `/api/projects/:projectId/participants` | 参加者追加。201: `{ participant: {..., version} }`。 |
+| PUT | `/api/projects/:projectId/participants/:participantId` | 参加者更新。body=`{ participant: ParticipantInput, version }`。200: `{ participant: {..., version: newVersion} }`。409: `{ conflict: { participant: latestParticipant } }`。 |
+| DELETE | `/api/projects/:projectId/participants/:participantId` | 参加者削除。`If-Match` or version 必須。204: 成功。 |
+| GET | `/api/projects/:projectId/participants/:participantId/responses` | 参加者別ビュー。200: `{ participant, responses: [...], tallies }`。参加者トークンは自分自身のみアクセス可。 |
+
+### 6.5 回答（Responses）
+
+- `ResponseInput` = `{ participantId, candidateId, mark, comment?, version }`
+
+| Method | Path | 説明 |
+| ------ | ---- | ---- |
+| POST | `/api/projects/:projectId/responses` | 回答の upsert。201（新規）または 200（更新）: `{ response: {..., version: newVersion}, summary: { candidateTally, participantTally } }`。409: `{ conflict: { response: latestResponse } }`。 |
+| DELETE | `/api/projects/:projectId/responses` | 回答削除。body=`{ participantId, candidateId, version }`。204: 成功。409: `{ conflict: { response: latestResponse } }`。 |
+| GET | `/api/projects/:projectId/responses/summary` | 日程別・参加者別集計。200: `{ candidates: [{ candidateId, tally }], participants: [{ participantId, tallies }] }`。 |
+
+### 6.6 共有トークン・エクスポート・インポート
+
+| Method | Path | 説明 |
+| ------ | ---- | ---- |
+| POST | `/api/projects/:projectId/share/rotate` | 管理者/参加者トークンの再発行。body=`{ version, rotatedBy? }`。200: `{ shareTokens: {..., version: newVersion} }`。 |
+| POST | `/api/projects/:projectId/share/invalidate` | 指定トークン失効。body=`{ tokenType: 'admin'|'participant', version }`。204。 |
+| GET | `/api/projects/:projectId/export/ics` | サーバ生成の ICS を返す。`Content-Type: text/calendar`、`Content-Disposition: attachment`. |
+| GET | `/api/projects/:projectId/export/json` | `snapshot` の JSON を attachment として返す。 |
+| POST | `/api/projects/:projectId/import/json` | JSON スナップショットを上書き。body=`{ snapshot, version }`。200: 新しい `snapshot`。 |
+| GET | `/api/healthz` / `/api/readyz` | 健全性エンドポイント。body=`{ status: 'ok'|'ready'|'starting', meta? }`。 |
 
 ### 楽観排他の粒度
 - Responses: 1行（participantId × candidateId）。`version` 必須。
