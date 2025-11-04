@@ -100,7 +100,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ### 優先度: 最高
 - 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
 - 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）※実装要件は `docs/internal/spec-api-flow.md` 6.10 参照
-- API エラーログとアクセス監視を含むログ／モニタリング基盤（構造化ログ出力、保存期間、モニタリング方法）を整備する
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
@@ -153,6 +152,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
 - サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
 - 楽観更新ヘルパー設計（共通ヘルパー/ロールバック/再試行フロー）を `docs/internal/spec-api-flow.md` に記載
+- API エラーログとアクセス監視基盤の方針を `docs/internal/spec-server-integration-wip.md` に記載
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
 - ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記

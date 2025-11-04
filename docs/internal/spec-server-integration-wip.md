@@ -83,6 +83,38 @@
 - 定期的に `/snapshot` で取得した JSON を外部へバックアップする CLI を用意すると検証時の再現が容易になる。
 - 将来の永続化に備えて、API レイヤはリポジトリインターフェース（`ProjectRepository`）を間に挟み、実装を `MemoryRepository` から `SqlRepository` へ差し替えられるようにする。
 
+### ログ／モニタリング基盤（初期構成）
+
+- **構造化ログ**
+  - 書式は JSON 行（1 行 1 レコード）。`{ timestamp, level, message, context }` を基本とし、`context` に `projectId`（ハッシュ化）、`operation`, `tokenType`, `durationMs`, `statusCode`, `requestId` を含める。
+  - レベル定義: `info`（通常リクエスト）、`warn`（4xx）、`error`（5xx・未捕捉例外）、`debug`（開発用）。409 は `info`＋`conflict.reason` を記録。
+  - 揮発版は stdout へ出力し、ローカル開発では `LOG_LEVEL=debug` で詳細表示。本番想定ではファイルローリングもしくは stdout → Collect Agent を前提とする。
+
+- **保存とマスキング**
+  - トークン値・コメント等の個人情報はログに残さない。必要に応じて `hashToken(token)`（SHA-256 の先頭 8 文字）や `sanitizePII(text)` でマスクする。
+  - プロジェクト ID は `hashProjectId(projectId)` で匿名化し、アクセス集計時のみ利用。
+  - 保存期間は初期段階で 30 日。古いログは自動削除（外部保存先を利用する場合も同水準を目指す）。
+
+- **アクセス監視**
+  - API ミドルウェアで Access Log を記録（リクエスト開始時に `requestId` を発行）。レスポンス完了時に `durationMs` を算出し、閾値（例: 1.5s）を超えた場合は `warn` を出力。
+  - 重要操作（共有URL発行、ICS/JSON エクスポート、インポート、デモプロジェクトインポート、プロジェクト削除）は `operation` を `critical` とし、別ストリーム（監査ログ）にも複製。
+
+- **メトリクス**
+  - まずは Application Logs から計算できるサマリ（リクエスト数、4xx/5xx レート、平均レスポンス）を想定。将来的に Prometheus 等を導入する場合は `/api/metrics` エンドポイントで `http_request_duration_seconds` Histogram などを公開する。
+  - フロントエンドでも `performance.now()` を用いて主要操作の所要時間を計測し、`debug` レベルで出力（将来の RUM 基盤を見据える）。
+
+- **アラート**
+  - 初期段階ではダッシュボード上での目視確認を前提。永続環境へ移行する際には以下の閾値でアラートを設定: 5xx レート > 2%（5 分間平均）、平均レスポンス > 2s、連続失敗（共有 URL 発行/エクスポート）3 回以上。
+
+- **ダッシュボード**
+  - ログ集約基盤（Datadog, Loki+Grafana 等）を想定し、標準ダッシュボードに「総リクエスト数」「ステータス別件数」「重要操作ログ一覧」「平均レスポンス時間」「エラーメッセージ Top5」を配置する。
+  - 監査向けには `operation=critical` のログを日付降順で確認できるビューを用意する。
+
+- **落とし穴と対策**
+  - ログ量肥大を避けるため、`debug` ログは開発時のみ。リリース時には `LOG_LEVEL=info`。
+  - エラー情報にスタックトレースを含める場合も、個人情報やトークンが混じらないよう `sanitizeError()` を通す。
+  - 将来的に永続ストレージへ移行したら、DB 側でも Slow Query ログやエラーログを取る計画を別途策定する。
+
 ## サーバー健全性エンドポイント
 
 最小構成の Node.js サーバーでも、稼働監視のためのヘルスチェックを提供する。
