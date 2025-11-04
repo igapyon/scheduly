@@ -97,33 +97,36 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ## 6. TODO バックログ
 
-### 優先度: 高
+### 優先度: 最高
+- 揮発性バックエンドの初期実装方針を固める（プロジェクト情報＋ICS候補＋参加者回答の分離、重複を最小化しつつ永続化は行わない）
+- API 層でのバリデーションと整合性管理を実装する（zod 等でスキーマ定義しフロント/サーバ共用、リクエスト検証と制約違反時のエラー整形）
+- REST ベースの API 設計を確定し、Project/Candidate/Participant/Response の CRUD とサマリー取得エンドポイントを定義する
+- 入力制約と並行更新時の振る舞い（version/Timestamp を使った楽観ロック）を仕様化し、エンドポイント単位でドキュメント化
+- サブリソースごとの version 付与と楽観排他の粒度（回答=行、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）を定義する
+- 主要エンドポイント（Responses/Candidates/Participants/Project/ShareTokens/全体取得）で version を必須にし、409 時の最新データ・再送導線を明記する
+- ICS/JSON のサーバ生成パスを用意し、アクセス制御と生成ジョブのキューイング方針を決める
+- フロントは当面ポーリング（定期リロード）で同期し、API 側で競合検知・ロールバックを担保する
+- 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
+- GDPR / 個人情報保護観点の整理（保管期間・アクセス権限・ログ扱い）を行う
+- 参加者コメントが個人情報に該当する場合の扱いを `docs/external/ref-disclaimer.md` に追記し、公開時点の FAQ/ディスクレーマへ反映する
 - 動的サーバ移行の前提整備（オンメモリ/単一プロセス想定を明記）
 - 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
-- バリデーション導入（zod 等で型スキーマ定義しフロント/サーバ共用）
-- バージョニング付与（サブリソースごとに整数 version を持たせる）
-- 楽観排他の粒度設計を実装（回答=行単位、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）
-- Responses の行粒度API（`POST /api/projects/:id/responses`、bodyに version を同梱、409時は最新返却）
-- Candidates の個票更新API（`PUT /api/projects/:id/candidates/:cid`、version必須）
-- Candidates 一覧操作API（`POST /api/projects/:id/candidates:reorder`、`POST /api/projects/:id/ics/import` は `candidatesListVersion` でIf-Match）
-- Participants の個票更新API（`PUT /api/projects/:id/participants/:pid`、version必須）
-- Project メタ更新API（`PUT /api/projects/:id/meta`、`projectMeta.version` でIf-Match）
-- Share トークン回転API（`POST /api/projects/:id/share/rotate`、`shareTokens.version` でIf-Match）
-- 全体取得API（`GET /api/projects/:id` に各サブリソースの version を含める）
 - ヘルスチェックAPI（`GET /api/healthz` / `GET /api/readyz`）
-- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
-- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
 - エラーハンドリング標準化（409/413/権限/ネットワークの文言と再試行導線）
+- API エラーログとアクセス監視を含むログ／モニタリング基盤（構造化ログ出力、保存期間、モニタリング方法）を整備する
+- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
+- 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
+
+### 優先度: 高
+- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
+- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
-- トークン運用ポリシーの明文化（桁数/文字種、ログ非出力、回転と失効）
-- 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
 - I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
-- 管理画面に「デモ用プロジェクトをインポート」ボタンを追加（配置: プロジェクト削除のさらに下）。クリックで `public/proj/scheduly-project-sampledata-001.json` を読み込み、現在プロジェクトとしてインポートできるようにする（確認ダイアログあり／既存データは置換）。
 - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
  - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
@@ -131,6 +134,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
  - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
 
 ### 優先度: 中
+ - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
  - 主要幅でのビジュアル回帰テスト（Playwright）導入。320/375/414/768px のスクショ比較を CI で実施し、「横スクロールなし・文字サイズ不変」をチェックする。
  - （注: 優先度: 高の「サービス層の driver 化」の受け入れ条件として包含）`responseService.upsert` 後は必ず `tallyService.recalculate` を走らせるホットループを維持し、インライン編集コンポーネント（`InlineResponseEditor`）からの更新が参加者一覧とサマリーへ即時反映されるよう整備する。集計表示は `summaryService` に集約し、`user.jsx` は派生データの描画に専念させる。
  - 参加者の登録順を編集できるようにする。

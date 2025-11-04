@@ -5,6 +5,7 @@
 ## 読者別の入口
 
 - 利用者/運用者（外部仕様・運用ガイド）
+  - 外部ドキュメント入口: `docs/external/README.md`
   - 画面概要: `docs/external/index-screens.md`
   - 外部仕様の前提・制約: `docs/external/concept-assumptions.md`
   - ICS 連携・運用: `docs/external/guide-ical-workflow.md`
@@ -12,8 +13,10 @@
   - 変更履歴: `docs/external/ref-changelog.md`
   - 貢献ガイド: `docs/external/guide-contributing.md`
   - コントリビューター: `docs/external/ref-contributors.md`
+  - 用語集: `docs/external/glossary.md`
 
 - 開発者/運用設計（内部仕様・設計・手順）
+  - 内部ドキュメント入口: `docs/internal/README.md`
   - アーキテクチャ: `docs/internal/concept-architecture.md`
   - データモデル: `docs/internal/spec-data-model.md`
   - フローと API 草案: `docs/internal/spec-api-flow.md`

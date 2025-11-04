@@ -44,6 +44,14 @@ Scheduly における iCalendar (ICS) の取り扱いについて、外部仕様
 | TZID | タイムゾーン ID。指定がない場合の既定や書式は現行仕様に従う。|
 | LOCATION / DESCRIPTION / STATUS | 補足情報として出力。|
 
+## 5. 役割別の主なタスク
+
+| 役割 | 主な操作 | 注意点 | 参照 |
+| ---- | -------- | ------ | ---- |
+| 管理者 / 主催者 | 候補の追加・編集、ICS/JSON の入出力、共有 URL の配布 | 管理者URLの取り扱いとトークン管理を徹底する。インポート前にプレビューで差分確認。 | docs/external/index-screens.md |
+| 参加者 | 参加者URLから回答（○/△/× とコメント）を更新、必要に応じて ICS を参照 | URL が第三者へ漏れないよう注意。回答後はサマリーが即反映される。 | docs/external/index-screens.md |
+| 運用担当 / サポート | 運用状況の確認、ICS 配布フローのサポート、トラブル時の再エクスポート | トークンの失効手段がないため、誤送信時は新規プロジェクト作成などの対応が必要。変更履歴を随時 `ref-changelog.md` に反映。 | docs/external/concept-assumptions.md |
+
 ---
 
 内部実装の詳細は `docs/internal/spec-ical-internals.md` を参照してください。未実装・将来検討中の事項は `docs/internal/DEVELOPER_NOTES.md` に集約しています。

@@ -10,6 +10,13 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 
 > セキュリティ注意: 秘密URLを前提とした簡易モデルです。URLの取り扱いにはご注意ください。認証・承認が必要な運用では別途の仕組みを導入してください。
 
+## 想定ユースケース
+- チームやコミュニティが候補日をまとめて提示し、参加者が ○/△/× とコメントでリアクションして即時に集計したいとき
+- 認証基盤を用意せずに、URL を共有するだけで管理者/参加者の画面を切り替えて使いたい場合
+- イベントや会議の日程調整を素早く進め、確定候補を ICS で配布・外部カレンダーへ取り込みたいケース
+
+> 参加者URLが第三者に漏れると誰でも回答を更新できるため、URL を知っている人のみがアクセスできる前提で運用してください。
+
 ## はじめに（ローカル動作）
 1) `npm install`
 2) `npm run dev`（http://localhost:5173）
@@ -39,21 +46,23 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 ## Documentation Index
 
 - ドキュメントの読み方と読者別索引: `docs/README.md`
-
-- [docs/internal/guide-development-process-wip.md](docs/internal/guide-development-process-wip.md): 現行の開発プロセス定義（WIP）と経緯の要点
-- [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
-- [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
-- [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案
-- [docs/external/index-screens.md](docs/external/index-screens.md): 画面役割と回答管理 UI の詳細
-- [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md): ICS 連携の運用メモ
-- [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
-- [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
-- [docs/internal/spec-server-integration-wip.md](docs/internal/spec-server-integration-wip.md): サーバー導入時の検討事項（WIP）
-- [docs/external/ref-disclaimer.md](docs/external/ref-disclaimer.md): 免責事項と利用時の注意点
-- [docs/external/guide-contributing.md](docs/external/guide-contributing.md): コントリビューション手引き
-- [docs/external/ref-contributors.md](docs/external/ref-contributors.md): コントリビューター一覧
-- [docs/external/ref-changelog.md](docs/external/ref-changelog.md): 変更履歴のメモ
-- [docs/external/concept-assumptions.md](docs/external/concept-assumptions.md): 外部仕様の前提・制約（通常と異なる方式）
+- **外部向け** `docs/external/README.md`: 読み始める順番と目的別リンク
+- **外部向け** [docs/external/index-screens.md](docs/external/index-screens.md): 画面役割と回答管理 UI の詳細
+- **外部向け** [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md): ICS 連携の運用メモ
+- **外部向け** [docs/external/concept-assumptions.md](docs/external/concept-assumptions.md): 外部仕様の前提・制約（通常と異なる方式）
+- **外部向け** [docs/external/ref-disclaimer.md](docs/external/ref-disclaimer.md): 免責事項と利用時の注意点
+- **外部向け** [docs/external/ref-changelog.md](docs/external/ref-changelog.md): 変更履歴のメモ
+- **外部向け** [docs/external/guide-contributing.md](docs/external/guide-contributing.md): コントリビューション手引き
+- **外部向け** [docs/external/ref-contributors.md](docs/external/ref-contributors.md): コントリビューター一覧
+- **外部向け** [docs/external/glossary.md](docs/external/glossary.md): 用語集
+- **内部向け** `docs/internal/README.md`: 内部仕様の読み方と依存関係ガイド
+- **内部向け** [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
+- **内部向け** [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
+- **内部向け** [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案
+- **内部向け** [docs/internal/spec-server-integration-wip.md](docs/internal/spec-server-integration-wip.md): サーバー導入時の検討事項（WIP）
+- **内部向け** [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
+- **内部向け** [docs/internal/guide-development-process-wip.md](docs/internal/guide-development-process-wip.md): 現行の開発プロセス定義（WIP）と経緯の要点
+- **内部向け** [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |
