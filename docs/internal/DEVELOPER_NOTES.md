@@ -98,7 +98,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- 揮発性バックエンドの初期実装方針を固める（プロジェクト情報＋ICS候補＋参加者回答の分離、重複を最小化しつつ永続化は行わない）
 - API 層でのバリデーションと整合性管理を実装する（zod 等でスキーマ定義しフロント/サーバ共用、リクエスト検証と制約違反時のエラー整形）
 - REST ベースの API 設計を確定し、Project/Candidate/Participant/Response の CRUD とサマリー取得エンドポイントを定義する
 - 入力制約と並行更新時の振る舞い（version/Timestamp を使った楽観ロック）を仕様化し、エンドポイント単位でドキュメント化
@@ -153,6 +152,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
+- 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
 - ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記

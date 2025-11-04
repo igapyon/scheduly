@@ -25,6 +25,63 @@
    - ファイルアップロード/ダウンロードのハンドリング  
    - ICS の差分更新をサーバー側でどう管理するか
 
+## 揮発性バックエンド（初期実装）方針
+
+最初のサーバ導入は、あくまでフロントの sessionStorage 実装を置き換える最小機能に限定し、可観測性・競合検知の基礎を整えることを目的とする。永続ストレージや分散構成は後続フェーズで検討する。
+
+### ランタイム構成
+
+- Node.js + Express（または同等の軽量 HTTP フレームワーク）を単一プロセスで起動する。
+- プロセス内に `Map<projectId, ProjectState>` を保持する in-memory ストアを実装し、API ハンドラからのみアクセスさせる。`ProjectState` はフロントの `projectStore` と同等の構造（`project`, `candidates`, `participants`, `responses`, `icsText`, `shareTokens`, `versions`）を持つ。
+- プロセス再起動＝全データ消失となる点を運用文書に明示し、ステートレスなサンプル用途（PoC/デモ）として扱う。
+
+### API スコープ
+
+- ルート: `/api/projects/:projectId`
+- サブリソース:
+  - `GET/PUT` `/meta` – プロジェクト名・説明・タイムゾーンなどのメタ情報
+  - `GET/POST/PUT/DELETE` `/candidates` – 候補 CRUD、一覧更新（順序変更）には `If-Match` or `candidatesListVersion`
+  - `GET/POST/PUT/DELETE` `/participants`
+  - `GET/POST/PUT/DELETE` `/responses`
+  - `POST` `/share/rotate` – 管理者/参加者トークンの再発行
+  - `GET` `/snapshot` – 一括取得。`projectStore` へ流し込める JSON 全体を返す
+- レスポンスはフロントと共通の型 (`src/shared/types.ts` を共用予定) を採用し、`version` を必須フィールドとして返す。
+
+### データ分離とバージョン管理
+
+- `ProjectState` 内で以下のバージョン番号を保持する。
+  - `metaVersion`
+  - `candidatesVersion` と `candidatesListVersion`
+  - `participantsVersion`
+  - `responsesVersion`（行単位は `Response.version` として保持）
+  - `shareTokensVersion`
+- 書き込み系 API は `If-Match` ヘッダまたはリクエスト Body の `version` を要求し、不一致の場合は 409 を返却。レスポンスに最新値を含め、クライアントがロールバック後に再送できるようにする。
+- 行単位での衝突検知が必要な `Response` は、`{ participantId, candidateId }` キーでバージョンを持たせる。候補一覧や参加者一覧はリスト全体も別バージョンを持つ。
+
+### 起動時と終了時の扱い
+
+- プロセス初期化時は空のストアから開始し、リクエストを受けて初めて `ProjectState` を生成する。デモ用途で初期データが必要な場合は、外部 CLI や管理 API から `snapshot` をロードする方針とする。
+- シャットダウン時は特別な永続化は行わないが、将来の永続化を見据えて `serializeState()` ヘルパーを用意しておく。
+- 監視目的で `/api/healthz` `/api/readyz` の結果に `uptime`, `projectCount` などのメタ情報を追加できるようにする。
+
+### ファイル入出力
+
+- ICS / JSON エクスポートは API サーバ側で生成し、`Content-Disposition: attachment` によるダウンロードレスポンスを返す。フロントからは fetch で受け取り Blob に変換。
+- インポート（JSON/ICS）は `multipart/form-data` または JSON payload とし、サーバ側で `ProjectState` へマージする。現行のフロント `importState` と同じ整合チェック（UID/DTSTAMP 比較）を行う。
+- ファイルサイズ上限（例: 1 MB）とリクエストタイムアウトを明文化しておき、413 や 422 の返却ポリシーを合わせて `spec-api-flow.md` へ記載する。
+
+### 権限・セキュリティ
+
+- 当面は共有トークンをベアラートークンとして利用し、`Authorization: Bearer <token>` ヘッダで認証する。管理者トークンと参加者トークンを区別し、エンドポイントごとに許可範囲をチェックする。
+- 管理者トークンでのアクセス時は全 API を許可、参加者トークンでのアクセス時は `GET /snapshot`（回答者向けビュー）と自分の `POST/PUT /responses` のみに限定する。
+- ログにはトークン値を直接出さず、ハッシュ化（SHA-256 の先頭数文字など）して記録する。
+
+### 運用上の留意
+
+- プロセスが落ちた場合は復元手段がないため、PoC として扱う。安定運用や SLA が必要になった段階で永続ストレージ（SQLite/PostgreSQL 等）への移行を計画する。
+- 定期的に `/snapshot` で取得した JSON を外部へバックアップする CLI を用意すると検証時の再現が容易になる。
+- 将来の永続化に備えて、API レイヤはリポジトリインターフェース（`ProjectRepository`）を間に挟み、実装を `MemoryRepository` から `SqlRepository` へ差し替えられるようにする。
+
 ## サーバー健全性エンドポイント
 
 最小構成の Node.js サーバーでも、稼働監視のためのヘルスチェックを提供する。
