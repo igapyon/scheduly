@@ -66,9 +66,10 @@
 
 ### ファイル入出力
 
-- ICS / JSON エクスポートは API サーバ側で生成し、`Content-Disposition: attachment` によるダウンロードレスポンスを返す。フロントからは fetch で受け取り Blob に変換。
+- ICS / JSON エクスポートは同期処理で返す。`GET /api/projects/:projectId/export/ics` は `text/calendar`、`GET /api/projects/:projectId/export/json` は `application/json` + `Content-Disposition: attachment`。生成は都度行い、ジョブキューは使わない。
 - インポート（JSON/ICS）は `multipart/form-data` または JSON payload とし、サーバ側で `ProjectState` へマージする。現行のフロント `importState` と同じ整合チェック（UID/DTSTAMP 比較）を行う。
 - ファイルサイズ上限（例: 1 MB）とリクエストタイムアウトを明文化しておき、413 や 422 の返却ポリシーを合わせて `spec-api-flow.md` へ記載する。
+- トークン権限チェック: 管理者トークンのみエクスポート/インポート可。参加者トークンはアクセス拒否（403）。揮発版ではレスポンス生成後に監査ログ（リクエスト ID, tokenType, ファイル種別）を残す。
 
 ### 権限・セキュリティ
 

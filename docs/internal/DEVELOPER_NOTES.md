@@ -100,7 +100,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ### 優先度: 最高
 - サブリソースごとの version 付与と楽観排他の粒度（回答=行、候補=個票、候補一覧=リスト、参加者=個票、メタ=メタ、共有トークン=セット）を定義する
 - 主要エンドポイント（Responses/Candidates/Participants/Project/ShareTokens/全体取得）で version を必須にし、409 時の最新データ・再送導線を明記する
-- ICS/JSON のサーバ生成パスを用意し、アクセス制御と生成ジョブのキューイング方針を決める
 - 回答/候補編集の競合解決に向け、レコード版数や更新日時を保持し UI でマージ/再入力を促すフローを設計する
 - 共有データ型の一本化（`src/shared/types.ts` に Project/Participant/Candidate/Response/ShareTokens/RouteContext）
 - 楽観更新ヘルパー実装（成功はそのまま、409/通信失敗時はロールバック＋再取得UI）
@@ -153,6 +152,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 入力制約と並行更新時の振る舞い（version/timestamp/409 ハンドリング）を `docs/internal/spec-api-flow.md` に整理
 - エラーハンドリング標準化（409/413/401/403/ネットワーク）を `docs/internal/spec-api-flow.md` に整理
 - バリデーション共通スキーマ導入計画（Zod ベースの shared/schema）を `docs/internal/spec-api-flow.md` に記載
+- ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
 - サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
 - ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記
