@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import { useEffect, useState, useId, useRef, Fragment } from "react";
+import { useEffect, useState, useId, useRef, Fragment, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -482,11 +482,16 @@ function OrganizerApp() {
   const [openCandidateId, setOpenCandidateId] = useState(null);
   const [candidateErrors, setCandidateErrors] = useState(() => ({}));
   const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
+  const [metaSyncStatus, setMetaSyncStatus] = useState(() => ({ phase: "idle", message: "" }));
   const metaWarnedRef = useRef({ name: false, description: false });
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
   const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
+
+  useEffect(() => {
+    setMetaSyncStatus({ phase: "idle", message: "" });
+  }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -933,10 +938,57 @@ function OrganizerApp() {
     });
   };
 
-  const popToast = (message) => {
+  const popToast = useCallback((message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 1800);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (!event || event.projectId !== projectId) return;
+      const { scope, phase, error, meta } = event;
+      if (scope === "meta") {
+        if (phase === "pending" || phase === "sending") {
+          setMetaSyncStatus({ phase: phase === "pending" ? "pending" : "sending", message: "" });
+        } else if (phase === "success") {
+          setMetaSyncStatus({ phase: "idle", message: "" });
+        } else if (phase === "validation-error") {
+          const message =
+            (error && error.payload && (error.payload.message || error.payload.error)) ||
+            "プロジェクト情報の保存に失敗しました。入力内容をご確認ください。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        } else if (phase === "conflict") {
+          const message = "サーバー側でプロジェクト情報が更新されました。最新情報を取得しています…";
+          setMetaSyncStatus({ phase: "refreshing", message });
+          popToast(message);
+        } else if (phase === "error") {
+          const message = "プロジェクト情報の同期中にエラーが発生しました。時間を置いて再度お試しください。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        }
+      } else if (scope === "snapshot") {
+        if (phase === "start") {
+          setMetaSyncStatus((prev) => ({
+            phase: prev.phase === "sending" ? prev.phase : "refreshing",
+            message: prev.message
+          }));
+        } else if (phase === "success") {
+          setMetaSyncStatus({ phase: "idle", message: "" });
+          if (meta && meta.reason === "conflict") {
+            popToast("サーバーの最新状態を反映しました。");
+          }
+        } else if (phase === "error") {
+          const message = "サーバーの最新状態を取得できませんでした。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [projectId, popToast]);
 
   const copyTextToClipboard = async (value) => {
     if (!isNonEmptyString(value)) throw new Error("empty");
@@ -1170,6 +1222,9 @@ function OrganizerApp() {
     participantShareEntry &&
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
+  const isMetaSyncSaving = metaSyncStatus.phase === "pending" || metaSyncStatus.phase === "sending";
+  const isMetaSyncRefreshing = metaSyncStatus.phase === "refreshing";
+  const metaSyncErrorMessage = metaSyncStatus.phase === "error" ? metaSyncStatus.message : "";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1187,6 +1242,23 @@ function OrganizerApp() {
             {isAdminShareMiss && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 指定された管理者用URLは無効になっています。新しい共有URLを再発行すると、正しいリンクを参加者と共有できます。
+              </div>
+            )}
+            {isMetaSyncSaving && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-sky-600">
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-sky-500" aria-hidden="true" />
+                <span>サーバーに保存しています…</span>
+              </div>
+            )}
+            {isMetaSyncRefreshing && !isMetaSyncSaving && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-slate-400" aria-hidden="true" />
+                <span>サーバーから最新の情報を取得しています…</span>
+              </div>
+            )}
+            {metaSyncErrorMessage && (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                {metaSyncErrorMessage}
               </div>
             )}
           </div>

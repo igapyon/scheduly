@@ -31,6 +31,26 @@ const apiSyncState = {
 
 const META_SYNC_DELAY_MS = 600;
 
+const syncListeners = new Set();
+const emitSyncEvent = (event) => {
+  if (!event || typeof event !== "object") return;
+  syncListeners.forEach((listener) => {
+    try {
+      listener(event);
+    } catch (error) {
+      console.warn("[Scheduly] sync listener failed", error);
+    }
+  });
+};
+
+const addSyncListener = (listener) => {
+  if (typeof listener !== "function") return () => {};
+  syncListeners.add(listener);
+  return () => {
+    syncListeners.delete(listener);
+  };
+};
+
 // --- Local driver helpers --------------------------------------------------
 
 const localCreate = (payload = {}) => {
@@ -141,23 +161,26 @@ const localGetState = (projectId) => projectStore.getProjectStateSnapshot(projec
 
 // --- API helpers -----------------------------------------------------------
 
-const syncProjectSnapshot = (projectId, { force } = {}) => {
+const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
   if (!isApiEnabled() || !projectId) {
     return Promise.resolve(null);
   }
   if (!force && apiSyncState.snapshotPromises.has(projectId)) {
     return apiSyncState.snapshotPromises.get(projectId);
   }
+  emitSyncEvent({ scope: "snapshot", phase: "start", projectId, meta: { reason } });
   const promise = (async () => {
     try {
       const snapshot = await apiClient.get(`/api/projects/${encodeURIComponent(projectId)}/snapshot`);
       if (snapshot && snapshot.project) {
         projectStore.replaceStateFromApi(projectId, snapshot);
         apiSyncState.readyProjects.add(projectId);
+        emitSyncEvent({ scope: "snapshot", phase: "success", projectId, payload: snapshot, meta: { reason } });
       }
       return snapshot;
     } catch (error) {
       console.warn("[Scheduly] Failed to synchronize project snapshot", error);
+      emitSyncEvent({ scope: "snapshot", phase: "error", projectId, error, meta: { reason } });
       return null;
     } finally {
       apiSyncState.snapshotPromises.delete(projectId);
@@ -179,6 +202,7 @@ const scheduleMetaSync = (projectId) => {
     return;
   }
 
+  emitSyncEvent({ scope: "meta", phase: "pending", projectId });
   const existing = apiSyncState.metaTimers.get(projectId);
   if (existing) {
     clearTimeout(existing);
@@ -192,6 +216,7 @@ const scheduleMetaSync = (projectId) => {
 
 const persistProjectMeta = async (projectId) => {
   try {
+    emitSyncEvent({ scope: "meta", phase: "sending", projectId });
     const state = projectStore.getProjectStateSnapshot(projectId);
     if (!state) return;
     const versions = state.versions || {};
@@ -221,10 +246,15 @@ const persistProjectMeta = async (projectId) => {
     if (response && typeof response.version === "number") {
       projectStore.updateProjectVersions(projectId, { metaVersion: response.version });
     }
+    emitSyncEvent({ scope: "meta", phase: "success", projectId });
   } catch (error) {
     if (error && error.status === 409) {
-      syncProjectSnapshot(projectId, { force: true });
+      emitSyncEvent({ scope: "meta", phase: "conflict", projectId, error });
+      syncProjectSnapshot(projectId, { force: true, reason: "conflict" });
+    } else if (error && error.status === 422) {
+      emitSyncEvent({ scope: "meta", phase: "validation-error", projectId, error });
     } else {
+      emitSyncEvent({ scope: "meta", phase: "error", projectId, error });
       console.warn("[Scheduly] Failed to persist project meta", error);
     }
   }
@@ -351,7 +381,7 @@ module.exports = {
   subscribe,
   resolveProjectFromLocation,
   getRouteContext,
+  addSyncListener,
   getDefaultProjectId: projectStore.getDefaultProjectId,
   getState: localGetState
 };
-
