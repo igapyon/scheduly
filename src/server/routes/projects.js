@@ -83,6 +83,47 @@ const createProjectsRouter = (store) => {
     }
   });
 
+  router.get("/:projectId/export/json", (req, res, next) => {
+    try {
+      const snapshot = store.exportProjectSnapshot(req.params.projectId);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="scheduly-project-${req.params.projectId}.json"`
+      );
+      res.json(snapshot);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:projectId/import/json", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      if (!body.snapshot && typeof body !== "object") {
+        throw new BadRequestError("snapshot is required");
+      }
+      const snapshot = store.importProjectSnapshot(req.params.projectId, body);
+      res.json({ snapshot });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/:projectId/export/ics", (req, res, next) => {
+    try {
+      const icsText = store.exportProjectIcs(req.params.projectId);
+      res.setHeader("Content-Type", "text/calendar;charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="scheduly-project-${req.params.projectId}.ics"`
+      );
+      res.send(icsText);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/:projectId/candidates", (req, res, next) => {
     try {
       const body = req.body && typeof req.body === "object" ? req.body : {};

@@ -10,6 +10,37 @@ const VALID_CANDIDATE_STATUS = new Set(["CONFIRMED", "TENTATIVE", "CANCELLED"]);
 const PARTICIPANT_STATUS = new Set(["active", "archived"]);
 const VALID_RESPONSE_MARKS = new Set(["o", "d", "x"]);
 const SHARE_TOKEN_TYPES = ["admin", "participant"];
+const ICAL_HEADER_LINES = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Scheduly//Backend//JA",
+  "CALSCALE:GREGORIAN",
+  "METHOD:PUBLISH"
+];
+
+const pad = (value) => String(value).padStart(2, "0");
+
+const formatUtcForICal = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getUTCFullYear();
+  const month = pad(date.getUTCMonth() + 1);
+  const day = pad(date.getUTCDate());
+  const hour = pad(date.getUTCHours());
+  const minute = pad(date.getUTCMinutes());
+  const second = pad(date.getUTCSeconds());
+  return `${year}${month}${day}T${hour}${minute}${second}Z`;
+};
+
+const escapeIcalText = (value) => {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+};
 
 const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
 const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
@@ -26,6 +57,29 @@ const sanitizeString = (input, { fallback = "" } = {}) => {
   if (typeof input !== "string") return fallback;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const createInitialVersions = () => ({
+  metaVersion: 1,
+  candidatesVersion: 0,
+  candidatesListVersion: 0,
+  participantsVersion: 0,
+  responsesVersion: 0,
+  shareTokensVersion: 1
+});
+
+const sanitizeVersions = (raw) => {
+  const base = createInitialVersions();
+  if (!raw || typeof raw !== "object") {
+    return base;
+  }
+  Object.keys(base).forEach((key) => {
+    const value = raw[key];
+    if (Number.isInteger(value) && value >= 0) {
+      base[key] = value;
+    }
+  });
+  return base;
 };
 
 const isValidDateTime = (value) => {
@@ -63,6 +117,44 @@ const sanitizeMetaInput = (meta = {}) => {
     description,
     defaultTzid
   };
+};
+
+const sanitizeShareTokenEntry = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  const token = sanitizeString(raw.token);
+  if (!token) return null;
+  const entry = {
+    token,
+    url: sanitizeString(raw.url),
+    issuedAt: sanitizeString(raw.issuedAt)
+  };
+  const revokedAt = sanitizeString(raw.revokedAt);
+  if (revokedAt) entry.revokedAt = revokedAt;
+  const lastGeneratedBy = sanitizeString(raw.lastGeneratedBy);
+  if (lastGeneratedBy) entry.lastGeneratedBy = lastGeneratedBy;
+  return entry;
+};
+
+const sanitizeShareTokens = (rawTokens) => {
+  const next = {};
+  if (rawTokens && typeof rawTokens === "object") {
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const entry = sanitizeShareTokenEntry(rawTokens[type]);
+      if (entry) {
+        if (!entry.issuedAt) {
+          entry.issuedAt = new Date().toISOString();
+        }
+        next[type] = entry;
+      }
+    });
+  }
+  if (!next.admin) {
+    next.admin = createShareTokenEntry("admin");
+  }
+  if (!next.participant) {
+    next.participant = createShareTokenEntry("participant");
+  }
+  return next;
 };
 
 const sanitizeCandidateInput = (input = {}, { allowPartial = false } = {}) => {
@@ -366,6 +458,35 @@ const computeResponsesSummary = (state) => {
       tallies: cloneTally(participantMap.get(participant.participantId))
     }))
   };
+};
+
+const buildIcsFromState = (state) => {
+  const lines = ICAL_HEADER_LINES.slice();
+  const dtstamp = formatUtcForICal(new Date().toISOString());
+
+  state.candidates.forEach((candidate) => {
+    const dtstart = formatUtcForICal(candidate.dtstart);
+    const dtend = formatUtcForICal(candidate.dtend);
+    const status = (candidate.status || "CONFIRMED").toUpperCase();
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${candidate.uid || candidate.candidateId}`);
+    lines.push(`SEQUENCE:${Number.isInteger(candidate.sequence) ? candidate.sequence : 0}`);
+    if (dtstamp) lines.push(`DTSTAMP:${dtstamp}`);
+    if (dtstart) lines.push(`DTSTART:${dtstart}`);
+    if (dtend) lines.push(`DTEND:${dtend}`);
+    lines.push(`STATUS:${status}`);
+    lines.push(`SUMMARY:${escapeIcalText(candidate.summary || "")}`);
+    lines.push(`LOCATION:${escapeIcalText(candidate.location || "")}`);
+    lines.push(`DESCRIPTION:${escapeIcalText(candidate.description || "")}`);
+    const tzid = candidate.tzid || DEFAULT_TZID;
+    if (tzid) {
+      lines.push(`X-SCHEDULY-TZID:${escapeIcalText(tzid)}`);
+    }
+    lines.push("END:VEVENT");
+  });
+
+  lines.push("END:VCALENDAR");
+  return `${lines.join("\r\n")}\r\n`;
 };
 
 class InMemoryProjectStore {
@@ -809,6 +930,156 @@ class InMemoryProjectStore {
   getResponsesSummary(projectId) {
     const state = this.#requireProject(projectId);
     return computeResponsesSummary(state);
+  }
+
+  exportProjectSnapshot(projectId) {
+    return this.#serializeProject(projectId);
+  }
+
+  exportProjectIcs(projectId) {
+    const state = this.#requireProject(projectId);
+    return buildIcsFromState(state);
+  }
+
+  importProjectSnapshot(projectId, payload = {}) {
+    const body = payload.snapshot || payload;
+    if (!body || typeof body !== "object") {
+      throw new ValidationError("snapshot is required", ["snapshot"]);
+    }
+    const expectedVersion = Number(payload.version ?? body.version ?? 1);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    let state;
+    try {
+      state = this.#requireProject(projectId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        state = createInitialProjectState(projectId, {});
+        this.projects.set(projectId, state);
+      } else {
+        throw error;
+      }
+    }
+
+    if (expectedVersion !== state.versions.metaVersion) {
+      throw new ConflictError("Project version mismatch", {
+        entity: "project",
+        reason: "version_mismatch",
+        latest: {
+          snapshot: this.#serializeProject(projectId),
+          version: state.versions.metaVersion
+        }
+      });
+    }
+
+    const metaInput = sanitizeMetaInput(body.project || {});
+    const versions = sanitizeVersions(body.versions);
+
+    const candidates = Array.isArray(body.candidates)
+      ? body.candidates.map((item) => {
+          try {
+            const candidateId = sanitizeString(item.candidateId) || generateId("cand");
+            const sanitized = sanitizeCandidateInput(item);
+            return {
+              candidateId,
+              summary: sanitized.summary,
+              description: sanitized.description,
+              location: sanitized.location,
+              status: sanitized.status,
+              dtstart: sanitized.dtstart,
+              dtend: sanitized.dtend,
+              tzid: sanitized.tzid,
+              uid: sanitizeString(item.uid, { fallback: candidateId }),
+              sequence: Number.isInteger(item.sequence) ? item.sequence : 0,
+              dtstamp: sanitizeString(item.dtstamp) || new Date().toISOString(),
+              createdAt: sanitizeString(item.createdAt) || new Date().toISOString(),
+              updatedAt: sanitizeString(item.updatedAt) || new Date().toISOString(),
+              version: Number.isInteger(item.version) && item.version > 0 ? item.version : 1
+            };
+          } catch (error) {
+            console.warn("[Scheduly][server] Failed to import candidate", error);
+            return null;
+          }
+        }).filter(Boolean)
+      : [];
+
+    const participants = [];
+    if (Array.isArray(body.participants)) {
+      const takenNames = new Set();
+      body.participants.forEach((item) => {
+        try {
+          const participantId = sanitizeString(item.participantId) || generateId("part");
+          const sanitized = sanitizeParticipantInput(item, {
+            allowPartial: false,
+            participants
+          });
+          const normalizedName = sanitized.displayName.toLowerCase();
+          if (takenNames.has(normalizedName)) {
+            throw new ValidationError("duplicate displayName", ["displayName"]);
+          }
+          takenNames.add(normalizedName);
+          participants.push({
+            participantId,
+            displayName: sanitized.displayName,
+            email: sanitized.email || "",
+            status: sanitized.status || "active",
+            token: sanitizeString(item.token) || generateId("token"),
+            createdAt: sanitizeString(item.createdAt) || new Date().toISOString(),
+            updatedAt: sanitizeString(item.updatedAt) || new Date().toISOString(),
+            version: Number.isInteger(item.version) && item.version > 0 ? item.version : 1
+          });
+        } catch (error) {
+          console.warn("[Scheduly][server] Failed to import participant", error);
+        }
+      });
+    }
+
+    const participantIdSet = new Set(participants.map((p) => p.participantId));
+    const candidateIdSet = new Set(candidates.map((c) => c.candidateId));
+    const responses = [];
+    if (Array.isArray(body.responses)) {
+      body.responses.forEach((item) => {
+        try {
+          const sanitized = sanitizeResponseInput(item);
+          if (!participantIdSet.has(sanitized.participantId) || !candidateIdSet.has(sanitized.candidateId)) {
+            throw new ValidationError("invalid response reference", ["participantId", "candidateId"]);
+          }
+          responses.push({
+            responseId: sanitizeString(item.responseId) || generateId("resp"),
+            participantId: sanitized.participantId,
+            candidateId: sanitized.candidateId,
+            mark: sanitized.mark,
+            comment: sanitized.comment,
+            createdAt: sanitizeString(item.createdAt) || new Date().toISOString(),
+            updatedAt: sanitizeString(item.updatedAt) || new Date().toISOString(),
+            version: Number.isInteger(item.version) && item.version > 0 ? item.version : 1
+          });
+        } catch (error) {
+          console.warn("[Scheduly][server] Failed to import response", error);
+        }
+      });
+    }
+
+    const shareTokens = sanitizeShareTokens(body.shareTokens);
+
+    const nextState = {
+      project: {
+        ...state.project,
+        ...metaInput,
+        projectId,
+        createdAt: sanitizeString(body.project?.createdAt) || state.project.createdAt,
+        updatedAt: new Date().toISOString()
+      },
+      candidates,
+      participants,
+      responses,
+      shareTokens,
+      versions
+    };
+
+    this.projects.set(projectId, nextState);
+    return this.#serializeProject(projectId);
   }
 
   rotateShareTokens(projectId, { rotatedBy, version } = {}) {
