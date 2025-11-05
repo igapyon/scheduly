@@ -997,6 +997,7 @@ module.exports = {
   getShareTokens,
   findProjectByShareToken,
   updateShareTokens,
+  updateProjectVersions,
   getParticipants,
   replaceParticipants,
   upsertParticipant,

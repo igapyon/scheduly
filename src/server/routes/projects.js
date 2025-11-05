@@ -67,6 +67,22 @@ const createProjectsRouter = (store) => {
     }
   });
 
+  router.post("/:projectId/share/invalidate", (req, res, next) => {
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      if (typeof body.tokenType !== "string") {
+        throw new BadRequestError("tokenType is required");
+      }
+      const result = store.invalidateShareToken(req.params.projectId, body.tokenType, body);
+      res.json({
+        shareTokens: result.shareTokens,
+        version: result.version
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/:projectId/candidates", (req, res, next) => {
     try {
       const body = req.body && typeof req.body === "object" ? req.body : {};

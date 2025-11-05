@@ -7,6 +7,7 @@ import sharedIcalUtils from "./shared/ical-utils";
 import projectService from "./services/project-service";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
+import runtimeConfig from "./shared/runtime-config";
 import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
@@ -916,7 +917,7 @@ function OrganizerApp() {
     event.target.value = "";
   };
 
-  const refreshShareTokensState = (options = {}) => {
+  const refreshShareTokensState = useCallback((options = {}) => {
     if (!projectId) return shareTokens;
     const tokens = shareService.get(projectId);
     setShareTokens(tokens);
@@ -929,7 +930,7 @@ function OrganizerApp() {
       setBaseUrl(resolveDefaultBaseUrl());
     }
     return tokens;
-  };
+  }, [projectId, shareTokens]);
 
   const handleBaseUrlBlur = () => {
     setBaseUrl((prev) => {
@@ -941,6 +942,13 @@ function OrganizerApp() {
   const popToast = useCallback((message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 1800);
+  }, []);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
+      console.info("[Scheduly][admin] project driver", driver);
+    }
   }, []);
 
   useEffect(() => {
@@ -1036,7 +1044,7 @@ function OrganizerApp() {
     }
   };
 
-  const handleShareLinkAction = () => {
+  const handleShareLinkAction = async () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってください。");
       return;
@@ -1048,7 +1056,7 @@ function OrganizerApp() {
     }
     try {
       const action = hasIssued ? shareService.rotate : shareService.generate;
-      const result = action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
+      const result = await action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
       const notices = [];
@@ -1092,35 +1100,51 @@ function OrganizerApp() {
   };
 
   useEffect(() => {
+    const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][admin] project driver", driver);
+    }
     if (!projectId) return;
     if (autoIssueHandledRef.current) return;
-    const adminEntry = shareTokens?.admin || null;
-    const hasValidAdminToken =
-      adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
 
-    if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
-      autoIssueHandledRef.current = true;
-      return;
-    }
+    let cancelled = false;
 
-    if (hasValidAdminToken) {
-      updateLocationToAdminUrl(adminEntry);
-      autoIssueHandledRef.current = true;
-      return;
-    }
+    const run = async () => {
+      const adminEntry = shareTokens?.admin || null;
+      const hasValidAdminToken =
+        adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
 
-    try {
-      const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
-      const tokens = refreshShareTokensState({ resetWhenMissing: true });
-      const nextAdmin = tokens.admin || result.admin;
-      updateLocationToAdminUrl(nextAdmin);
-      popToast("共有URLを発行しました。コピーしてください");
-    } catch (error) {
-      console.error("Auto issue share URLs failed", error);
-    } finally {
-      autoIssueHandledRef.current = true;
-    }
-  }, [projectId, baseUrl, shareTokens, initialRouteContext]);
+      if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
+        autoIssueHandledRef.current = true;
+        return;
+      }
+
+      if (hasValidAdminToken) {
+        updateLocationToAdminUrl(adminEntry);
+        autoIssueHandledRef.current = true;
+        return;
+      }
+
+      try {
+        const result = await shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+        if (cancelled) return;
+        const tokens = refreshShareTokensState({ resetWhenMissing: true });
+        const nextAdmin = tokens.admin || result.admin;
+        updateLocationToAdminUrl(nextAdmin);
+        popToast("共有URLを発行しました。コピーしてください");
+      } catch (error) {
+        console.error("Auto issue share URLs failed", error);
+      } finally {
+        autoIssueHandledRef.current = true;
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, baseUrl, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
 
   const handleExportProjectInfo = () => {
     if (!projectId) {
@@ -1271,7 +1295,7 @@ function OrganizerApp() {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const entry = shareTokens?.participant;
                 if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
                   try {
@@ -1286,7 +1310,7 @@ function OrganizerApp() {
                     window.open(entry.url, "_blank");
                   }
                 } else {
-                  const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+                  const result = await shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
                   const tokens = refreshShareTokensState({ resetWhenMissing: true });
                   const next = tokens.participant || result.participant;
                   if (next && next.url) {

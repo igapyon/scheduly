@@ -1,5 +1,7 @@
 const projectStore = require("../store/project-store");
 const sharedIcalUtils = require("../shared/ical-utils");
+const runtimeConfig = require("../shared/runtime-config");
+const apiClient = require("./api-client");
 
 const { createLogger } = sharedIcalUtils;
 
@@ -13,6 +15,7 @@ const URL_PREFIX = {
 const DEFAULT_BASE_URL = "https://scheduly.app";
 
 const logDebug = createLogger("share-service");
+const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -124,6 +127,22 @@ const applyBaseUrlToEntry = (type, entry, baseUrl) => {
   return next;
 };
 
+const applyBaseUrlToTokens = (tokens, baseUrl) => {
+  const next = {};
+  SHARE_TOKEN_TYPES.forEach((type) => {
+    if (tokens && tokens[type]) {
+      next[type] = applyBaseUrlToEntry(type, tokens[type], baseUrl);
+    }
+  });
+  return next;
+};
+
+const getShareTokensVersion = (projectId) => {
+  const snapshot = projectStore.getProjectStateSnapshot(projectId);
+  const version = snapshot?.versions?.shareTokensVersion;
+  return Number.isInteger(version) && version >= 0 ? version : 1;
+};
+
 const isSameOrigin = (targetUrl) => {
   const currentOrigin = getWindowOrigin();
   if (!currentOrigin) return false;
@@ -153,12 +172,23 @@ const handleNavigation = (adminEntry, options) => {
   return { attempted: true, blocked: false };
 };
 
+const applyApiTokens = (projectId, tokens, version, baseUrl) => {
+  const mapped = applyBaseUrlToTokens(tokens, baseUrl);
+  const storedTokens = projectStore.updateShareTokens(projectId, mapped);
+  if (Number.isInteger(version)) {
+    projectStore.updateProjectVersions(projectId, { shareTokensVersion: version });
+  } else if (tokens && Number.isInteger(tokens.version)) {
+    projectStore.updateProjectVersions(projectId, { shareTokensVersion: tokens.version });
+  }
+  return storedTokens;
+};
+
 const get = (projectId) => {
   const tokens = projectStore.getShareTokens(projectId);
   return cloneTokens(tokens);
 };
 
-const generate = (projectId, options = {}) => {
+const localGenerate = (projectId, options = {}) => {
   const baseUrl = sanitizeBaseUrl(options.baseUrl);
   const currentTokens = projectStore.getShareTokens(projectId);
   const nextAdmin = hasUsableEntry(currentTokens.admin)
@@ -185,7 +215,7 @@ const generate = (projectId, options = {}) => {
   };
 };
 
-const rotate = (projectId, options = {}) => {
+const localRotate = (projectId, options = {}) => {
   const baseUrl = sanitizeBaseUrl(options.baseUrl);
   const adminEntry = createShareTokenEntry("admin", baseUrl, options.lastGeneratedBy);
   const participantEntry = createShareTokenEntry("participant", baseUrl, options.lastGeneratedBy);
@@ -201,7 +231,7 @@ const rotate = (projectId, options = {}) => {
   };
 };
 
-const invalidate = (projectId, type) => {
+const localInvalidate = (projectId, type) => {
   if (!SHARE_TOKEN_TYPES.includes(type)) {
     throw new Error(`Invalid share token type: ${type}`);
   }
@@ -211,6 +241,80 @@ const invalidate = (projectId, type) => {
     return next;
   });
 };
+
+const apiRotate = async (projectId, options = {}) => {
+  const baseUrl = sanitizeBaseUrl(options.baseUrl);
+  const payload = {
+    version: getShareTokensVersion(projectId)
+  };
+  if (options.lastGeneratedBy) {
+    payload.rotatedBy = options.lastGeneratedBy;
+  }
+  try {
+    const response = await apiClient.post(
+      `/api/projects/${encodeURIComponent(projectId)}/share/rotate`,
+      payload
+    );
+    const tokens = response?.shareTokens || {};
+    const storedTokens = applyApiTokens(projectId, tokens, response?.version, baseUrl);
+    const navigation = handleNavigation(storedTokens.admin, options);
+    return {
+      admin: cloneEntry(storedTokens.admin),
+      participant: cloneEntry(storedTokens.participant),
+      navigation
+    };
+  } catch (error) {
+    console.error("[Scheduly] shareService.rotate failed", error);
+    throw error;
+  }
+};
+
+const apiGenerate = async (projectId, options = {}) => {
+  const baseUrl = sanitizeBaseUrl(options.baseUrl);
+  const currentTokens = projectStore.getShareTokens(projectId);
+  const hasAdmin = hasUsableEntry(currentTokens.admin);
+  const hasParticipant = hasUsableEntry(currentTokens.participant);
+  if (!hasAdmin || !hasParticipant) {
+    return apiRotate(projectId, { ...options, baseUrl });
+  }
+  const mapped = applyBaseUrlToTokens(currentTokens, baseUrl);
+  const storedTokens = projectStore.updateShareTokens(projectId, mapped);
+  const navigation = handleNavigation(storedTokens.admin, options);
+  return {
+    admin: cloneEntry(storedTokens.admin),
+    participant: cloneEntry(storedTokens.participant),
+    navigation
+  };
+};
+
+const apiInvalidate = async (projectId, type) => {
+  if (!SHARE_TOKEN_TYPES.includes(type)) {
+    throw new Error(`Invalid share token type: ${type}`);
+  }
+  try {
+    await apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/share/invalidate`, {
+      tokenType: type,
+      version: getShareTokensVersion(projectId)
+    });
+    projectStore.updateShareTokens(projectId, (current) => {
+      const next = { ...current };
+      delete next[type];
+      return next;
+    });
+  } catch (error) {
+    console.error("[Scheduly] shareService.invalidate failed", error);
+    throw error;
+  }
+};
+
+const generate = (projectId, options = {}) =>
+  (isApiEnabled() ? apiGenerate(projectId, options) : localGenerate(projectId, options));
+
+const rotate = (projectId, options = {}) =>
+  (isApiEnabled() ? apiRotate(projectId, options) : localRotate(projectId, options));
+
+const invalidate = (projectId, type) =>
+  (isApiEnabled() ? apiInvalidate(projectId, type) : localInvalidate(projectId, type));
 
 module.exports = {
   get,

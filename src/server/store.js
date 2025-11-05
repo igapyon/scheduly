@@ -9,6 +9,7 @@ const DEFAULT_TZID = "Asia/Tokyo";
 const VALID_CANDIDATE_STATUS = new Set(["CONFIRMED", "TENTATIVE", "CANCELLED"]);
 const PARTICIPANT_STATUS = new Set(["active", "archived"]);
 const VALID_RESPONSE_MARKS = new Set(["o", "d", "x"]);
+const SHARE_TOKEN_TYPES = ["admin", "participant"];
 
 const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
 const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
@@ -810,8 +811,22 @@ class InMemoryProjectStore {
     return computeResponsesSummary(state);
   }
 
-  rotateShareTokens(projectId, { rotatedBy } = {}) {
+  rotateShareTokens(projectId, { rotatedBy, version } = {}) {
     const state = this.#requireProject(projectId);
+    const expectedVersion = Number(version);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    if (expectedVersion !== state.versions.shareTokensVersion) {
+      throw new ConflictError("Share tokens version mismatch", {
+        entity: "share_tokens",
+        reason: "version_mismatch",
+        latest: {
+          shareTokens: clone(state.shareTokens),
+          version: state.versions.shareTokensVersion
+        }
+      });
+    }
     const now = new Date().toISOString();
     const rotatedByValue = sanitizeString(rotatedBy);
     const nextTokens = {
@@ -826,6 +841,37 @@ class InMemoryProjectStore {
       nextTokens.admin.lastGeneratedBy = rotatedByValue;
     }
     state.shareTokens = nextTokens;
+    state.versions.shareTokensVersion += 1;
+    const latest = this.#serializeProject(projectId);
+    return {
+      shareTokens: latest.shareTokens,
+      version: state.versions.shareTokensVersion
+    };
+  }
+
+  invalidateShareToken(projectId, type, { version } = {}) {
+    if (!SHARE_TOKEN_TYPES.includes(type)) {
+      throw new ValidationError("invalid share token type", ["tokenType"]);
+    }
+    const state = this.#requireProject(projectId);
+    const expectedVersion = Number(version);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new ValidationError("version must be a positive integer", ["version"]);
+    }
+    if (expectedVersion !== state.versions.shareTokensVersion) {
+      throw new ConflictError("Share tokens version mismatch", {
+        entity: "share_tokens",
+        reason: "version_mismatch",
+        latest: {
+          shareTokens: clone(state.shareTokens),
+          version: state.versions.shareTokensVersion
+        }
+      });
+    }
+    if (!state.shareTokens || !state.shareTokens[type]) {
+      throw new NotFoundError("Share token not found");
+    }
+    delete state.shareTokens[type];
     state.versions.shareTokensVersion += 1;
     const latest = this.#serializeProject(projectId);
     return {
