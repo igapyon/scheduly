@@ -2,6 +2,9 @@
 
 const projectStore = require("../store/project-store");
 const { validate, buildParticipantRules } = require("../shared/validation");
+const runtimeConfig = require("../shared/runtime-config");
+const apiClient = require("./api-client");
+const tallyService = require("./tally-service");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -66,7 +69,31 @@ const isDuplicateDisplayName = (projectId, name, ignoreParticipantId = null) => 
   });
 };
 
-const addParticipant = (projectId, payload) => {
+const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
+
+const mapApiParticipant = (participant) => {
+  if (!participant || typeof participant !== "object") return null;
+  const participantId = participant.participantId || participant.id || randomUUID();
+  return {
+    id: participantId,
+    token: participant.token || "",
+    displayName: participant.displayName || "",
+    email: participant.email || "",
+    comment: participant.comment || "",
+    status: participant.status || "active",
+    createdAt: participant.createdAt || new Date().toISOString(),
+    updatedAt: participant.updatedAt || new Date().toISOString(),
+    version: Number.isInteger(participant.version) ? participant.version : 1
+  };
+};
+
+const updateParticipantsVersion = (projectId, version) => {
+  if (Number.isInteger(version) && version >= 0) {
+    projectStore.updateProjectVersions(projectId, { participantsVersion: version });
+  }
+};
+
+const localAddParticipant = (projectId, payload) => {
   const timestamp = new Date().toISOString();
   const preferredId = payload?.id;
   const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
@@ -92,13 +119,36 @@ const addParticipant = (projectId, payload) => {
     email: payload?.email || "",
     comment: payload?.comment || "",
     createdAt,
-    updatedAt
+    updatedAt,
+    version: 1,
+    status: payload?.status || "active"
   };
   projectStore.upsertParticipant(projectId, participant);
+  tallyService.recalculate(projectId);
   return participant;
 };
 
-const updateParticipant = (projectId, participantId, changes) => {
+const apiAddParticipant = async (projectId, payload) => {
+  const body = { participant: payload };
+  const response = await apiClient.post(
+    `/api/projects/${encodeURIComponent(projectId)}/participants`,
+    body
+  );
+  const participant = mapApiParticipant(response?.participant || payload);
+  if (!participant) {
+    throw new Error("Failed to create participant");
+  }
+  projectStore.upsertParticipant(projectId, participant);
+  updateParticipantsVersion(projectId, response?.version);
+  tallyService.recalculate(projectId);
+  return participant;
+};
+
+const addParticipant = (projectId, payload) => (
+  isApiEnabled() ? apiAddParticipant(projectId, payload) : localAddParticipant(projectId, payload)
+);
+
+const localUpdateParticipant = (projectId, participantId, changes) => {
   const existing = getParticipant(projectId, participantId);
   if (!existing) {
     throw new Error("Participant not found");
@@ -127,15 +177,59 @@ const updateParticipant = (projectId, participantId, changes) => {
     email: changes?.email ?? existing.email,
     comment: changes?.comment ?? existing.comment,
     token: nextToken,
-    updatedAt: changes?.updatedAt || new Date().toISOString()
+    status: (changes?.status ?? existing.status) || "active",
+    updatedAt: changes?.updatedAt || new Date().toISOString(),
+    version: typeof changes?.version === "number" ? changes.version : (existing.version ?? 1)
   };
   projectStore.upsertParticipant(projectId, nextParticipant);
   return nextParticipant;
 };
 
-const removeParticipant = (projectId, participantId) => {
-  projectStore.removeParticipant(projectId, participantId);
+const apiUpdateParticipant = async (projectId, participantId, changes) => {
+  const existing = getParticipant(projectId, participantId);
+  const body = {
+    participant: changes,
+    version: changes?.version ?? existing?.version ?? 1
+  };
+  const response = await apiClient.put(
+    `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
+    body
+  );
+  const participant = mapApiParticipant(response?.participant);
+  if (!participant) {
+    throw new Error("Failed to update participant");
+  }
+  projectStore.upsertParticipant(projectId, participant);
+  updateParticipantsVersion(projectId, response?.version);
+  return participant;
 };
+
+const updateParticipant = (projectId, participantId, changes) => (
+  isApiEnabled()
+    ? apiUpdateParticipant(projectId, participantId, changes)
+    : localUpdateParticipant(projectId, participantId, changes)
+);
+
+const localRemoveParticipant = (projectId, participantId) => {
+  projectStore.removeParticipant(projectId, participantId);
+  tallyService.recalculate(projectId);
+};
+
+const apiRemoveParticipant = async (projectId, participantId) => {
+  const existing = getParticipant(projectId, participantId);
+  const version = existing?.version ?? 1;
+  const response = await apiClient.del(
+    `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
+    { version }
+  );
+  projectStore.removeParticipant(projectId, participantId);
+  updateParticipantsVersion(projectId, response?.version);
+  tallyService.recalculate(projectId);
+};
+
+const removeParticipant = (projectId, participantId) => (
+  isApiEnabled() ? apiRemoveParticipant(projectId, participantId) : localRemoveParticipant(projectId, participantId)
+);
 
 const bulkUpsertParticipants = (projectId, list) => {
   if (!Array.isArray(list) || list.length === 0) return [];
@@ -167,7 +261,9 @@ const bulkUpsertParticipants = (projectId, list) => {
       email: item.email || base.email || "",
       comment: item.comment || base.comment || "",
       createdAt: base.createdAt || item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || new Date().toISOString()
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      status: item.status || base.status || "active",
+      version: typeof item.version === "number" ? item.version : base.version || 1
     };
     projectStore.upsertParticipant(projectId, participant);
     results.push(participant);

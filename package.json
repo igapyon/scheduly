@@ -4,7 +4,7 @@
   "description": "Scheduly は、ICS（iCalendar）との連携を念頭に置いたスケジュール調整アプリの UI プロトタイプです。現時点ではブラウザで開くだけで動作するモックを提供し、参加者向け・管理者向けの双方から操作感を確認できます。",
   "main": "index.js",
   "scripts": {
-    "dev": "webpack serve --config webpack.config.js --mode development",
+    "dev": "node bootstrap.js webpack serve --config webpack.config.js --mode development",
     "start": "npm run dev",
     "api:dev": "node src/server/index.js",
     "prebuild": "npm run css:build",

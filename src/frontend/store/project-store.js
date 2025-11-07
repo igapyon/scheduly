@@ -1,5 +1,14 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
+/**
+ * @typedef {import("../../shared/types").ShareTokens} ShareTokens
+ * @typedef {import("../../shared/types").ProjectSnapshot} ProjectSnapshot
+ * @typedef {import("../../shared/types").ScheduleCandidate} ScheduleCandidate
+ * @typedef {import("../../shared/types").Participant} ProjectParticipant
+ * @typedef {import("../../shared/types").ParticipantResponse} ProjectResponse
+ * @typedef {import("../../shared/types").VersionState} VersionState
+ */
+
 const { DEFAULT_TZID } = require("../shared/ical-utils");
 
 const DEFAULT_PROJECT_ID = "demo-project";
@@ -244,10 +253,22 @@ const notify = (projectId) => {
   subs.forEach((callback) => callback(snapshot));
 };
 
+/**
+ * @param {ScheduleCandidate[]} candidates
+ * @returns {ScheduleCandidate[]}
+ */
 const cloneCandidates = (candidates) => candidates.map((item) => ({ ...item }));
 
+/**
+ * @param {ProjectParticipant[]} participants
+ * @returns {ProjectParticipant[]}
+ */
 const cloneParticipants = (participants) => participants.map((item) => ({ ...item }));
 
+/**
+ * @param {ProjectResponse[]} responses
+ * @returns {ProjectResponse[]}
+ */
 const cloneResponses = (responses) => responses.map((item) => ({ ...item }));
 
 function rebuildParticipantTokenIndex(projectId) {
@@ -631,7 +652,8 @@ const sanitizeParticipants = (list) => {
       email: typeof item.email === "string" ? item.email : "",
       comment: typeof item.comment === "string" ? item.comment : "",
       createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
-      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+      version: Number.isInteger(item.version) ? item.version : 1
     });
     return acc;
   }, []);

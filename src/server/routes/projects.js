@@ -180,7 +180,8 @@ const createProjectsRouter = (store) => {
       const participantInput = body.participant || body;
       const created = store.createParticipant(req.params.projectId, participantInput);
       res.status(201).json({
-        participant: created.participant
+        participant: created.participant,
+        version: created.version
       });
     } catch (error) {
       next(error);
@@ -196,7 +197,8 @@ const createProjectsRouter = (store) => {
         body
       );
       res.json({
-        participant: updated.participant
+        participant: updated.participant,
+        version: updated.version
       });
     } catch (error) {
       next(error);
@@ -206,8 +208,8 @@ const createProjectsRouter = (store) => {
   router.delete("/:projectId/participants/:participantId", (req, res, next) => {
     try {
       const body = req.body && typeof req.body === "object" ? req.body : {};
-      store.removeParticipant(req.params.projectId, req.params.participantId, body);
-      res.status(204).send();
+      const result = store.removeParticipant(req.params.projectId, req.params.participantId, body);
+      res.json({ version: result.version });
     } catch (error) {
       next(error);
     }
@@ -231,7 +233,8 @@ const createProjectsRouter = (store) => {
         summary: {
           candidateTally: result.candidateTally,
           participantTally: result.participantTally
-        }
+        },
+        version: result.version
       });
     } catch (error) {
       next(error);
@@ -241,8 +244,8 @@ const createProjectsRouter = (store) => {
   router.delete("/:projectId/responses", (req, res, next) => {
     try {
       const body = req.body && typeof req.body === "object" ? req.body : {};
-      store.removeResponse(req.params.projectId, body);
-      res.status(204).send();
+      const result = store.removeResponse(req.params.projectId, body);
+      res.json({ version: result.version });
     } catch (error) {
       next(error);
     }

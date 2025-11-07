@@ -235,10 +235,10 @@ function InlineResponseEditor({
   }, []);
 
   const commitUpdate = useCallback(
-    (nextMark, nextComment) => {
+    async (nextMark, nextComment) => {
       if (!projectId || !participantId || !schedule?.id) return;
       try {
-        responseService.upsertResponse(projectId, {
+        await responseService.upsertResponse(projectId, {
           participantId,
           candidateId: schedule.id,
           mark: nextMark || "pending",
@@ -965,7 +965,7 @@ function AdminResponsesApp() {
   const projectName = projectState?.project?.name || DASHBOARD_META.projectName;
   const projectDescription = projectState?.project?.description || DASHBOARD_META.description;
 
-  const handleAddParticipant = () => {
+  const handleAddParticipant = async () => {
     const trimmed = newParticipantName.trim();
     if (!trimmed) {
       setParticipantActionError("参加者名を入力してください");
@@ -978,7 +978,7 @@ function AdminResponsesApp() {
       return;
     }
     try {
-      const created = participantService.addParticipant(projectId, { displayName: trimmed });
+      const created = await participantService.addParticipant(projectId, { displayName: trimmed });
       setParticipantActionMessage(`${created.displayName || "参加者"}を追加しました`);
       setParticipantActionError("");
       setNewParticipantName("");
@@ -1003,13 +1003,13 @@ function AdminResponsesApp() {
     setRemoveInProgress(false);
   };
 
-  const confirmRemoveParticipant = () => {
+  const confirmRemoveParticipant = async () => {
     if (!removeDialogParticipant) return;
     if (removeConfirmText.trim() !== "DELETE") return;
     const targetParticipant = removeDialogParticipant;
     setRemoveInProgress(true);
     try {
-      handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
+      await handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
       closeRemoveParticipantDialog();
     } catch (error) {
       console.error("[Scheduly] failed to remove participant", error);
@@ -1038,7 +1038,7 @@ function AdminResponsesApp() {
     setRenameInProgress(false);
   };
 
-  const confirmRenameParticipant = () => {
+  const confirmRenameParticipant = async () => {
     if (!renameDialogParticipant || !renameDialogParticipant.id) return;
     const trimmed = renameName.trim();
     if (!trimmed) {
@@ -1051,7 +1051,7 @@ function AdminResponsesApp() {
     }
     setRenameInProgress(true);
     try {
-      participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
+      await participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
       setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
       setParticipantActionError("");
       closeRenameParticipantDialog();
@@ -1063,14 +1063,14 @@ function AdminResponsesApp() {
     }
   };
 
-  const handleRemoveParticipant = (participantId, displayName) => {
+  const handleRemoveParticipant = async (participantId, displayName) => {
     const summaryName = displayName || "参加者";
     if (!projectId) {
       setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       setParticipantActionMessage("");
       return;
     }
-    participantService.removeParticipant(projectId, participantId);
+    await participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
   };

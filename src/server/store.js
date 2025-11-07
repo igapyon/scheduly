@@ -5,6 +5,15 @@ const {
   ConflictError
 } = require("./errors");
 
+/**
+ * @typedef {import("../shared/types").ProjectSnapshot} ProjectSnapshot
+ * @typedef {import("../shared/types").ScheduleCandidate} ScheduleCandidate
+ * @typedef {import("../shared/types").Participant} ProjectParticipant
+ * @typedef {import("../shared/types").ParticipantResponse} ProjectResponse
+ * @typedef {import("../shared/types").ShareTokens} ShareTokens
+ * @typedef {import("../shared/types").VersionState} VersionState
+ */
+
 const DEFAULT_TZID = "Asia/Tokyo";
 const VALID_CANDIDATE_STATUS = new Set(["CONFIRMED", "TENTATIVE", "CANCELLED"]);
 const PARTICIPANT_STATUS = new Set(["active", "archived"]);
@@ -720,7 +729,8 @@ class InMemoryProjectStore {
     state.participants.push(participant);
     state.versions.participantsVersion += 1;
     return {
-      participant: clone(participant)
+      participant: clone(participant),
+      version: state.versions.participantsVersion
     };
   }
 
@@ -768,7 +778,8 @@ class InMemoryProjectStore {
     state.participants[index] = nextParticipant;
     state.versions.participantsVersion += 1;
     return {
-      participant: clone(nextParticipant)
+      participant: clone(nextParticipant),
+      version: state.versions.participantsVersion
     };
   }
 
@@ -795,6 +806,9 @@ class InMemoryProjectStore {
     if (state.responses.length !== beforeResponses) {
       state.versions.responsesVersion += 1;
     }
+    return {
+      version: state.versions.participantsVersion
+    };
   }
 
   getParticipantResponses(projectId, participantId) {
@@ -890,7 +904,8 @@ class InMemoryProjectStore {
       response: clone(responseRecord),
       created,
       candidateTally,
-      participantTally
+      participantTally,
+      version: state.versions.responsesVersion
     };
   }
 
@@ -925,6 +940,9 @@ class InMemoryProjectStore {
     }
     state.responses.splice(index, 1);
     state.versions.responsesVersion += 1;
+    return {
+      version: state.versions.responsesVersion
+    };
   }
 
   getResponsesSummary(projectId) {

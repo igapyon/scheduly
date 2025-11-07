@@ -73,7 +73,9 @@ module.exports = {
       "process.env.API_BASE_URL": JSON.stringify(process.env.API_BASE_URL || ""),
       "process.env.BASE_URL": JSON.stringify(process.env.BASE_URL || ""),
       "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || (isProduction ? "production" : "development")),
-      "process.env.CORS_ALLOWED_ORIGINS": JSON.stringify(process.env.CORS_ALLOWED_ORIGINS || "")
+      "process.env.CORS_ALLOWED_ORIGINS": JSON.stringify(process.env.CORS_ALLOWED_ORIGINS || ""),
+      "process.env.SCHEDULY_PROJECT_DRIVER": JSON.stringify(process.env.SCHEDULY_PROJECT_DRIVER || ""),
+      "process.env.SCHEDULY_API_BASE_URL": JSON.stringify(process.env.SCHEDULY_API_BASE_URL || "")
     })
   ]
 };

@@ -31,6 +31,12 @@ const detectDriverFromEnvironment = () => {
     process.env &&
     typeof process.env.SCHEDULY_PROJECT_DRIVER === "string"
   ) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info(
+        "[Scheduly][runtime-config] driver from env",
+        process.env.SCHEDULY_PROJECT_DRIVER
+      );
+    }
     return normalizeDriver(process.env.SCHEDULY_PROJECT_DRIVER);
   }
   return DRIVER_LOCAL;
@@ -44,6 +50,12 @@ const detectApiBaseUrl = () => {
     return window.__SCHEDULY_API_BASE_URL__;
   }
   if (typeof process !== "undefined" && process.env && process.env.SCHEDULY_API_BASE_URL) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info(
+        "[Scheduly][runtime-config] api base url from env",
+        process.env.SCHEDULY_API_BASE_URL
+      );
+    }
     return process.env.SCHEDULY_API_BASE_URL;
   }
   return "";

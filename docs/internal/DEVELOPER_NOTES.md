@@ -39,6 +39,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
 - フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) も API ドライバ時はサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
+- 共通のデータ型は `src/shared/types.js` に JSDoc で集約している。フロント／サーバ双方で `@typedef {import('../shared/types')...}` を用い、プロジェクトスナップショットや共有トークン、候補・参加者の構造を参照する。
 
 ---
 
