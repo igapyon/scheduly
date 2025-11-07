@@ -102,7 +102,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- API バックエンド（揮発性 Node.js in-memory）を実装する（`docs/internal/spec-server-integration-wip.md` の構成・エンドポイントに沿って CRUD/HW/ログを整備）
 - バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する（`docs/internal/spec-api-flow.md` 6.8 参照）
 - 共有データ型を `src/shared/types.ts` に集約し、JSDoc/TS 型チェックを導入する（`docs/internal/spec-api-flow.md` 6.9 参照）
 - 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
