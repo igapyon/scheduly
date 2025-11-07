@@ -26,10 +26,103 @@ const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 const apiSyncState = {
   readyProjects: new Set(),
   snapshotPromises: new Map(),
-  metaTimers: new Map()
+  metaTimers: new Map(),
+  metaValidationIssues: new Map()
 };
 
 const META_SYNC_DELAY_MS = 600;
+const META_NAME_MAX = 120;
+const META_DESCRIPTION_MAX = 2000;
+
+const cancelPendingMetaSync = (projectId) => {
+  const existing = apiSyncState.metaTimers.get(projectId);
+  if (existing) {
+    clearTimeout(existing);
+    apiSyncState.metaTimers.delete(projectId);
+  }
+};
+
+const ensureMetaPayloadShape = (project = {}) => ({
+  name: typeof project?.name === "string" ? project.name : "",
+  description: typeof project?.description === "string" ? project.description : "",
+  defaultTzid:
+    typeof project?.defaultTzid === "string" && project.defaultTzid
+      ? project.defaultTzid
+      : DEFAULT_TZID
+});
+
+const validateMetaPayload = (payload = {}) => {
+  const issues = [];
+  const rawName = typeof payload.name === "string" ? payload.name : "";
+  const trimmedName = rawName.trim();
+  if (!trimmedName) {
+    issues.push("name_missing");
+  } else if (rawName.length > META_NAME_MAX) {
+    issues.push("name_length");
+  }
+
+  const description = typeof payload.description === "string" ? payload.description : "";
+  if (description.length > META_DESCRIPTION_MAX) {
+    issues.push("description_length");
+  }
+
+  const tzid =
+    typeof payload.defaultTzid === "string" && payload.defaultTzid.trim()
+      ? payload.defaultTzid.trim()
+      : "";
+  if (!tzid) {
+    issues.push("defaultTzid_missing");
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    normalized: {
+      name: trimmedName,
+      description,
+      defaultTzid: tzid || DEFAULT_TZID
+    }
+  };
+};
+
+const issuesToFieldList = (issues = []) =>
+  Array.from(
+    new Set(
+      issues.map((issue) => {
+        if (issue.startsWith("name")) return "name";
+        if (issue.startsWith("description")) return "description";
+        if (issue.startsWith("defaultTzid")) return "defaultTzid";
+        return "meta";
+      })
+    )
+  );
+
+const describeMetaValidationIssues = (issues = []) => {
+  if (issues.includes("name_missing")) {
+    return "プロジェクト名を入力してください";
+  }
+  if (issues.includes("name_length")) {
+    return `プロジェクト名は ${META_NAME_MAX} 文字以内で入力してください`;
+  }
+  if (issues.includes("description_length")) {
+    return `説明は ${META_DESCRIPTION_MAX} 文字以内で入力してください`;
+  }
+  if (issues.includes("defaultTzid_missing")) {
+    return "デフォルトのタイムゾーンを入力してください";
+  }
+  return "Project meta validation failed";
+};
+
+const rememberMetaValidationIssues = (projectId, issues) => {
+  const key = issues.join("|") || "none";
+  const previous = apiSyncState.metaValidationIssues.get(projectId);
+  apiSyncState.metaValidationIssues.set(projectId, key);
+  return previous !== key;
+};
+
+const clearMetaValidationIssues = (projectId) => {
+  apiSyncState.metaValidationIssues.delete(projectId);
+};
 
 const syncListeners = new Set();
 const emitSyncEvent = (event) => {
@@ -49,6 +142,25 @@ const addSyncListener = (listener) => {
   return () => {
     syncListeners.delete(listener);
   };
+};
+
+const emitMetaValidationError = (projectId, issues) => {
+  const message = describeMetaValidationIssues(issues);
+  const error = new Error(message);
+  error.status = 422;
+  error.payload = {
+    code: 422,
+    message,
+    fields: issuesToFieldList(issues)
+  };
+  emitSyncEvent({ scope: "meta", phase: "validation-error", projectId, error });
+};
+
+const handleMetaValidationFailure = (projectId, issues) => {
+  cancelPendingMetaSync(projectId);
+  if (rememberMetaValidationIssues(projectId, issues)) {
+    emitMetaValidationError(projectId, issues);
+  }
 };
 
 // --- Local driver helpers --------------------------------------------------
@@ -209,10 +321,8 @@ const scheduleMetaSync = (projectId) => {
   }
 
   emitSyncEvent({ scope: "meta", phase: "pending", projectId });
-  const existing = apiSyncState.metaTimers.get(projectId);
-  if (existing) {
-    clearTimeout(existing);
-  }
+  cancelPendingMetaSync(projectId);
+  clearMetaValidationIssues(projectId);
   const timer = setTimeout(() => {
     apiSyncState.metaTimers.delete(projectId);
     if (process.env.NODE_ENV !== "production") {
@@ -233,19 +343,18 @@ const persistProjectMeta = async (projectId) => {
     if (!state) return;
     const versions = state.versions || {};
     const versionValue = Number.isInteger(versions.metaVersion) ? versions.metaVersion : 1;
-    const metaPayload = {
-      name: typeof state.project?.name === "string" ? state.project.name : "",
-      description: typeof state.project?.description === "string" ? state.project.description : "",
-      defaultTzid:
-        typeof state.project?.defaultTzid === "string" && state.project.defaultTzid
-          ? state.project.defaultTzid
-          : DEFAULT_TZID
-    };
+    const metaPayload = ensureMetaPayloadShape(state.project);
+    const validation = validateMetaPayload(metaPayload);
+    if (!validation.valid) {
+      handleMetaValidationFailure(projectId, validation.issues);
+      return;
+    }
+    clearMetaValidationIssues(projectId);
     const response = await apiClient.put(
       `/api/projects/${encodeURIComponent(projectId)}/meta`,
       {
         version: versionValue,
-        meta: metaPayload
+        meta: validation.normalized
       }
     );
     if (response && response.meta) {
@@ -332,6 +441,16 @@ const apiLoadByParticipantToken = (token) => {
 
 const apiUpdateMeta = (projectId, changes) => {
   const snapshot = localUpdateMeta(projectId, changes);
+  if (!projectId) {
+    return snapshot;
+  }
+  const metaPayload = ensureMetaPayloadShape(snapshot?.project);
+  const validation = validateMetaPayload(metaPayload);
+  if (!validation.valid) {
+    handleMetaValidationFailure(projectId, validation.issues);
+    return snapshot;
+  }
+  clearMetaValidationIssues(projectId);
   scheduleMetaSync(projectId);
   return snapshot;
 };

@@ -484,7 +484,12 @@ function OrganizerApp() {
   const [candidateErrors, setCandidateErrors] = useState(() => ({}));
   const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
   const [metaSyncStatus, setMetaSyncStatus] = useState(() => ({ phase: "idle", message: "" }));
-  const metaWarnedRef = useRef({ name: false, description: false });
+  const metaWarnedRef = useRef({ nameLength: false, nameRequired: false, descriptionLength: false });
+
+  const popToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 1800);
+  }, []);
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
@@ -558,28 +563,42 @@ function OrganizerApp() {
   useEffect(() => {
     const NAME_MAX = 120;
     const DESC_MAX = 2000;
-    const overName = (summary || "").length > NAME_MAX;
+    const rawSummary = summary || "";
+    const missingName = rawSummary.trim().length === 0;
+    const overName = rawSummary.length > NAME_MAX;
     const overDesc = (description || "").length > DESC_MAX;
-    setMetaErrors((prev) =>
-      prev.name !== overName || prev.description !== overDesc
-        ? { name: overName, description: overDesc }
-        : prev
-    );
-    if (overName && !metaWarnedRef.current.name) {
-      metaWarnedRef.current.name = true;
+    const nextErrors = {
+      name: missingName || overName,
+      description: overDesc
+    };
+    setMetaErrors((prev) => {
+      if (prev.name !== nextErrors.name || prev.description !== nextErrors.description) {
+        return nextErrors;
+      }
+      return prev;
+    });
+
+    if (missingName && !metaWarnedRef.current.nameRequired) {
+      metaWarnedRef.current.nameRequired = true;
+      popToast("プロジェクト名を入力してください");
+    } else if (!missingName && metaWarnedRef.current.nameRequired) {
+      metaWarnedRef.current.nameRequired = false;
+    }
+
+    if (overName && !metaWarnedRef.current.nameLength) {
+      metaWarnedRef.current.nameLength = true;
       popToast(`プロジェクト名は ${NAME_MAX} 文字以内で入力してください`);
+    } else if (!overName && metaWarnedRef.current.nameLength) {
+      metaWarnedRef.current.nameLength = false;
     }
-    if (!overName && metaWarnedRef.current.name) {
-      metaWarnedRef.current.name = false;
-    }
-    if (overDesc && !metaWarnedRef.current.description) {
-      metaWarnedRef.current.description = true;
+
+    if (overDesc && !metaWarnedRef.current.descriptionLength) {
+      metaWarnedRef.current.descriptionLength = true;
       popToast(`説明は ${DESC_MAX} 文字以内で入力してください`);
+    } else if (!overDesc && metaWarnedRef.current.descriptionLength) {
+      metaWarnedRef.current.descriptionLength = false;
     }
-    if (!overDesc && metaWarnedRef.current.description) {
-      metaWarnedRef.current.description = false;
-    }
-  }, [summary, description]);
+  }, [summary, description, popToast]);
 
   useEffect(() => {
     if (baseUrlTouchedRef.current) return;
@@ -938,11 +957,6 @@ function OrganizerApp() {
       return value.replace(/\/+$/, "");
     });
   };
-
-  const popToast = useCallback((message) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 1800);
-  }, []);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
