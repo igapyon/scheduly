@@ -6,6 +6,27 @@ const DRIVER_API = "api";
 let driverOverride = null;
 let apiBaseUrlOverride = null;
 
+const envDriverLiteral = process.env.SCHEDULY_PROJECT_DRIVER || "";
+const envApiBaseLiteral = process.env.SCHEDULY_API_BASE_URL || "";
+
+const injectWindowDefaults = () => {
+  if (typeof window === "undefined") return;
+  if (!window.__SCHEDULY_PROJECT_DRIVER__ && envDriverLiteral) {
+    window.__SCHEDULY_PROJECT_DRIVER__ = envDriverLiteral;
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][runtime-config] applied window driver from env", envDriverLiteral);
+    }
+  }
+  if (!window.__SCHEDULY_API_BASE_URL__ && envApiBaseLiteral) {
+    window.__SCHEDULY_API_BASE_URL__ = envApiBaseLiteral;
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][runtime-config] applied window api base from env", envApiBaseLiteral);
+    }
+  }
+};
+
+injectWindowDefaults();
+
 const normalizeDriver = (input) => {
   if (!input) return DRIVER_LOCAL;
   const value = String(input).toLowerCase();
