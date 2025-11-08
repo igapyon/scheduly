@@ -61,6 +61,31 @@ const ICAL_STATUS_BADGE_CLASSES = {
   CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
 };
 
+const CANDIDATE_COMPARE_KEYS = [
+  "summary",
+  "status",
+  "dtstart",
+  "dtend",
+  "tzid",
+  "location",
+  "description",
+  "uid",
+  "sequence",
+  "dtstamp"
+];
+
+const normalizeCandidateCompareValue = (value) => {
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value : String(value);
+};
+
+const areCandidatesEqual = (a, b) => {
+  if (!a || !b) return false;
+  return CANDIDATE_COMPARE_KEYS.every(
+    (key) => normalizeCandidateCompareValue(a[key]) === normalizeCandidateCompareValue(b[key])
+  );
+};
+
 function formatIcalStatusLabel(status) {
   const key = status ? String(status).toUpperCase() : "CONFIRMED";
   const label = ICAL_STATUS_LABELS[key] || key;
@@ -146,7 +171,18 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen, errors = {} }) {
+function CandidateCard({
+  index,
+  value,
+  onChange,
+  onCommit,
+  onRemove,
+  onExport,
+  disableRemove,
+  isOpen = false,
+  onToggleOpen,
+  errors = {}
+}) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
@@ -227,6 +263,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.summary}
               onChange={(e) => onChange({ ...value, summary: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.summary ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.summary ? "true" : undefined}
               placeholder="例: 秋の合宿 調整会議 Day1"
@@ -242,6 +279,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.status}
               onChange={(e) => onChange({ ...value, status: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.status ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.status ? "true" : undefined}
             >
@@ -257,6 +295,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtstart}
               onChange={(e) => onChange({ ...value, dtstart: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtstart ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.dtstart ? "true" : undefined}
             />
@@ -267,6 +306,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtend}
               onChange={(e) => onChange({ ...value, dtend: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtend ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.dtend ? "true" : undefined}
             />
@@ -277,6 +317,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.tzid}
               onChange={(e) => onChange({ ...value, tzid: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.tzid ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.tzid ? "true" : undefined}
             >
@@ -293,6 +334,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.location}
               onChange={(e) => onChange({ ...value, location: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.location ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.location ? "true" : undefined}
               placeholder="例: サントリーホール 大ホール"
@@ -310,6 +352,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           <textarea
             value={value.description}
             onChange={(e) => onChange({ ...value, description: e.target.value })}
+            onBlur={onCommit}
             rows={3}
             className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
             aria-invalid={errors.description ? "true" : undefined}
@@ -513,9 +556,8 @@ function OrganizerApp() {
       setRouteContext(resolved.routeContext);
       setInitialRouteContext(resolved.routeContext);
       const state = resolved.state || {};
-      setSummary(state.project?.name || "");
-      setDescription(state.project?.description || "");
-      setCandidates(state.candidates || []);
+      applySyncedMeta(state.project?.name || "", state.project?.description || "");
+      applySyncedCandidates(state.candidates || []);
 
       const tokens = shareService.get(resolved.projectId);
       setShareTokens(tokens);
@@ -535,9 +577,8 @@ function OrganizerApp() {
 
       unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
         if (cancelled || !nextState) return;
-        setSummary(nextState.project?.name || "");
-        setDescription(nextState.project?.description || "");
-        setCandidates(nextState.candidates || []);
+        applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
+        applySyncedCandidates(nextState.candidates || []);
         // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
         setShareTokens(shareService.get(resolved.projectId));
         setRouteContext(projectService.getRouteContext());
@@ -554,9 +595,48 @@ function OrganizerApp() {
     };
   }, []);
 
-  useEffect(() => {
+  const syncedMetaRef = useRef({ name: "", description: "" });
+  const candidateSyncedRef = useRef(new Map());
+  const candidateDraftRef = useRef(new Map());
+
+  const applySyncedMeta = useCallback((nameValue = "", descriptionValue = "") => {
+    const normalizedName = nameValue || "";
+    const normalizedDescription = descriptionValue || "";
+    setSummary(normalizedName);
+    setDescription(normalizedDescription);
+    syncedMetaRef.current = { name: normalizedName, description: normalizedDescription };
+  }, []);
+
+  const applySyncedCandidates = useCallback((list) => {
+    const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
+    setCandidates(normalized);
+    const snapshotMap = new Map();
+    const draftMap = new Map();
+    normalized.forEach((item) => {
+      snapshotMap.set(item.id, { ...item });
+      draftMap.set(item.id, { ...item });
+    });
+    candidateSyncedRef.current = snapshotMap;
+    candidateDraftRef.current = draftMap;
+  }, []);
+
+  const clearCandidateErrors = useCallback((candidateId) => {
+    setCandidateErrors((prev) => {
+      if (!prev[candidateId]) return prev;
+      const next = { ...prev };
+      delete next[candidateId];
+      return next;
+    });
+  }, []);
+
+  const handleMetaBlur = useCallback(() => {
     if (!projectId) return;
+    const currentSynced = syncedMetaRef.current;
+    if (currentSynced.name === summary && currentSynced.description === description) {
+      return;
+    }
     projectService.updateMeta(projectId, { name: summary, description });
+    syncedMetaRef.current = { name: summary, description };
   }, [projectId, summary, description]);
 
   // Project meta live validation (length) with visual cues and one-shot toast
@@ -624,44 +704,71 @@ function OrganizerApp() {
     }, 0);
   };
 
-  const updateCandidate = (id, next) => {
+  const handleCandidateDraftChange = (id, next) => {
+    setCandidates((prev) => {
+      let replaced = false;
+      const mapped = prev.map((item) => {
+        if (item.id === id) {
+          replaced = true;
+          return next;
+        }
+        return item;
+      });
+      if (replaced) {
+        return mapped;
+      }
+      return prev;
+    });
+    candidateDraftRef.current.set(id, { ...next });
+    clearCandidateErrors(id);
+  };
+
+  const markCandidateFieldErrors = (id, message) => {
+    let fields = [];
+    if (message.includes(":")) {
+      const after = message.split(":").slice(1).join(":").trim();
+      if (after.includes("must be after")) {
+        fields = ["dtstart", "dtend"];
+      } else {
+        fields = after.split(/[,\s]+/).filter(Boolean);
+      }
+    }
+    if (fields.length) {
+      setCandidateErrors((prev) => {
+        const current = prev[id] || {};
+        const nextFlags = { ...current };
+        fields.forEach((f) => {
+          const key = String(f).toLowerCase();
+          nextFlags[key] = true;
+        });
+        return { ...prev, [id]: nextFlags };
+      });
+    }
+  };
+
+  const persistCandidateChanges = (id) => {
     if (!projectId) return;
+    const draft = candidateDraftRef.current.get(id);
+    const latest = draft || candidates.find((item) => item.id === id);
+    if (!latest) return;
+    const synced = candidateSyncedRef.current.get(id);
+    if (synced && areCandidatesEqual(synced, latest)) {
+      return;
+    }
     try {
-      updateScheduleCandidate(projectId, id, next);
-      // clear errors for this candidate on success
-      setCandidateErrors((prev) => ({ ...prev, [id]: {} }));
+      updateScheduleCandidate(projectId, id, latest);
+      candidateSyncedRef.current.set(id, { ...latest });
+      clearCandidateErrors(id);
     } catch (error) {
       const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
       const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
       if (isValidation) {
-        // Validation errors are expected during editing; avoid noisy error logs
-        // but keep a lightweight trace for debugging when needed.
         console.debug("updateCandidate validation", msg);
       } else {
         console.error("updateCandidate error", error);
       }
       popToast(msg);
-      // parse fields from message to highlight
-      let fields = [];
-      if (msg.includes(":")) {
-        const after = msg.split(":").slice(1).join(":").trim();
-        if (after.includes("must be after")) {
-          fields = ["dtstart", "dtend"];
-        } else {
-          fields = after.split(/[,\s]+/).filter(Boolean);
-        }
-      }
-      if (fields.length) {
-        setCandidateErrors((prev) => {
-          const current = prev[id] || {};
-          const nextFlags = { ...current };
-          fields.forEach((f) => {
-            const key = String(f).toLowerCase();
-            nextFlags[key] = true;
-          });
-          return { ...prev, [id]: nextFlags };
-        });
-      }
+      markCandidateFieldErrors(id, msg);
     }
   };
 
@@ -763,9 +870,8 @@ function OrganizerApp() {
   const handleDeleteProject = () => {
     if (!projectId) return;
     const fresh = projectService.reset(projectId);
-    setSummary(fresh.project?.name || "");
-    setDescription(fresh.project?.description || "");
-    setCandidates(fresh.candidates || []);
+    applySyncedMeta(fresh.project?.name || "", fresh.project?.description || "");
+    applySyncedCandidates(fresh.candidates || []);
     baseUrlTouchedRef.current = false;
     refreshShareTokensState({ resetWhenMissing: true });
     setRouteContext(projectService.getRouteContext());
@@ -1203,9 +1309,8 @@ function OrganizerApp() {
       }
       projectService.importState(projectId, parsed);
       const snapshot = projectService.getState(projectId);
-      setSummary(snapshot.project?.name || "");
-      setDescription(snapshot.project?.description || "");
-      setCandidates(snapshot.candidates || []);
+      applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
+      applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
@@ -1233,9 +1338,8 @@ function OrganizerApp() {
       const parsed = await res.json();
       projectService.importState(projectId, parsed);
       const snapshot = projectService.getState(projectId);
-      setSummary(snapshot.project?.name || "");
-      setDescription(snapshot.project?.description || "");
-      setCandidates(snapshot.candidates || []);
+      applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
+      applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
@@ -1467,6 +1571,7 @@ function OrganizerApp() {
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
+                onBlur={handleMetaBlur}
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.name ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクト名を入力"
               />
@@ -1479,6 +1584,7 @@ function OrganizerApp() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleMetaBlur}
                 rows={3}
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクトの概要を入力"
@@ -1541,7 +1647,8 @@ function OrganizerApp() {
                   index={index}
                   key={candidate.id}
                   value={candidate}
-                  onChange={(next) => updateCandidate(candidate.id, next)}
+                  onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
+                  onCommit={() => persistCandidateChanges(candidate.id)}
                   onRemove={() => openCandidateDeleteDialog(candidate)}
                   onExport={() => handleExportCandidate(candidate.id)}
                   disableRemove={candidates.length === 1}
