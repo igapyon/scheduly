@@ -699,7 +699,9 @@ const sanitizeResponsesForImport = (list, validParticipantIds, validCandidateIds
       candidateId,
       mark: typeof item.mark === "string" ? item.mark : "",
       comment: typeof item.comment === "string" ? item.comment : "",
-      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+      createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+      version: Number.isInteger(item.version) ? item.version : 1
     });
     return acc;
   }, []);
@@ -845,7 +847,9 @@ const convertApiResponses = (list) => {
         candidateId,
         mark: typeof item.mark === "string" ? item.mark : "",
         comment: typeof item.comment === "string" ? item.comment : "",
-        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+        version: Number.isInteger(item.version) ? item.version : 1
       };
     })
     .filter(Boolean);
