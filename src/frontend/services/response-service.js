@@ -2,9 +2,9 @@
 
 const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
-const { validate, buildResponseRules } = require("../shared/validation");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
+const { responseInputSchema, collectZodIssueFields } = require("../../shared/schema");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
 
@@ -19,6 +19,17 @@ const normalizeMark = (mark) => {
 };
 
 const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
+
+const parseResponseInput = (payload) => {
+  const result = responseInputSchema.safeParse(payload);
+  if (!result.success) {
+    const err = new Error("response validation failed");
+    err.code = 422;
+    err.fields = collectZodIssueFields(result.error.errors);
+    throw err;
+  }
+  return result.data;
+};
 
 const mapApiResponse = (response) => {
   if (!response || typeof response !== "object") return null;
@@ -52,56 +63,50 @@ const localUpsertResponse = (projectId, payload) => {
   if (!payload || !payload.participantId || !payload.candidateId) {
     throw new Error("participantId and candidateId are required");
   }
-  // Minimal input validation (replaceable by zod later)
-  const rules = buildResponseRules({});
-  const check = validate(
-    {
-      participantId: String(payload.participantId || ""),
-      candidateId: String(payload.candidateId || ""),
-      mark: String((payload.mark || "").toString()),
-      comment: String(payload.comment || "")
-    },
-    rules
-  );
-  if (!check.ok) {
-    const fields = check.errors.join(", ");
-    const err = new Error(`validation failed: ${fields}`);
-    err.code = 422;
-    throw err;
-  }
+  const parsed = parseResponseInput({
+    participantId: payload.participantId,
+    candidateId: payload.candidateId,
+    mark: payload.mark || "",
+    comment: payload.comment || ""
+  });
   const candidateList = projectStore.getCandidates(projectId);
-  if (candidateList && !candidateList.some((item) => item.id === payload.candidateId)) {
+  if (candidateList && !candidateList.some((item) => item.id === parsed.candidateId)) {
     throw new Error("candidate not found");
   }
 
   const responses = projectStore.getResponses(projectId);
-  const id = buildResponseId(payload.participantId, payload.candidateId);
+  const id = buildResponseId(parsed.participantId, parsed.candidateId);
   const existing = responses.find((item) => item && item.id === id);
   const timestamp = new Date().toISOString();
   const createdAt = payload?.createdAt || (existing && existing.createdAt) || timestamp;
   const updatedAt = payload?.updatedAt || timestamp;
   const response = {
     id,
-    participantId: payload.participantId,
-    candidateId: payload.candidateId,
-    mark: normalizeMark(payload.mark),
-    comment: payload.comment || "",
+    participantId: parsed.participantId,
+    candidateId: parsed.candidateId,
+    mark: normalizeMark(parsed.mark),
+    comment: parsed.comment || "",
     createdAt,
     updatedAt
   };
   projectStore.upsertResponse(projectId, response);
-  tallyService.recalculate(projectId, payload.candidateId);
+  tallyService.recalculate(projectId, parsed.candidateId);
   return response;
 };
 
 const apiUpsertResponse = async (projectId, payload) => {
-  const id = buildResponseId(payload.participantId, payload.candidateId);
-  const existing = getResponse(projectId, payload.participantId, payload.candidateId);
-  const body = {
+  const parsed = parseResponseInput({
     participantId: payload.participantId,
     candidateId: payload.candidateId,
-    mark: payload.mark,
-    comment: payload.comment || "",
+    mark: payload.mark || "",
+    comment: payload.comment || ""
+  });
+  const existing = getResponse(projectId, parsed.participantId, parsed.candidateId);
+  const body = {
+    participantId: parsed.participantId,
+    candidateId: parsed.candidateId,
+    mark: parsed.mark,
+    comment: parsed.comment || "",
     version: payload.version ?? existing?.version ?? 1
   };
   const response = await apiClient.post(
@@ -113,7 +118,7 @@ const apiUpsertResponse = async (projectId, payload) => {
     throw new Error("Failed to upsert response");
   }
   projectStore.upsertResponse(projectId, mapped);
-  tallyService.recalculate(projectId, payload.candidateId);
+  tallyService.recalculate(projectId, parsed.candidateId);
   if (Number.isInteger(response?.version)) {
     projectStore.updateProjectVersions(projectId, { responsesVersion: response.version });
   }
@@ -138,12 +143,18 @@ const bulkImportResponses = (projectId, list) => {
     const id = buildResponseId(item.participantId, item.candidateId);
     const previous = merged.get(id);
     const timestamp = new Date().toISOString();
-    const response = {
-      id,
+    const parsed = parseResponseInput({
       participantId: item.participantId,
       candidateId: item.candidateId,
-      mark: normalizeMark(item.mark),
-      comment: item.comment || "",
+      mark: item.mark || "",
+      comment: item.comment || ""
+    });
+    const response = {
+      id,
+      participantId: parsed.participantId,
+      candidateId: parsed.candidateId,
+      mark: normalizeMark(parsed.mark),
+      comment: parsed.comment || "",
       createdAt: item.createdAt || previous?.createdAt || timestamp,
       updatedAt: item.updatedAt || timestamp
     };

@@ -245,7 +245,8 @@ const localInvalidate = (projectId, type) => {
 const apiRotate = async (projectId, options = {}) => {
   const baseUrl = sanitizeBaseUrl(options.baseUrl);
   const payload = {
-    version: getShareTokensVersion(projectId)
+    version: getShareTokensVersion(projectId),
+    baseUrl
   };
   if (options.lastGeneratedBy) {
     payload.rotatedBy = options.lastGeneratedBy;

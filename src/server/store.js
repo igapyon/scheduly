@@ -4,6 +4,13 @@ const {
   ValidationError,
   ConflictError
 } = require("./errors");
+const {
+  candidateInputSchema,
+  participantInputSchema,
+  responseInputSchema,
+  projectMetaSchema,
+  collectZodIssueFields
+} = require("../shared/schema");
 
 /**
  * @typedef {import("../shared/types").ProjectSnapshot} ProjectSnapshot
@@ -19,6 +26,10 @@ const VALID_CANDIDATE_STATUS = new Set(["CONFIRMED", "TENTATIVE", "CANCELLED"]);
 const PARTICIPANT_STATUS = new Set(["active", "archived"]);
 const VALID_RESPONSE_MARKS = new Set(["o", "d", "x"]);
 const SHARE_TOKEN_TYPES = ["admin", "participant"];
+const SHARE_URL_PREFIX = {
+  admin: "a",
+  participant: "p"
+};
 const ICAL_HEADER_LINES = [
   "BEGIN:VCALENDAR",
   "VERSION:2.0",
@@ -62,10 +73,39 @@ const generateId = (prefix) => {
   return prefix ? `${prefix}_${random}` : random;
 };
 
+const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+
 const sanitizeString = (input, { fallback = "" } = {}) => {
   if (typeof input !== "string") return fallback;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const trimTrailingSlash = (value) => {
+  if (typeof value !== "string" || !value) return "";
+  return value.replace(/\/+$/, "");
+};
+
+const SHARE_BASE_URL = trimTrailingSlash(
+  process.env.SCHEDULY_SHARE_BASE_URL || process.env.BASE_URL || ""
+);
+
+const buildShareUrl = (type, token, baseUrl = SHARE_BASE_URL) => {
+  if (!token) return "";
+  const prefix = SHARE_URL_PREFIX[type];
+  if (!prefix) return "";
+  if (!baseUrl) return "";
+  const normalizedBase = trimTrailingSlash(baseUrl) || "";
+  if (!normalizedBase) return "";
+  return `${normalizedBase}/${prefix}/${token}`;
+};
+
+const parseWithValidationError = (schema, payload, message) => {
+  const result = schema.safeParse(payload);
+  if (!result.success) {
+    throw new ValidationError(message, collectZodIssueFields(result.error.errors));
+  }
+  return result.data;
 };
 
 const createInitialVersions = () => ({
@@ -101,34 +141,19 @@ const sanitizeMetaInput = (meta = {}) => {
   if (!meta || typeof meta !== "object") {
     throw new ValidationError("meta is required", ["meta"]);
   }
-  const name = sanitizeString(meta.name);
-  const description = sanitizeString(meta.description);
-  const defaultTzid = sanitizeString(meta.defaultTzid, { fallback: DEFAULT_TZID });
-
-  const errors = [];
-  if (!name) {
-    errors.push("name");
-  } else if (name.length > 120) {
-    errors.push("name");
-  }
-  if (description && description.length > 2000) {
-    errors.push("description");
-  }
-  if (!defaultTzid) {
-    errors.push("defaultTzid");
-  }
-  if (errors.length) {
-    throw new ValidationError("Project meta validation failed", errors);
-  }
-
-  return {
-    name,
-    description,
-    defaultTzid
-  };
+  const parsed = parseWithValidationError(
+    projectMetaSchema,
+    {
+      name: meta.name ?? "",
+      description: meta.description ?? "",
+      defaultTzid: meta.defaultTzid ?? DEFAULT_TZID
+    },
+    "Project meta validation failed"
+  );
+  return parsed;
 };
 
-const sanitizeShareTokenEntry = (raw) => {
+const sanitizeShareTokenEntry = (raw, type, baseUrl = SHARE_BASE_URL) => {
   if (!raw || typeof raw !== "object") return null;
   const token = sanitizeString(raw.token);
   if (!token) return null;
@@ -141,27 +166,30 @@ const sanitizeShareTokenEntry = (raw) => {
   if (revokedAt) entry.revokedAt = revokedAt;
   const lastGeneratedBy = sanitizeString(raw.lastGeneratedBy);
   if (lastGeneratedBy) entry.lastGeneratedBy = lastGeneratedBy;
+  if (isNonEmptyString(baseUrl) && !isNonEmptyString(entry.url)) {
+    entry.url = buildShareUrl(type, token, baseUrl);
+  }
+  if (!entry.issuedAt) {
+    entry.issuedAt = new Date().toISOString();
+  }
   return entry;
 };
 
-const sanitizeShareTokens = (rawTokens) => {
+const sanitizeShareTokens = (rawTokens, baseUrl = SHARE_BASE_URL) => {
   const next = {};
   if (rawTokens && typeof rawTokens === "object") {
     SHARE_TOKEN_TYPES.forEach((type) => {
-      const entry = sanitizeShareTokenEntry(rawTokens[type]);
+      const entry = sanitizeShareTokenEntry(rawTokens[type], type, baseUrl);
       if (entry) {
-        if (!entry.issuedAt) {
-          entry.issuedAt = new Date().toISOString();
-        }
         next[type] = entry;
       }
     });
   }
   if (!next.admin) {
-    next.admin = createShareTokenEntry("admin");
+    next.admin = createShareTokenEntry("admin", baseUrl);
   }
   if (!next.participant) {
-    next.participant = createShareTokenEntry("participant");
+    next.participant = createShareTokenEntry("participant", baseUrl);
   }
   return next;
 };
@@ -170,82 +198,45 @@ const sanitizeCandidateInput = (input = {}, { allowPartial = false } = {}) => {
   if (!input || typeof input !== "object") {
     throw new ValidationError("candidate payload is required", ["candidate"]);
   }
-
-  const errors = [];
-  const summary = sanitizeString(input.summary);
-  const description = sanitizeString(input.description);
-  const location = sanitizeString(input.location);
-  const statusValue = sanitizeString(input.status, { fallback: "TENTATIVE" }).toUpperCase();
-  const tzidValue = sanitizeString(input.tzid, { fallback: DEFAULT_TZID });
-  const dtstartValue = sanitizeString(input.dtstart);
-  const dtendValue = sanitizeString(input.dtend);
-
-  if (!allowPartial || summary || summary === "") {
-    if (!summary) {
-      errors.push("summary");
-    } else if (summary.length > 120) {
-      errors.push("summary");
+  const parsed = parseWithValidationError(
+    candidateInputSchema,
+    {
+      summary: input.summary ?? "",
+      dtstart: input.dtstart ?? "",
+      dtend: input.dtend ?? "",
+      tzid: input.tzid ?? DEFAULT_TZID,
+      status: input.status ?? "TENTATIVE",
+      location: input.location ?? "",
+      description: input.description ?? ""
+    },
+    "Candidate validation failed"
+  );
+  if (!allowPartial) {
+    const missing = [];
+    if (!parsed.dtstart) missing.push("dtstart");
+    if (!parsed.dtend) missing.push("dtend");
+    if (missing.length) {
+      throw new ValidationError("Candidate datetime is required", missing);
+    }
+    if (parsed.dtstart && parsed.dtend && Date.parse(parsed.dtend) <= Date.parse(parsed.dtstart)) {
+      throw new ValidationError("Candidate dtend must be after dtstart", ["dtstart", "dtend"]);
     }
   }
-
-  if (description && description.length > 2000) {
-    errors.push("description");
-  }
-
-  if (location && location.length > 120) {
-    errors.push("location");
-  }
-
-  if (!allowPartial || input.status !== undefined) {
-    if (!VALID_CANDIDATE_STATUS.has(statusValue)) {
-      errors.push("status");
-    }
-  }
-
-  if (!allowPartial || input.tzid !== undefined) {
-    if (
-      !tzidValue ||
-      (!TZID_PATTERN.test(tzidValue) && !CUSTOM_TZID_PATTERN.test(tzidValue))
-    ) {
-      errors.push("tzid");
-    }
-  }
-
-  if (!allowPartial || input.dtstart !== undefined) {
-    if (!isValidDateTime(dtstartValue)) {
-      errors.push("dtstart");
-    }
-  }
-
-  if (!allowPartial || input.dtend !== undefined) {
-    if (!isValidDateTime(dtendValue)) {
-      errors.push("dtend");
-    }
-  }
-
   if (
-    (!allowPartial || (input.dtstart !== undefined && input.dtend !== undefined)) &&
-    isValidDateTime(dtstartValue) &&
-    isValidDateTime(dtendValue)
+    parsed.tzid &&
+    !TZID_PATTERN.test(parsed.tzid) &&
+    !CUSTOM_TZID_PATTERN.test(parsed.tzid)
   ) {
-    if (Date.parse(dtendValue) <= Date.parse(dtstartValue)) {
-      errors.push("dtstart");
-      errors.push("dtend");
-    }
+    throw new ValidationError("Candidate validation failed", ["tzid"]);
   }
-
-  if (errors.length) {
-    throw new ValidationError("Candidate validation failed", Array.from(new Set(errors)));
-  }
-
   return {
-    summary,
-    description,
-    location,
-    status: statusValue || "TENTATIVE",
-    tzid: tzidValue,
-    dtstart: dtstartValue,
-    dtend: dtendValue
+    summary: parsed.summary,
+    description: parsed.description,
+    location: parsed.location,
+    status: parsed.status || "TENTATIVE",
+    tzid: parsed.tzid || DEFAULT_TZID,
+    dtstart: parsed.dtstart,
+    dtend: parsed.dtend
   };
 };
 
@@ -256,57 +247,49 @@ const sanitizeParticipantInput = (
   if (!input || typeof input !== "object") {
     throw new ValidationError("participant payload is required", ["participant"]);
   }
-
-  const errors = [];
-  const hasDisplayName = Object.prototype.hasOwnProperty.call(input, "displayName");
-  const hasEmail = Object.prototype.hasOwnProperty.call(input, "email");
-  const hasStatus = Object.prototype.hasOwnProperty.call(input, "status");
-
-  const displayName = hasDisplayName ? sanitizeString(input.displayName) : undefined;
-  const email = hasEmail ? sanitizeString(input.email) : undefined;
-  const statusValue = hasStatus
-    ? sanitizeString(input.status, { fallback: "active" }).toLowerCase()
-    : "active";
-
-  if (!allowPartial || hasDisplayName) {
-    if (!displayName) {
-      errors.push("displayName");
-    } else if (displayName.length > 80) {
-      errors.push("displayName");
-    } else {
-      const normalized = displayName.toLowerCase();
-      const conflict = participants.some(
-        (entry) =>
-          entry &&
-          entry.participantId !== currentId &&
-          typeof entry.displayName === "string" &&
-          entry.displayName.toLowerCase() === normalized
-      );
-      if (conflict) {
-        errors.push("displayName");
-      }
+  const parsed = parseWithValidationError(
+    participantInputSchema,
+    {
+      displayName: input.displayName ?? "",
+      email: input.email ?? "",
+      comment: input.comment ?? ""
+    },
+    "Participant validation failed"
+  );
+  if (!allowPartial && !parsed.displayName) {
+    throw new ValidationError("displayName is required", ["displayName"]);
+  }
+  if (parsed.displayName && participants.length) {
+    const normalized = parsed.displayName.toLowerCase();
+    const conflict = participants.some(
+      (entry) =>
+        entry &&
+        entry.participantId !== currentId &&
+        typeof entry.displayName === "string" &&
+        entry.displayName.toLowerCase() === normalized
+    );
+    if (conflict) {
+      throw new ValidationError("Participant displayName must be unique", ["displayName"]);
     }
   }
-
-  if (!allowPartial || hasStatus) {
-    if (statusValue && !PARTICIPANT_STATUS.has(statusValue)) {
-      errors.push("status");
+  const result = {
+    displayName: parsed.displayName,
+    email: parsed.email || "",
+    comment: parsed.comment || ""
+  };
+  if (!allowPartial) {
+    result.status = sanitizeString(input.status, { fallback: "active" }).toLowerCase();
+    if (!PARTICIPANT_STATUS.has(result.status)) {
+      result.status = "active";
+    }
+  } else if (input.status) {
+    const statusValue = sanitizeString(input.status).toLowerCase();
+    if (PARTICIPANT_STATUS.has(statusValue)) {
+      result.status = statusValue;
     }
   }
-
-  if (errors.length) {
-    throw new ValidationError("Participant validation failed", Array.from(new Set(errors)));
-  }
-
-  const result = {};
-  if (!allowPartial || hasDisplayName) {
-    result.displayName = displayName;
-  }
-  if (!allowPartial || hasEmail) {
-    result.email = email || "";
-  }
-  if (!allowPartial || hasStatus) {
-    result.status = statusValue || "active";
+  if (!result.status) {
+    result.status = "active";
   }
   return result;
 };
@@ -315,42 +298,25 @@ const sanitizeResponseInput = (input = {}) => {
   if (!input || typeof input !== "object") {
     throw new ValidationError("response payload is required", ["response"]);
   }
-  const errors = [];
-  const participantId = sanitizeString(input.participantId);
-  const candidateId = sanitizeString(input.candidateId);
-  const markValue = sanitizeString(input.mark).toLowerCase();
-  const comment = typeof input.comment === "string" ? input.comment : "";
-
-  if (!participantId) {
-    errors.push("participantId");
-  }
-  if (!candidateId) {
-    errors.push("candidateId");
-  }
-  if (!VALID_RESPONSE_MARKS.has(markValue)) {
-    errors.push("mark");
-  }
-  if (comment && comment.length > 500) {
-    errors.push("comment");
-  }
-
-  if (errors.length) {
-    throw new ValidationError("Response validation failed", Array.from(new Set(errors)));
-  }
-
-  return {
-    participantId,
-    candidateId,
-    mark: markValue,
-    comment
-  };
+  const parsed = parseWithValidationError(
+    responseInputSchema,
+    {
+      participantId: input.participantId ?? "",
+      candidateId: input.candidateId ?? "",
+      mark: input.mark ?? "",
+      comment: input.comment ?? ""
+    },
+    "Response validation failed"
+  );
+  return parsed;
 };
 
-const createShareTokenEntry = (type) => {
+const createShareTokenEntry = (type, baseUrl = SHARE_BASE_URL) => {
   const issuedAt = new Date().toISOString();
   const token = generateId(`scheduly-${type}`);
   return {
     token,
+    url: baseUrl ? buildShareUrl(type, token, baseUrl) : "",
     issuedAt
   };
 };
@@ -1100,7 +1066,7 @@ class InMemoryProjectStore {
     return this.#serializeProject(projectId);
   }
 
-  rotateShareTokens(projectId, { rotatedBy, version } = {}) {
+  rotateShareTokens(projectId, { rotatedBy, version, baseUrl } = {}) {
     const state = this.#requireProject(projectId);
     const expectedVersion = Number(version);
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
@@ -1118,11 +1084,12 @@ class InMemoryProjectStore {
     }
     const now = new Date().toISOString();
     const rotatedByValue = sanitizeString(rotatedBy);
+    const shareBaseUrl = baseUrl ? trimTrailingSlash(baseUrl) : SHARE_BASE_URL;
     const nextTokens = {
       admin: {
-        ...createShareTokenEntry("admin")
+        ...createShareTokenEntry("admin", shareBaseUrl)
       },
-      participant: createShareTokenEntry("participant")
+      participant: createShareTokenEntry("participant", shareBaseUrl)
     };
     nextTokens.admin.issuedAt = now;
     nextTokens.participant.issuedAt = now;

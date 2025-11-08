@@ -47,7 +47,7 @@
   - 参加者名変更: カウンタ表示（0/80）。上限超過やサービスエラー時は赤枠＋インラインエラー。
 
 ## 実装ノート
-- スキーマは `src/frontend/shared/validation.js`（軽量ヘルパ。将来的に zod へ置換可）
+- スキーマは `src/shared/schema/index.js`（Zod ベースでフロント/サーバ共通）
   - `buildResponseRules`、`buildCandidateRules`、`buildParticipantRules`、共通プリミティブ（maxLength, enum 等）
 - サービス層は検証失敗で `code = 422` の `Error` を投げる。UI は赤枠＋トーストにマッピング。
 - 管理 UI はメッセージからフィールド名を抽出し、項目別エラーフラグを設定。

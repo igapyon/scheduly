@@ -1,10 +1,10 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const projectStore = require("../store/project-store");
-const { validate, buildParticipantRules } = require("../shared/validation");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const tallyService = require("./tally-service");
+const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -71,6 +71,17 @@ const isDuplicateDisplayName = (projectId, name, ignoreParticipantId = null) => 
 
 const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
+const parseParticipantInput = (payload) => {
+  const result = participantInputSchema.safeParse(payload);
+  if (!result.success) {
+    const err = new Error("participant validation failed");
+    err.code = 422;
+    err.fields = collectZodIssueFields(result.error.errors);
+    throw err;
+  }
+  return result.data;
+};
+
 const mapApiParticipant = (participant) => {
   if (!participant || typeof participant !== "object") return null;
   const participantId = participant.participantId || participant.id || randomUUID();
@@ -97,15 +108,12 @@ const localAddParticipant = (projectId, payload) => {
   const timestamp = new Date().toISOString();
   const preferredId = payload?.id;
   const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
-  const displayName = payload?.displayName || "";
-  // Minimal validation
-  const rules = buildParticipantRules({});
-  const check = validate({ displayName, email: payload?.email || "", comment: payload?.comment || "" }, rules);
-  if (!check.ok) {
-    const err = new Error(`participant validation failed: ${check.errors.join(", ")}`);
-    err.code = 422;
-    throw err;
-  }
+  const parsed = parseParticipantInput({
+    displayName: payload?.displayName || "",
+    email: payload?.email || "",
+    comment: payload?.comment || ""
+  });
+  const displayName = parsed.displayName;
   if (isDuplicateDisplayName(projectId, displayName)) {
     throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
   }
@@ -116,8 +124,8 @@ const localAddParticipant = (projectId, payload) => {
     id,
     token,
     displayName,
-    email: payload?.email || "",
-    comment: payload?.comment || "",
+    email: parsed.email || "",
+    comment: parsed.comment || "",
     createdAt,
     updatedAt,
     version: 1,
@@ -129,7 +137,12 @@ const localAddParticipant = (projectId, payload) => {
 };
 
 const apiAddParticipant = async (projectId, payload) => {
-  const body = { participant: payload };
+  const participantPayload = parseParticipantInput({
+    displayName: payload?.displayName || "",
+    email: payload?.email || "",
+    comment: payload?.comment || ""
+  });
+  const body = { participant: { ...payload, ...participantPayload } };
   const response = await apiClient.post(
     `/api/projects/${encodeURIComponent(projectId)}/participants`,
     body
@@ -153,18 +166,12 @@ const localUpdateParticipant = (projectId, participantId, changes) => {
   if (!existing) {
     throw new Error("Participant not found");
   }
-  const nextDisplayName = changes?.displayName ?? existing.displayName;
-  const rules = buildParticipantRules({});
-  const check = validate({
-    displayName: String(nextDisplayName || ""),
-    email: String(changes?.email ?? existing.email ?? ""),
-    comment: String(changes?.comment ?? existing.comment ?? "")
-  }, rules);
-  if (!check.ok) {
-    const err = new Error(`participant validation failed: ${check.errors.join(", ")}`);
-    err.code = 422;
-    throw err;
-  }
+  const parsed = parseParticipantInput({
+    displayName: changes?.displayName ?? existing.displayName ?? "",
+    email: changes?.email ?? existing.email ?? "",
+    comment: changes?.comment ?? existing.comment ?? ""
+  });
+  const nextDisplayName = parsed.displayName;
   if (isDuplicateDisplayName(projectId, nextDisplayName, participantId)) {
     throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
   }
@@ -174,8 +181,8 @@ const localUpdateParticipant = (projectId, participantId, changes) => {
   const nextParticipant = {
     ...existing,
     displayName: nextDisplayName,
-    email: changes?.email ?? existing.email,
-    comment: changes?.comment ?? existing.comment,
+    email: parsed.email,
+    comment: parsed.comment,
     token: nextToken,
     status: (changes?.status ?? existing.status) || "active",
     updatedAt: changes?.updatedAt || new Date().toISOString(),
@@ -187,8 +194,16 @@ const localUpdateParticipant = (projectId, participantId, changes) => {
 
 const apiUpdateParticipant = async (projectId, participantId, changes) => {
   const existing = getParticipant(projectId, participantId);
+  const parsed = parseParticipantInput({
+    displayName: changes?.displayName ?? existing?.displayName ?? "",
+    email: changes?.email ?? existing?.email ?? "",
+    comment: changes?.comment ?? existing?.comment ?? ""
+  });
   const body = {
-    participant: changes,
+    participant: {
+      ...changes,
+      ...parsed
+    },
     version: changes?.version ?? existing?.version ?? 1
   };
   const response = await apiClient.put(
@@ -253,13 +268,18 @@ const bulkUpsertParticipants = (projectId, list) => {
       id: baseId,
       createdAt: item.createdAt || new Date().toISOString()
     };
+    const parsed = parseParticipantInput({
+      displayName: item.displayName || base.displayName || "",
+      email: item.email || base.email || "",
+      comment: item.comment || base.comment || ""
+    });
     const token = ensureUniqueToken(item.token || base.token, projectId, base.id);
     const participant = {
       ...base,
       token,
-      displayName: item.displayName || base.displayName || "",
-      email: item.email || base.email || "",
-      comment: item.comment || base.comment || "",
+      displayName: parsed.displayName,
+      email: parsed.email,
+      comment: parsed.comment,
       createdAt: base.createdAt || item.createdAt || new Date().toISOString(),
       updatedAt: item.updatedAt || new Date().toISOString(),
       status: item.status || base.status || "active",
