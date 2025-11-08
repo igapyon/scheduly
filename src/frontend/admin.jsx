@@ -144,6 +144,11 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
   return veventLines;
 };
 
+const normalizeBaseUrlInput = (value) => {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\/+$/, "");
+};
+
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName, titleClassName, iconClassName, headerBadge }) {
@@ -509,7 +514,9 @@ function OrganizerApp() {
   const [candidates, setCandidates] = useState([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [shareTokens, setShareTokens] = useState({});
-  const [baseUrl, setBaseUrl] = useState(() => resolveDefaultBaseUrl());
+  const initialBaseUrlRef = useRef(resolveDefaultBaseUrl());
+  const [baseUrlDraft, setBaseUrlDraft] = useState(() => initialBaseUrlRef.current);
+  const [baseUrlEffective, setBaseUrlEffective] = useState(() => initialBaseUrlRef.current);
   const baseUrlTouchedRef = useRef(false);
   const [navigateAfterGenerate, setNavigateAfterGenerate] = useState(false);
   const [toast, setToast] = useState("");
@@ -562,8 +569,11 @@ function OrganizerApp() {
       const tokens = shareService.get(resolved.projectId);
       setShareTokens(tokens);
       const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
+      const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
       baseUrlTouchedRef.current = false;
-      setBaseUrl(derivedBaseUrl);
+      initialBaseUrlRef.current = normalizedBaseUrl;
+      setBaseUrlDraft(normalizedBaseUrl);
+      setBaseUrlEffective(normalizedBaseUrl);
 
       try {
         await ensureDemoProjectData(resolved.projectId);
@@ -685,7 +695,10 @@ function OrganizerApp() {
     const derived = deriveBaseUrlFromAdminEntry(shareTokens?.admin);
     if (derived) {
       baseUrlTouchedRef.current = false;
-      setBaseUrl(derived);
+      const normalizedBaseUrl = normalizeBaseUrlInput(derived) || resolveDefaultBaseUrl();
+      initialBaseUrlRef.current = normalizedBaseUrl;
+      setBaseUrlDraft(normalizedBaseUrl);
+      setBaseUrlEffective(normalizedBaseUrl);
     }
   }, [shareTokens]);
 
@@ -1046,21 +1059,29 @@ function OrganizerApp() {
     if (!projectId) return shareTokens;
     const tokens = shareService.get(projectId);
     setShareTokens(tokens);
-    const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
-    if (derived && !baseUrlTouchedRef.current) {
-      baseUrlTouchedRef.current = false;
-      setBaseUrl(derived);
-    } else if (options.resetWhenMissing && !baseUrlTouchedRef.current) {
-      baseUrlTouchedRef.current = false;
-      setBaseUrl(resolveDefaultBaseUrl());
+    if (!baseUrlTouchedRef.current) {
+      const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
+      if (derived) {
+        const normalized = normalizeBaseUrlInput(derived) || resolveDefaultBaseUrl();
+        initialBaseUrlRef.current = normalized;
+        setBaseUrlDraft(normalized);
+        setBaseUrlEffective(normalized);
+      } else if (options.resetWhenMissing) {
+        const fallback = resolveDefaultBaseUrl();
+        initialBaseUrlRef.current = fallback;
+        setBaseUrlDraft(fallback);
+        setBaseUrlEffective(fallback);
+      }
     }
     return tokens;
   }, [projectId, shareTokens]);
 
   const handleBaseUrlBlur = () => {
-    setBaseUrl((prev) => {
-      const value = typeof prev === "string" ? prev.trim() : "";
-      return value.replace(/\/+$/, "");
+    setBaseUrlDraft((prev) => {
+      const normalized = normalizeBaseUrlInput(prev);
+      const resolved = normalized || initialBaseUrlRef.current || resolveDefaultBaseUrl();
+      setBaseUrlEffective((current) => (current === resolved ? current : resolved));
+      return resolved;
     });
   };
 
@@ -1176,7 +1197,7 @@ function OrganizerApp() {
     }
     try {
       const action = hasIssued ? shareService.rotate : shareService.generate;
-      const result = await action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
+      const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: navigateAfterGenerate });
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
       const notices = [];
@@ -1246,7 +1267,7 @@ function OrganizerApp() {
       }
 
       try {
-        const result = await shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+        const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
         if (cancelled) return;
         const tokens = refreshShareTokensState({ resetWhenMissing: true });
         const nextAdmin = tokens.admin || result.admin;
@@ -1264,7 +1285,7 @@ function OrganizerApp() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, baseUrl, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
+  }, [projectId, baseUrlEffective, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
 
   const handleExportProjectInfo = () => {
     if (!projectId) {
@@ -1428,7 +1449,7 @@ function OrganizerApp() {
                     window.open(entry.url, "_blank");
                   }
                 } else {
-                  const result = await shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+                  const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
                   const tokens = refreshShareTokensState({ resetWhenMissing: true });
                   const next = tokens.participant || result.participant;
                   if (next && next.url) {
@@ -1473,10 +1494,10 @@ function OrganizerApp() {
                 <span className="text-xs font-semibold text-zinc-500">基準URL</span>
                 <input
                   type="url"
-                  value={baseUrl}
+                  value={baseUrlDraft}
                   onChange={(event) => {
                     baseUrlTouchedRef.current = true;
-                    setBaseUrl(event.target.value);
+                    setBaseUrlDraft(event.target.value);
                   }}
                   onBlur={handleBaseUrlBlur}
                   placeholder="https://scheduly.app"
