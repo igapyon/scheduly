@@ -518,7 +518,6 @@ function OrganizerApp() {
   const [baseUrlDraft, setBaseUrlDraft] = useState(() => initialBaseUrlRef.current);
   const [baseUrlEffective, setBaseUrlEffective] = useState(() => initialBaseUrlRef.current);
   const baseUrlTouchedRef = useRef(false);
-  const [navigateAfterGenerate, setNavigateAfterGenerate] = useState(false);
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
@@ -535,6 +534,9 @@ function OrganizerApp() {
   const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
   const [metaSyncStatus, setMetaSyncStatus] = useState(() => ({ phase: "idle", message: "" }));
   const metaWarnedRef = useRef({ nameLength: false, nameRequired: false, descriptionLength: false });
+  const [shareReissueDialogOpen, setShareReissueDialogOpen] = useState(false);
+  const [shareReissueConfirm, setShareReissueConfirm] = useState("");
+  const [shareActionInProgress, setShareActionInProgress] = useState(false);
 
   const popToast = useCallback((message) => {
     setToast(message);
@@ -1190,19 +1192,16 @@ function OrganizerApp() {
     }
   };
 
-  const handleShareLinkAction = async () => {
+  const executeShareLinkAction = async () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってください。");
       return;
     }
-    const hasIssued = hasIssuedShareTokens;
-    if (hasIssued) {
-      const confirmed = window.confirm("共有URLを再発行します。以前のリンクは無効になります。続行しますか？");
-      if (!confirmed) return;
-    }
+    setShareActionInProgress(true);
     try {
+      const hasIssued = hasIssuedShareTokens;
       const action = hasIssued ? shareService.rotate : shareService.generate;
-      const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: navigateAfterGenerate });
+      const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: true });
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
       const notices = [];
@@ -1218,7 +1217,39 @@ function OrganizerApp() {
     } catch (error) {
       console.error("Share link generation error", error);
       popToast("共有URLの生成に失敗しました");
+    } finally {
+      setShareActionInProgress(false);
+      setShareReissueDialogOpen(false);
+      setShareReissueConfirm("");
     }
+  };
+
+  const handleShareLinkAction = () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
+    if (hasIssuedShareTokens) {
+      setShareReissueConfirm("");
+      setShareReissueDialogOpen(true);
+      return;
+    }
+    void executeShareLinkAction();
+  };
+
+  const handleShareReissueSubmit = (event) => {
+    event.preventDefault();
+    if (shareReissueConfirm.trim().toUpperCase() !== "REISSUE") {
+      popToast("REISSUE を入力してください");
+      return;
+    }
+    void executeShareLinkAction();
+  };
+
+  const closeShareReissueDialog = () => {
+    if (shareActionInProgress) return;
+    setShareReissueDialogOpen(false);
+    setShareReissueConfirm("");
   };
 
   const handleCopyShareUrl = async (type) => {
@@ -1487,8 +1518,9 @@ function OrganizerApp() {
             action={
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
                 onClick={handleShareLinkAction}
+                disabled={shareActionInProgress}
               >
                 {shareActionLabel}
               </button>
@@ -1508,15 +1540,6 @@ function OrganizerApp() {
                   placeholder="https://scheduly.app"
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                  checked={navigateAfterGenerate}
-                  onChange={(event) => setNavigateAfterGenerate(event.target.checked)}
-                />
-                発行後に管理者URLを開く
               </label>
             </div>
             <div className="space-y-3">
@@ -1833,6 +1856,72 @@ function OrganizerApp() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {shareReissueDialogOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            onClick={closeShareReissueDialog}
+          >
+            <div
+              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="共有URLを再発行"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-zinc-800">共有URLを再発行</h2>
+                <button
+                  type="button"
+                  className="text-xs text-zinc-500"
+                  onClick={closeShareReissueDialog}
+                  disabled={shareActionInProgress}
+                >
+                  閉じる
+                </button>
+              </div>
+              <form className="space-y-3" onSubmit={handleShareReissueSubmit}>
+                <p className="text-xs text-zinc-500">
+                  共有URLを再発行すると既存の管理者URL・参加者URLが<strong>即座に無効</strong>になります。
+                  続行するには確認のため <span className="font-mono text-zinc-700">REISSUE</span> と入力してください。
+                </p>
+                <label className="block text-xs text-zinc-500">
+                  確認ワード
+                  <input
+                    type="text"
+                    value={shareReissueConfirm}
+                    onChange={(event) => setShareReissueConfirm(event.target.value.toUpperCase())}
+                    placeholder="REISSUE"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    autoFocus
+                    autoComplete="off"
+                    disabled={shareActionInProgress}
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={closeShareReissueDialog}
+                    disabled={shareActionInProgress}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-rose-200 bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={shareActionInProgress}
+                  >
+                    再発行する
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-600">
+                  再発行後は自動で新しい管理者URLへ移動します。ブックマークも更新してください。
+                </p>
+              </form>
             </div>
           </div>
         )}
