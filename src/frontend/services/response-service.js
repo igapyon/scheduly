@@ -4,6 +4,8 @@ const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
+const projectService = require("./project-service");
+const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { responseInputSchema, collectZodIssueFields } = require("../../shared/schema");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
@@ -51,6 +53,20 @@ const mapApiResponse = (response) => {
 
 const listResponses = (projectId) => {
   return projectStore.getResponses(projectId);
+};
+
+const captureResponseSnapshot = (projectId) => ({
+  responses: projectStore.getResponses(projectId),
+  tallies: projectStore.getTallies(projectId)
+});
+
+const restoreResponseSnapshot = (projectId, snapshot) => {
+  if (snapshot && Array.isArray(snapshot.responses)) {
+    projectStore.replaceResponses(projectId, snapshot.responses);
+  }
+  if (snapshot && snapshot.tallies) {
+    projectStore.replaceTallies(projectId, snapshot.tallies);
+  }
 };
 
 const getResponse = (projectId, participantId, candidateId) => {
@@ -109,20 +125,54 @@ const apiUpsertResponse = async (projectId, payload) => {
     comment: parsed.comment || "",
     version: payload.version ?? existing?.version ?? 1
   };
-  const response = await apiClient.post(
-    `/api/projects/${encodeURIComponent(projectId)}/responses`,
-    body
-  );
-  const mapped = mapApiResponse(response?.response || body);
-  if (!mapped) {
-    throw new Error("Failed to upsert response");
-  }
-  projectStore.upsertResponse(projectId, mapped);
-  tallyService.recalculate(projectId, parsed.candidateId);
-  if (Number.isInteger(response?.version)) {
-    projectStore.updateProjectVersions(projectId, { responsesVersion: response.version });
-  }
-  return mapped;
+  const optimisticResponse = () => {
+    const now = new Date().toISOString();
+    const versionValue = Number.isInteger(existing?.version) ? existing.version + 1 : 1;
+    return mapApiResponse({
+      responseId: existing?.id || buildResponseId(parsed.participantId, parsed.candidateId),
+      participantId: parsed.participantId,
+      candidateId: parsed.candidateId,
+      mark: parsed.mark,
+      comment: parsed.comment || "",
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      version: versionValue
+    });
+  };
+
+  const response = await runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureResponseSnapshot(projectId);
+      const optimistic = optimisticResponse();
+      if (optimistic) {
+        projectStore.upsertResponse(projectId, optimistic);
+        tallyService.recalculate(projectId, parsed.candidateId);
+      }
+      return () => restoreResponseSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/responses`, body),
+    onSuccess: (payload) => {
+      const mapped = mapApiResponse(payload?.response || body);
+      if (!mapped) {
+        throw new Error("Failed to upsert response");
+      }
+      projectStore.upsertResponse(projectId, mapped);
+      tallyService.recalculate(projectId, parsed.candidateId);
+      if (Number.isInteger(payload?.version)) {
+        projectStore.updateProjectVersions(projectId, { responsesVersion: payload.version });
+      }
+      return mapped;
+    },
+    refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "responses_conflict" }),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Response version mismatch";
+      }
+      return error;
+    }
+  });
+  return response;
 };
 
 const upsertResponse = (projectId, payload) => (

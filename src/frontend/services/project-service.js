@@ -523,5 +523,6 @@ module.exports = {
   getRouteContext,
   addSyncListener,
   getDefaultProjectId: projectStore.getDefaultProjectId,
-  getState: localGetState
+  getState: localGetState,
+  syncProjectSnapshot
 };
