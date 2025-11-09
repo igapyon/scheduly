@@ -103,8 +103,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する（`docs/internal/spec-api-flow.md` 6.8 参照）
-- 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
 - 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
 - API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
 - `projectService` 以外のサービス層（候補/参加者/回答など）を driver 化し、API ドライバ有効時は fetch 経由で CRUD を実行する（`src/frontend/services/*-service.js` の各操作を段階的に置換。既存の store 操作は local driver として温存する）。
@@ -164,6 +162,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - エラーハンドリング標準化（409/413/401/403/ネットワーク）を `docs/internal/spec-api-flow.md` に整理
 - バリデーション共通スキーマ導入計画（Zod ベースの shared/schema）を `docs/internal/spec-api-flow.md` に記載
 - 共有データ型を `src/shared/types.ts` に集約し、TypeScript/JSDoc 型チェックを導入
+- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する
+- 楽観更新ヘルパーを実装し、API ドライバ操作（回答/候補/参加者/共有トークン）へ段階的に適用
 - ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
 - 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
 - サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
