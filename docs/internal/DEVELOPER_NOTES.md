@@ -107,10 +107,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
 - `projectService` 以外のサービス層（候補/参加者/回答など）を driver 化し、API ドライバ有効時は fetch 経由で CRUD を実行する（`src/frontend/services/*-service.js` の各操作を段階的に置換。既存の store 操作は local driver として温存する）。
 - API ドライバ利用時の初期スナップショット同期完了を UI に伝える仕組みと、競合/更新失敗時のロールバック・トースト連携（`admin.jsx` / `user.jsx`）を整備する。現状は `projectService` での `/meta` 同期のみのため、他操作でも 409/422 をユーザーに通知できるよう統一する。
-- 共有URL再発行時は常に新しい管理者URLへ遷移させる。UI の「発行後に管理者URLを開く」トグルは削除し、挙動を一本化する。
-- `DEVELOPER_NOTES` の共有URLセクションを「再発行後は自動で新しい管理者URLへ遷移する」前提に書き換える。
 - 参加者URLの自動表示／遷移仕様を見直し、必要なら管理者URLと同じく発行直後に新URLへ誘導する方針へ揃える。
-- 共有URL再発行ボタンに「REISSUE」入力必須の確認ダイアログを追加し、誤操作防止を強化する。
 - 管理/参加者 UI に「BETA」バッジやロゴを表示し、利用者が試験運用版であると認識できるようにする。
 - 参加者画面ヘッダー右下に控えめサイズの「管理画面へ」リンクを配置し、クリック時は空の管理画面へ遷移（遷移前にダイアログで定型文字を入力させる）。参加者画面のURLは引き継がない。
 
@@ -166,6 +163,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 共有データ型を `src/shared/types.ts` に集約し、TypeScript/JSDoc 型チェックを導入
 - バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する
 - 楽観更新ヘルパーを実装し、API ドライバ操作（回答/候補/参加者/共有トークン）へ段階的に適用
+- 共有URL再発行時は常に新しい管理者URLへ遷移させる（UIトグル廃止、挙動一本化）
+- 共有URL再発行ボタンへ「REISSUE」入力必須の確認ダイアログを導入し、誤操作防止を強化
 - ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
 - 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
 - サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
