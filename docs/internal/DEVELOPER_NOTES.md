@@ -119,7 +119,9 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
-- I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
+- I/O の日時表現統一
+  - API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
+  - UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
