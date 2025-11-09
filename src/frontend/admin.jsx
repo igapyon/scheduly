@@ -759,7 +759,7 @@ function OrganizerApp() {
     }
   };
 
-  const persistCandidateChanges = (id) => {
+  const persistCandidateChanges = async (id) => {
     if (!projectId) return;
     const draft = candidateDraftRef.current.get(id);
     const latest = draft || candidates.find((item) => item.id === id);
@@ -769,7 +769,7 @@ function OrganizerApp() {
       return;
     }
     try {
-      updateScheduleCandidate(projectId, id, latest);
+      await updateScheduleCandidate(projectId, id, latest);
       candidateSyncedRef.current.set(id, { ...latest });
       clearCandidateErrors(id);
     } catch (error) {
@@ -785,15 +785,20 @@ function OrganizerApp() {
     }
   };
 
-  const removeCandidate = (id) => {
+  const removeCandidate = async (id) => {
     if (!projectId) return;
-    removeScheduleCandidate(projectId, id);
+    await removeScheduleCandidate(projectId, id);
   };
 
-  const addCandidate = () => {
+  const addCandidate = async () => {
     if (!projectId) return;
-    addScheduleCandidate(projectId);
-    popToast("日程を追加しました");
+    try {
+      await addScheduleCandidate(projectId);
+      popToast("日程を追加しました");
+    } catch (error) {
+      console.error("Candidate add failed", error);
+      popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+    }
   };
 
   const handleExportAllCandidates = () => {
@@ -851,12 +856,12 @@ function OrganizerApp() {
     setCandidateDeleteInProgress(false);
   };
 
-  const confirmCandidateDelete = () => {
+  const confirmCandidateDelete = async () => {
     if (!candidateDeleteDialog) return;
     if (candidateDeleteConfirm.trim() !== "DELETE") return;
     setCandidateDeleteInProgress(true);
     try {
-      removeCandidate(candidateDeleteDialog.id);
+      await removeCandidate(candidateDeleteDialog.id);
       popToast(`日程「${candidateDeleteDialog.summary || candidateDeleteDialog.id}」を削除しました`);
       closeCandidateDeleteDialog();
     } catch (error) {
