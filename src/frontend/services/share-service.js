@@ -2,6 +2,8 @@ const projectStore = require("../store/project-store");
 const sharedIcalUtils = require("../shared/ical-utils");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
+const { runOptimisticUpdate } = require("../shared/optimistic-update");
+const projectService = require("./project-service");
 
 const { createLogger } = sharedIcalUtils;
 
@@ -251,23 +253,30 @@ const apiRotate = async (projectId, options = {}) => {
   if (options.lastGeneratedBy) {
     payload.rotatedBy = options.lastGeneratedBy;
   }
-  try {
-    const response = await apiClient.post(
-      `/api/projects/${encodeURIComponent(projectId)}/share/rotate`,
-      payload
-    );
-    const tokens = response?.shareTokens || {};
-    const storedTokens = applyApiTokens(projectId, tokens, response?.version, baseUrl);
-    const navigation = handleNavigation(storedTokens.admin, options);
-    return {
-      admin: cloneEntry(storedTokens.admin),
-      participant: cloneEntry(storedTokens.participant),
-      navigation
-    };
-  } catch (error) {
-    console.error("[Scheduly] shareService.rotate failed", error);
-    throw error;
-  }
+  return runOptimisticUpdate({
+    request: () =>
+      apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/share/rotate`, payload),
+    onSuccess: (response) => {
+      const tokens = response?.shareTokens || {};
+      const storedTokens = applyApiTokens(projectId, tokens, response?.version, baseUrl);
+      const navigation = handleNavigation(storedTokens.admin, options);
+      return {
+        admin: cloneEntry(storedTokens.admin),
+        participant: cloneEntry(storedTokens.participant),
+        navigation
+      };
+    },
+    refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Share tokens version mismatch";
+      }
+      return error;
+    },
+    onError: (error) => {
+      console.error("[Scheduly] shareService.rotate failed", error);
+    }
+  });
 };
 
 const apiGenerate = async (projectId, options = {}) => {
@@ -292,20 +301,31 @@ const apiInvalidate = async (projectId, type) => {
   if (!SHARE_TOKEN_TYPES.includes(type)) {
     throw new Error(`Invalid share token type: ${type}`);
   }
-  try {
-    await apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/share/invalidate`, {
-      tokenType: type,
-      version: getShareTokensVersion(projectId)
-    });
-    projectStore.updateShareTokens(projectId, (current) => {
-      const next = { ...current };
-      delete next[type];
-      return next;
-    });
-  } catch (error) {
-    console.error("[Scheduly] shareService.invalidate failed", error);
-    throw error;
-  }
+  return runOptimisticUpdate({
+    request: () =>
+      apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/share/invalidate`, {
+        tokenType: type,
+        version: getShareTokensVersion(projectId)
+      }),
+    onSuccess: () => {
+      projectStore.updateShareTokens(projectId, (current) => {
+        const next = { ...current };
+        delete next[type];
+        return next;
+      });
+      return true;
+    },
+    refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Share token invalidation conflict";
+      }
+      return error;
+    },
+    onError: (error) => {
+      console.error("[Scheduly] shareService.invalidate failed", error);
+    }
+  });
 };
 
 const generate = (projectId, options = {}) =>

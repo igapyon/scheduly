@@ -4,6 +4,7 @@ const projectStore = require("../store/project-store");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const tallyService = require("./tally-service");
+const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
 
 const randomUUID = () => {
@@ -98,6 +99,47 @@ const mapApiParticipant = (participant) => {
   };
 };
 
+const getProjectService = (() => {
+  let cached = null;
+  return () => {
+    if (cached) return cached;
+    try {
+      cached = require("./project-service");
+    } catch (error) {
+      console.warn("[Scheduly][participantService] Failed to load project-service", error);
+      cached = null;
+    }
+    return cached;
+  };
+})();
+
+const syncSnapshot = (projectId, reason) => {
+  const service = getProjectService();
+  if (service && typeof service.syncProjectSnapshot === "function") {
+    return service.syncProjectSnapshot(projectId, { force: true, reason });
+  }
+  return Promise.resolve();
+};
+
+const captureParticipantSnapshot = (projectId) => ({
+  participants: projectStore.getParticipants(projectId),
+  responses: projectStore.getResponses(projectId),
+  tallies: projectStore.getTallies(projectId)
+});
+
+const restoreParticipantSnapshot = (projectId, snapshot) => {
+  if (!snapshot) return;
+  if (snapshot.participants) {
+    projectStore.replaceParticipants(projectId, snapshot.participants);
+  }
+  if (snapshot.responses) {
+    projectStore.replaceResponses(projectId, snapshot.responses);
+  }
+  if (snapshot.tallies) {
+    projectStore.replaceTallies(projectId, snapshot.tallies);
+  }
+};
+
 const updateParticipantsVersion = (projectId, version) => {
   if (Number.isInteger(version) && version >= 0) {
     projectStore.updateProjectVersions(projectId, { participantsVersion: version });
@@ -143,18 +185,27 @@ const apiAddParticipant = async (projectId, payload) => {
     comment: payload?.comment || ""
   });
   const body = { participant: { ...payload, ...participantPayload } };
-  const response = await apiClient.post(
-    `/api/projects/${encodeURIComponent(projectId)}/participants`,
-    body
-  );
-  const participant = mapApiParticipant(response?.participant || payload);
-  if (!participant) {
-    throw new Error("Failed to create participant");
-  }
-  projectStore.upsertParticipant(projectId, participant);
-  updateParticipantsVersion(projectId, response?.version);
-  tallyService.recalculate(projectId);
-  return participant;
+  return runOptimisticUpdate({
+    request: () =>
+      apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/participants`, body),
+    onSuccess: (response) => {
+      const participant = mapApiParticipant(response?.participant || payload);
+      if (!participant) {
+        throw new Error("Failed to create participant");
+      }
+      projectStore.upsertParticipant(projectId, participant);
+      updateParticipantsVersion(projectId, response?.version);
+      tallyService.recalculate(projectId);
+      return participant;
+    },
+    refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Participant creation conflict";
+      }
+      return error;
+    }
+  });
 };
 
 const addParticipant = (projectId, payload) => (
@@ -206,17 +257,34 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
     },
     version: changes?.version ?? existing?.version ?? 1
   };
-  const response = await apiClient.put(
-    `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
-    body
-  );
-  const participant = mapApiParticipant(response?.participant);
-  if (!participant) {
-    throw new Error("Failed to update participant");
-  }
-  projectStore.upsertParticipant(projectId, participant);
-  updateParticipantsVersion(projectId, response?.version);
-  return participant;
+  return runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureParticipantSnapshot(projectId);
+      localUpdateParticipant(projectId, participantId, changes);
+      return () => restoreParticipantSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.put(
+        `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
+        body
+      ),
+    onSuccess: (response) => {
+      const participant = mapApiParticipant(response?.participant);
+      if (!participant) {
+        throw new Error("Failed to update participant");
+      }
+      projectStore.upsertParticipant(projectId, participant);
+      updateParticipantsVersion(projectId, response?.version);
+      return participant;
+    },
+    refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Participant version mismatch";
+      }
+      return error;
+    }
+  });
 };
 
 const updateParticipant = (projectId, participantId, changes) => (
@@ -233,13 +301,30 @@ const localRemoveParticipant = (projectId, participantId) => {
 const apiRemoveParticipant = async (projectId, participantId) => {
   const existing = getParticipant(projectId, participantId);
   const version = existing?.version ?? 1;
-  const response = await apiClient.del(
-    `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
-    { version }
-  );
-  projectStore.removeParticipant(projectId, participantId);
-  updateParticipantsVersion(projectId, response?.version);
-  tallyService.recalculate(projectId);
+  return runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureParticipantSnapshot(projectId);
+      localRemoveParticipant(projectId, participantId);
+      return () => restoreParticipantSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.del(
+        `/api/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(participantId)}`,
+        { version }
+      ),
+    onSuccess: (response) => {
+      updateParticipantsVersion(projectId, response?.version);
+      tallyService.recalculate(projectId);
+      return true;
+    },
+    refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Participant removal conflict";
+      }
+      return error;
+    }
+  });
 };
 
 const removeParticipant = (projectId, participantId) => (
