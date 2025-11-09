@@ -72,7 +72,7 @@ function TypeConfirmationDialog({
             <input
               type="text"
               value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
+              onChange={(event) => setInputValue(event.target.value.toUpperCase())}
               placeholder={confirmWord}
               className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
               autoFocus
