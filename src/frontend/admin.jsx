@@ -77,6 +77,8 @@ const CANDIDATE_COMPARE_KEYS = [
 ];
 
 const SHARE_REISSUE_WORD = "REISSUE";
+const PROJECT_IMPORT_WORD = "IMPORT";
+const DEMO_IMPORT_WORD = "DEMO";
 
 const normalizeCandidateCompareValue = (value) => {
   if (value === undefined || value === null) return "";
@@ -538,6 +540,11 @@ function OrganizerApp() {
   const metaWarnedRef = useRef({ nameLength: false, nameRequired: false, descriptionLength: false });
   const [shareReissueDialogOpen, setShareReissueDialogOpen] = useState(false);
   const [shareActionInProgress, setShareActionInProgress] = useState(false);
+  const [projectImportDialogOpen, setProjectImportDialogOpen] = useState(false);
+  const [projectImportInProgress, setProjectImportInProgress] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [demoImportDialogOpen, setDemoImportDialogOpen] = useState(false);
+  const [demoImportInProgress, setDemoImportInProgress] = useState(false);
 
   const popToast = useCallback((message) => {
     setToast(message);
@@ -1327,21 +1334,33 @@ function OrganizerApp() {
     }
   };
 
-  const handleProjectImportFromFile = async (event) => {
+  const handleProjectImportFromFile = (event) => {
     const file = event.target.files && event.target.files[0];
+    event.target.value = "";
     if (!file) return;
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
-      event.target.value = "";
       return;
     }
+    setPendingImportFile(file);
+    setProjectImportDialogOpen(true);
+  };
+
+  const closeProjectImportDialog = () => {
+    if (projectImportInProgress) return;
+    setProjectImportDialogOpen(false);
+    setPendingImportFile(null);
+  };
+
+  const confirmProjectImportFromFile = async () => {
+    if (!projectId || !pendingImportFile) {
+      popToast("インポートするファイルが見つかりませんでした");
+      closeProjectImportDialog();
+      return;
+    }
+    setProjectImportInProgress(true);
     try {
-      const confirmed = window.confirm("現在のプロジェクトを置き換えます。よろしいですか？");
-      if (!confirmed) {
-        event.target.value = "";
-        return;
-      }
-      const text = await file.text();
+      const text = await pendingImportFile.text();
       let parsed;
       try {
         parsed = JSON.parse(text);
@@ -1363,20 +1382,36 @@ function OrganizerApp() {
       popToast("プロジェクト情報をインポートしました");
     } catch (error) {
       console.error("Project import error", error);
-      popToast("プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+      popToast(
+        "プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error))
+      );
     } finally {
-      event.target.value = "";
+      setProjectImportInProgress(false);
+      closeProjectImportDialog();
     }
   };
 
-  const handleProjectImportFromDemo = async () => {
+  const handleProjectImportFromDemo = () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       return;
     }
+    setDemoImportDialogOpen(true);
+  };
+
+  const closeDemoImportDialog = () => {
+    if (demoImportInProgress) return;
+    setDemoImportDialogOpen(false);
+  };
+
+  const confirmDemoImport = async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      closeDemoImportDialog();
+      return;
+    }
+    setDemoImportInProgress(true);
     try {
-      const confirmed = window.confirm("現在のプロジェクトをデモ用データで置き換えます。よろしいですか？");
-      if (!confirmed) return;
       const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const parsed = await res.json();
@@ -1392,7 +1427,12 @@ function OrganizerApp() {
       popToast("デモ用プロジェクトをインポートしました");
     } catch (error) {
       console.error("Demo project import error", error);
-      popToast("デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+      popToast(
+        "デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error))
+      );
+    } finally {
+      setDemoImportInProgress(false);
+      closeDemoImportDialog();
     }
   };
 
@@ -1863,6 +1903,83 @@ function OrganizerApp() {
           pending={shareActionInProgress}
           onClose={closeShareReissueDialog}
           onConfirm={handleShareReissueConfirm}
+        />
+        <TypeConfirmationDialog
+          open={Boolean(candidateDeleteDialog)}
+          title="日程を削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-700">
+                {candidateDeleteDialog?.summary || candidateDeleteDialog?.id || "日程"}
+              </span>
+              を削除します。確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={candidateDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={candidateDeleteInProgress}
+          onClose={closeCandidateDeleteDialog}
+          onConfirm={confirmCandidateDelete}
+        />
+
+        <TypeConfirmationDialog
+          open={projectDeleteDialogOpen}
+          title="プロジェクトを削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              プロジェクトの候補・参加者・回答データをすべて削除します。確認のため{" "}
+              <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={projectDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={projectDeleteInProgress}
+          onClose={closeProjectDeleteDialog}
+          onConfirm={confirmProjectDelete}
+        />
+
+        <TypeConfirmationDialog
+          open={projectImportDialogOpen}
+          title="プロジェクトをインポート"
+          description={
+            <p className="text-xs text-zinc-500">
+              現在のプロジェクトデータを
+              {pendingImportFile?.name ? (
+                <>
+                  <span className="font-semibold text-zinc-700"> {pendingImportFile.name} </span>
+                  に置き換えます。
+                </>
+              ) : (
+                "選択したファイルに置き換えます。"
+              )}
+              確認のため <span className="font-mono text-zinc-700">{PROJECT_IMPORT_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={PROJECT_IMPORT_WORD}
+          confirmLabel={projectImportInProgress ? "インポート中…" : "インポートする"}
+          confirmKind="primary"
+          pending={projectImportInProgress}
+          onClose={closeProjectImportDialog}
+          onConfirm={confirmProjectImportFromFile}
+        />
+
+        <TypeConfirmationDialog
+          open={demoImportDialogOpen}
+          title="デモ用プロジェクトを読み込む"
+          description={
+            <p className="text-xs text-zinc-500">
+              現在のプロジェクトをデモデータに置き換えます。確認のため{" "}
+              <span className="font-mono text-zinc-700">{DEMO_IMPORT_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={DEMO_IMPORT_WORD}
+          confirmLabel={demoImportInProgress ? "読み込み中…" : "読み込む"}
+          confirmKind="primary"
+          pending={demoImportInProgress}
+          onClose={closeDemoImportDialog}
+          onConfirm={confirmDemoImport}
         />
 
         <TypeConfirmationDialog
