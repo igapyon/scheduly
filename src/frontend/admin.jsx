@@ -1913,9 +1913,9 @@ function OrganizerApp() {
                   <button
                     type="submit"
                     className="rounded-lg border border-rose-200 bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={shareActionInProgress}
+                    disabled={shareActionInProgress || shareReissueConfirm.trim() !== "REISSUE"}
                   >
-                    再発行する
+                    {shareActionInProgress ? "再発行中…" : "再発行する"}
                   </button>
                 </div>
                 <p className="text-[11px] text-amber-600">
