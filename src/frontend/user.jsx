@@ -15,12 +15,14 @@ import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
 
 void EventMeta;
 void ErrorScreen;
 void InfoBadge;
+void TypeConfirmationDialog;
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
@@ -30,6 +32,7 @@ const DASHBOARD_META = {
 };
 
 const logDebug = createLogger("user");
+const MANAGEMENT_CONFIRM_WORD = "CREATE";
 
 const STATUS_LABELS = {
   CONFIRMED: { label: "確定", badgeClass: "bg-emerald-100 text-emerald-700" },
@@ -614,6 +617,7 @@ function AdminResponsesApp() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [managementDialogOpen, setManagementDialogOpen] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState("");
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
@@ -726,6 +730,19 @@ function AdminResponsesApp() {
       }
       return { participantId, scheduleId };
     });
+  };
+
+  const closeManagementDialog = () => {
+    setManagementDialogOpen(false);
+  };
+
+  const handleManagementConfirm = () => {
+    closeManagementDialog();
+    try {
+      window.open("/index.html", "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.warn("[user] failed to open management console", error);
+    }
   };
 
   useEffect(() => {
@@ -1120,6 +1137,16 @@ function AdminResponsesApp() {
               <span aria-hidden="true">＋</span>
               <span>参加者を新規登録</span>
             </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              onClick={() => {
+                setManagementDialogOpen(true);
+              }}
+            >
+              <span aria-hidden="true">🛠</span>
+              <span>新規プロジェクト</span>
+            </button>
           </div>
         </div>
       </header>
@@ -1310,6 +1337,25 @@ function AdminResponsesApp() {
           </div>
         </div>
       )}
+
+      <TypeConfirmationDialog
+        open={managementDialogOpen}
+        title="新規プロジェクトを作成"
+        description={
+          <p className="text-xs text-zinc-500">
+            新しい管理画面（空のプロジェクト）を開きます。参加者用URLは引き継がれません。
+            続行するには{" "}
+            <span className="font-mono text-zinc-700">{MANAGEMENT_CONFIRM_WORD}</span>
+            と入力してください。
+          </p>
+        }
+        confirmWord={MANAGEMENT_CONFIRM_WORD}
+        confirmLabel="開く"
+        confirmKind="primary"
+        pending={false}
+        onClose={closeManagementDialog}
+        onConfirm={handleManagementConfirm}
+      />
       {removeDialogParticipant && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"

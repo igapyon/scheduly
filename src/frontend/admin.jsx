@@ -12,6 +12,7 @@ import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
@@ -19,6 +20,7 @@ const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 void Fragment;
 void EventMeta;
 void InfoBadge;
+void TypeConfirmationDialog;
 void ClipboardIcon;
 void CheckIcon;
 
@@ -73,6 +75,8 @@ const CANDIDATE_COMPARE_KEYS = [
   "sequence",
   "dtstamp"
 ];
+
+const SHARE_REISSUE_WORD = "REISSUE";
 
 const normalizeCandidateCompareValue = (value) => {
   if (value === undefined || value === null) return "";
@@ -535,7 +539,6 @@ function OrganizerApp() {
   const [metaSyncStatus, setMetaSyncStatus] = useState(() => ({ phase: "idle", message: "" }));
   const metaWarnedRef = useRef({ nameLength: false, nameRequired: false, descriptionLength: false });
   const [shareReissueDialogOpen, setShareReissueDialogOpen] = useState(false);
-  const [shareReissueConfirm, setShareReissueConfirm] = useState("");
   const [shareActionInProgress, setShareActionInProgress] = useState(false);
 
   const popToast = useCallback((message) => {
@@ -1220,7 +1223,6 @@ function OrganizerApp() {
     } finally {
       setShareActionInProgress(false);
       setShareReissueDialogOpen(false);
-      setShareReissueConfirm("");
     }
   };
 
@@ -1230,26 +1232,19 @@ function OrganizerApp() {
       return;
     }
     if (hasIssuedShareTokens) {
-      setShareReissueConfirm("");
       setShareReissueDialogOpen(true);
       return;
     }
     void executeShareLinkAction();
   };
 
-  const handleShareReissueSubmit = (event) => {
-    event.preventDefault();
-    if (shareReissueConfirm.trim().toUpperCase() !== "REISSUE") {
-      popToast("REISSUE を入力してください");
-      return;
-    }
+  const handleShareReissueConfirm = () => {
     void executeShareLinkAction();
   };
 
   const closeShareReissueDialog = () => {
     if (shareActionInProgress) return;
     setShareReissueDialogOpen(false);
-    setShareReissueConfirm("");
   };
 
   const handleCopyShareUrl = async (type) => {
@@ -1860,71 +1855,23 @@ function OrganizerApp() {
           </div>
         )}
 
-        {shareReissueDialogOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
-            onClick={closeShareReissueDialog}
-          >
-            <div
-              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
-              role="dialog"
-              aria-modal="true"
-              aria-label="共有URLを再発行"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-zinc-800">共有URLを再発行</h2>
-                <button
-                  type="button"
-                  className="text-xs text-zinc-500"
-                  onClick={closeShareReissueDialog}
-                  disabled={shareActionInProgress}
-                >
-                  閉じる
-                </button>
-              </div>
-              <form className="space-y-3" onSubmit={handleShareReissueSubmit}>
-                <p className="text-xs text-zinc-500">
-                  共有URLを再発行すると既存の管理者URL・参加者URLが<strong>即座に無効</strong>になります。
-                  続行するには確認のため <span className="font-mono text-zinc-700">REISSUE</span> と入力してください。
-                </p>
-                <label className="block text-xs text-zinc-500">
-                  確認ワード
-                  <input
-                    type="text"
-                    value={shareReissueConfirm}
-                    onChange={(event) => setShareReissueConfirm(event.target.value.toUpperCase())}
-                    placeholder="REISSUE"
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    autoFocus
-                    autoComplete="off"
-                    disabled={shareActionInProgress}
-                  />
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={closeShareReissueDialog}
-                    disabled={shareActionInProgress}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-rose-200 bg-rose-500 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={shareActionInProgress || shareReissueConfirm.trim() !== "REISSUE"}
-                  >
-                    {shareActionInProgress ? "再発行中…" : "再発行する"}
-                  </button>
-                </div>
-                <p className="text-[11px] text-amber-600">
-                  再発行後は自動で新しい管理者URLへ移動します。ブックマークも更新してください。
-                </p>
-              </form>
-            </div>
-          </div>
-        )}
+        <TypeConfirmationDialog
+          open={shareReissueDialogOpen}
+          title="共有URLを再発行"
+          description={
+            <p className="text-xs text-zinc-500">
+              共有URLを再発行すると既存の管理者URL・参加者URLが
+              <strong>即座に無効</strong>になります。続行するには{" "}
+              <span className="font-mono text-zinc-700">{SHARE_REISSUE_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={SHARE_REISSUE_WORD}
+          confirmLabel="再発行する"
+          confirmKind="danger"
+          pending={shareActionInProgress}
+          onClose={closeShareReissueDialog}
+          onConfirm={handleShareReissueConfirm}
+        />
 
         {candidateDeleteDialog && (
           <div
