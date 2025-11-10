@@ -3,7 +3,11 @@
 const sharedIcalUtils = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
-const { validate, buildCandidateRules } = require("../shared/validation");
+const runtimeConfig = require("../shared/runtime-config");
+const apiClient = require("./api-client");
+const { runOptimisticUpdate } = require("../shared/optimistic-update");
+const projectService = require("./project-service");
+const { candidateInputSchema, collectZodIssueFields } = require("../../shared/schema");
 
 const {
   DEFAULT_TZID,
@@ -11,6 +15,71 @@ const {
 } = sharedIcalUtils;
 
 const logDebug = sharedIcalUtils.createLogger("schedule-service");
+const syncProjectSnapshot = (projectId, reason) =>
+  projectService && typeof projectService.syncProjectSnapshot === "function"
+    ? projectService.syncProjectSnapshot(projectId, { force: true, reason })
+    : Promise.resolve();
+
+const captureCandidateSnapshot = (projectId) => ({
+  candidates: projectStore.getCandidates(projectId),
+  responses: projectStore.getResponses(projectId),
+  tallies: projectStore.getTallies(projectId),
+  icsText: projectStore.getIcsText(projectId)
+});
+
+const restoreCandidateSnapshot = (projectId, snapshot) => {
+  if (!snapshot) return;
+  if (snapshot.candidates) {
+    projectStore.replaceCandidates(projectId, snapshot.candidates, snapshot.icsText);
+  }
+  if (snapshot.responses) {
+    projectStore.replaceResponses(projectId, snapshot.responses);
+  }
+  if (snapshot.tallies) {
+    projectStore.replaceTallies(projectId, snapshot.tallies);
+  }
+};
+
+const mapApiCandidate = (candidate) => {
+  if (!candidate || typeof candidate !== "object") return null;
+  const id = candidate.candidateId || candidate.id;
+  if (!id) return null;
+  return {
+    id,
+    candidateId: candidate.candidateId || id,
+    uid: candidate.uid || generateSchedulyUid(),
+    summary: candidate.summary || "",
+    description: candidate.description || "",
+    location: candidate.location || "",
+    status: candidate.status || "CONFIRMED",
+    dtstart: candidate.dtstart || "",
+    dtend: candidate.dtend || "",
+    tzid: candidate.tzid || DEFAULT_TZID,
+    sequence: Number.isInteger(candidate.sequence) ? candidate.sequence : 0,
+    dtstamp: candidate.dtstamp || new Date().toISOString(),
+    createdAt: candidate.createdAt || new Date().toISOString(),
+    updatedAt: candidate.updatedAt || new Date().toISOString(),
+    version: Number.isInteger(candidate.version) ? candidate.version : 1,
+    rawICalVevent: candidate.rawICalVevent || null
+  };
+};
+
+const toCandidateRequestPayload = (candidate) => ({
+  candidateId: candidate.candidateId || candidate.id,
+  summary: candidate.summary || "",
+  dtstart: candidate.dtstart || "",
+  dtend: candidate.dtend || "",
+  tzid: candidate.tzid || DEFAULT_TZID,
+  status: candidate.status || "TENTATIVE",
+  location: candidate.location || "",
+  description: candidate.description || ""
+});
+
+const findCandidateById = (projectId, candidateId) => {
+  const candidates = projectStore.getCandidates(projectId);
+  return candidates.find((item) => item && item.id === candidateId) || null;
+};
+const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
 const ICAL_LINE_BREAK = "\r\n";
 const ICAL_HEADER_LINES = [
@@ -168,21 +237,24 @@ const createCandidateFromVevent = (vevent) => {
   };
 };
 
-const addCandidate = (projectId) => {
+const localAddCandidate = (projectId, presetCandidate = null) => {
   const existing = projectStore.getCandidates(projectId);
-  const candidate = createBlankCandidate();
+  const candidate = presetCandidate
+    ? { ...presetCandidate }
+    : createBlankCandidate();
   candidate.sequence = existing.length;
   const nextCandidates = existing.concat(candidate);
   persistCandidates(projectId, nextCandidates);
   return candidate;
 };
 
-const updateCandidate = (projectId, candidateId, nextCandidate) => {
+const localUpdateCandidate = (projectId, candidateId, nextCandidate) => {
   const existing = projectStore.getCandidates(projectId);
-  // Minimal validation: basic field lengths and ISO-like datetime format
-  const rules = buildCandidateRules({});
   const base = existing.find((c) => c.id === candidateId) || {};
-  const payload = {
+  if (!base) {
+    throw new Error("Candidate not found");
+  }
+  const candidateInput = {
     summary: String((nextCandidate?.summary ?? base.summary) || ""),
     dtstart: String((nextCandidate?.dtstart ?? base.dtstart) || ""),
     dtend: String((nextCandidate?.dtend ?? base.dtend) || ""),
@@ -191,44 +263,60 @@ const updateCandidate = (projectId, candidateId, nextCandidate) => {
     location: String((nextCandidate?.location ?? base.location) || ""),
     description: String((nextCandidate?.description ?? base.description) || "")
   };
-  // Semantic check: dtend after dtstart when both present
-  const fullLocalRe = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
-  const startOk = typeof payload.dtstart === "string" && fullLocalRe.test(payload.dtstart) && !Number.isNaN(new Date(payload.dtstart).getTime());
-  const endOk = typeof payload.dtend === "string" && fullLocalRe.test(payload.dtend) && !Number.isNaN(new Date(payload.dtend).getTime());
-  const changedStart = nextCandidate && Object.prototype.hasOwnProperty.call(nextCandidate, "dtstart") && nextCandidate.dtstart !== base.dtstart;
-  const changedEnd = nextCandidate && Object.prototype.hasOwnProperty.call(nextCandidate, "dtend") && nextCandidate.dtend !== base.dtend;
-  // If user is typing and datetime value is incomplete, persist as-is without strict validation.
-  if ((changedStart && !startOk) || (changedEnd && !endOk)) {
-    const nextCandidates = existing.map((candidate) => (candidate.id === candidateId ? { ...candidate, ...nextCandidate } : candidate));
-    persistCandidates(projectId, nextCandidates);
-    return;
-  }
-  // Perform structural validation only when values are complete
-  const check = validate(payload, rules);
-  if (!check.ok) {
-    const err = new Error(`candidate validation failed: ${check.errors.join(", ")}`);
+  const changedStart =
+    nextCandidate && Object.prototype.hasOwnProperty.call(nextCandidate, "dtstart") && nextCandidate.dtstart !== base.dtstart;
+  const changedEnd =
+    nextCandidate && Object.prototype.hasOwnProperty.call(nextCandidate, "dtend") && nextCandidate.dtend !== base.dtend;
+  const validationResult = candidateInputSchema.safeParse(candidateInput);
+  if (!validationResult.success) {
+    const fields = collectZodIssueFields(validationResult.error.errors);
+    const temporalOnly = fields.length > 0 && fields.every((field) => field === "dtstart" || field === "dtend");
+    if (temporalOnly && (changedStart || changedEnd)) {
+      const nextCandidates = existing.map((candidate) =>
+        candidate.id === candidateId ? { ...candidate, ...nextCandidate } : candidate
+      );
+      persistCandidates(projectId, nextCandidates);
+      return;
+    }
+    const err = new Error(`candidate validation failed: ${fields.join(", ")}`);
     err.code = 422;
+    err.fields = fields;
     throw err;
   }
-  // Enforce ordering only when dtend is being edited（or both provided). This avoids blocking
-  // intermediate states when user adjusts DTSTART first.
+  const payload = validationResult.data;
+  const startOk = payload.dtstart && !Number.isNaN(new Date(payload.dtstart).getTime());
+  const endOk = payload.dtend && !Number.isNaN(new Date(payload.dtend).getTime());
   if (startOk && endOk && (changedEnd || (changedStart && changedEnd))) {
     const start = new Date(payload.dtstart);
     const end = new Date(payload.dtend);
     if (end <= start) {
-      // Persist the user input so editing can continue, but surface an error to caller.
-      const previewNext = existing.map((candidate) => (candidate.id === candidateId ? { ...candidate, ...nextCandidate } : candidate));
+      const previewNext = existing.map((candidate) =>
+        candidate.id === candidateId ? { ...candidate, ...nextCandidate } : candidate
+      );
       persistCandidates(projectId, previewNext);
       const err = new Error("candidate validation failed: dtend must be after dtstart");
       err.code = 422;
       throw err;
     }
   }
-  const nextCandidates = existing.map((candidate) => (candidate.id === candidateId ? { ...candidate, ...nextCandidate } : candidate));
+  const nextCandidates = existing.map((item) => {
+    if (item.id !== candidateId) return item;
+    return {
+      ...item,
+      ...nextCandidate,
+      summary: payload.summary,
+      dtstart: payload.dtstart,
+      dtend: payload.dtend,
+      tzid: payload.tzid || DEFAULT_TZID,
+      status: payload.status || "TENTATIVE",
+      location: payload.location,
+      description: payload.description
+    };
+  });
   persistCandidates(projectId, nextCandidates);
 };
 
-const removeCandidate = (projectId, candidateId) => {
+const localRemoveCandidate = (projectId, candidateId) => {
   const existing = projectStore.getCandidates(projectId);
   const nextCandidates = existing.filter((candidate) => candidate.id !== candidateId);
   projectStore.removeResponsesByCandidate(projectId, candidateId);
@@ -288,6 +376,132 @@ const exportCandidateToIcs = (projectId, candidateId) => {
 const replaceCandidatesFromImport = (projectId, importedCandidates, sourceIcsText = null) => {
   persistCandidates(projectId, importedCandidates, sourceIcsText);
 };
+
+const apiAddCandidate = async (projectId) => {
+  const placeholder = {
+    ...createBlankCandidate(),
+    candidateId: undefined
+  };
+  placeholder.candidateId = placeholder.id;
+  return runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureCandidateSnapshot(projectId);
+      localAddCandidate(projectId, placeholder);
+      return () => restoreCandidateSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/candidates`, {
+        candidate: toCandidateRequestPayload(placeholder)
+      }),
+    onSuccess: (response) => {
+      const mapped = mapApiCandidate(response?.candidate);
+      if (!mapped) {
+        throw new Error("Failed to create candidate");
+      }
+      const candidates = projectStore.getCandidates(projectId);
+      const next = candidates.map((item) => (item.id === placeholder.id ? mapped : item));
+      const exists = next.some((item) => item.id === mapped.id);
+      const finalCandidates = exists ? next : next.concat(mapped);
+      persistCandidates(projectId, finalCandidates);
+      return mapped;
+    },
+    refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Candidate creation conflict";
+      }
+      return error;
+    }
+  });
+};
+
+const apiUpdateCandidate = async (projectId, candidateId, changes = {}) => {
+  const existing = findCandidateById(projectId, candidateId);
+  if (!existing) {
+    throw new Error("Candidate not found");
+  }
+  let requestPayload = toCandidateRequestPayload({ ...existing, ...changes });
+  const expectedVersion = changes?.version ?? existing.version ?? 1;
+  return runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureCandidateSnapshot(projectId);
+      localUpdateCandidate(projectId, candidateId, changes);
+      const updated = findCandidateById(projectId, candidateId);
+      if (updated) {
+        requestPayload = toCandidateRequestPayload(updated);
+      }
+      return () => restoreCandidateSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.put(
+        `/api/projects/${encodeURIComponent(projectId)}/candidates/${encodeURIComponent(candidateId)}`,
+        {
+          version: expectedVersion,
+          candidate: requestPayload
+        }
+      ),
+    onSuccess: (response) => {
+      const mapped = mapApiCandidate(response?.candidate);
+      if (!mapped) {
+        throw new Error("Failed to update candidate");
+      }
+      const candidates = projectStore.getCandidates(projectId);
+      const next = candidates.map((item) => (item.id === candidateId ? mapped : item));
+      persistCandidates(projectId, next);
+      return mapped;
+    },
+    refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Candidate version mismatch";
+      }
+      return error;
+    }
+  });
+};
+
+const apiRemoveCandidate = async (projectId, candidateId) => {
+  const existing = findCandidateById(projectId, candidateId);
+  if (!existing) {
+    throw new Error("Candidate not found");
+  }
+  const expectedVersion = existing.version ?? 1;
+  return runOptimisticUpdate({
+    applyLocal: () => {
+      const snapshot = captureCandidateSnapshot(projectId);
+      localRemoveCandidate(projectId, candidateId);
+      return () => restoreCandidateSnapshot(projectId, snapshot);
+    },
+    request: () =>
+      apiClient.del(
+        `/api/projects/${encodeURIComponent(projectId)}/candidates/${encodeURIComponent(candidateId)}`,
+        { version: expectedVersion }
+      ),
+    refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    transformError: (error) => {
+      if (error && error.status === 409) {
+        error.message = "Candidate removal conflict";
+      }
+      return error;
+    }
+  });
+};
+
+const addCandidate = (projectId) => (
+  isApiEnabled() ? apiAddCandidate(projectId) : Promise.resolve(localAddCandidate(projectId))
+);
+
+const updateCandidate = (projectId, candidateId, nextCandidate) => (
+  isApiEnabled()
+    ? apiUpdateCandidate(projectId, candidateId, nextCandidate)
+    : Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate))
+);
+
+const removeCandidate = (projectId, candidateId) => (
+  isApiEnabled()
+    ? apiRemoveCandidate(projectId, candidateId)
+    : Promise.resolve(localRemoveCandidate(projectId, candidateId))
+);
 
 module.exports = {
   addCandidate,

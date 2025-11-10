@@ -15,12 +15,14 @@ import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
 
 void EventMeta;
 void ErrorScreen;
 void InfoBadge;
+void TypeConfirmationDialog;
 
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
@@ -30,6 +32,7 @@ const DASHBOARD_META = {
 };
 
 const logDebug = createLogger("user");
+const MANAGEMENT_CONFIRM_WORD = "CREATE";
 
 const STATUS_LABELS = {
   CONFIRMED: { label: "確定", badgeClass: "bg-emerald-100 text-emerald-700" },
@@ -235,10 +238,10 @@ function InlineResponseEditor({
   }, []);
 
   const commitUpdate = useCallback(
-    (nextMark, nextComment) => {
+    async (nextMark, nextComment) => {
       if (!projectId || !participantId || !schedule?.id) return;
       try {
-        responseService.upsertResponse(projectId, {
+        await responseService.upsertResponse(projectId, {
           participantId,
           candidateId: schedule.id,
           mark: nextMark || "pending",
@@ -614,11 +617,11 @@ function AdminResponsesApp() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [managementDialogOpen, setManagementDialogOpen] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState("");
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
   const [removeDialogParticipant, setRemoveDialogParticipant] = useState(null);
-  const [removeConfirmText, setRemoveConfirmText] = useState("");
   const [removeInProgress, setRemoveInProgress] = useState(false);
   const [renameDialogParticipant, setRenameDialogParticipant] = useState(null);
   const [renameName, setRenameName] = useState("");
@@ -726,6 +729,19 @@ function AdminResponsesApp() {
       }
       return { participantId, scheduleId };
     });
+  };
+
+  const closeManagementDialog = () => {
+    setManagementDialogOpen(false);
+  };
+
+  const handleManagementConfirm = () => {
+    closeManagementDialog();
+    try {
+      window.open("/index.html", "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.warn("[user] failed to open management console", error);
+    }
   };
 
   useEffect(() => {
@@ -965,7 +981,7 @@ function AdminResponsesApp() {
   const projectName = projectState?.project?.name || DASHBOARD_META.projectName;
   const projectDescription = projectState?.project?.description || DASHBOARD_META.description;
 
-  const handleAddParticipant = () => {
+  const handleAddParticipant = async () => {
     const trimmed = newParticipantName.trim();
     if (!trimmed) {
       setParticipantActionError("参加者名を入力してください");
@@ -978,7 +994,7 @@ function AdminResponsesApp() {
       return;
     }
     try {
-      const created = participantService.addParticipant(projectId, { displayName: trimmed });
+      const created = await participantService.addParticipant(projectId, { displayName: trimmed });
       setParticipantActionMessage(`${created.displayName || "参加者"}を追加しました`);
       setParticipantActionError("");
       setNewParticipantName("");
@@ -992,24 +1008,21 @@ function AdminResponsesApp() {
   const openRemoveParticipantDialog = (participant) => {
     if (!participant || !participant.id) return;
     setRemoveDialogParticipant(participant);
-    setRemoveConfirmText("");
     setRemoveInProgress(false);
     setParticipantActionError("");
   };
 
   const closeRemoveParticipantDialog = () => {
     setRemoveDialogParticipant(null);
-    setRemoveConfirmText("");
     setRemoveInProgress(false);
   };
 
-  const confirmRemoveParticipant = () => {
+  const confirmRemoveParticipant = async () => {
     if (!removeDialogParticipant) return;
-    if (removeConfirmText.trim() !== "DELETE") return;
     const targetParticipant = removeDialogParticipant;
     setRemoveInProgress(true);
     try {
-      handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
+      await handleRemoveParticipant(targetParticipant.id, targetParticipant.name);
       closeRemoveParticipantDialog();
     } catch (error) {
       console.error("[Scheduly] failed to remove participant", error);
@@ -1038,7 +1051,7 @@ function AdminResponsesApp() {
     setRenameInProgress(false);
   };
 
-  const confirmRenameParticipant = () => {
+  const confirmRenameParticipant = async () => {
     if (!renameDialogParticipant || !renameDialogParticipant.id) return;
     const trimmed = renameName.trim();
     if (!trimmed) {
@@ -1051,7 +1064,7 @@ function AdminResponsesApp() {
     }
     setRenameInProgress(true);
     try {
-      participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
+      await participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
       setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
       setParticipantActionError("");
       closeRenameParticipantDialog();
@@ -1063,14 +1076,14 @@ function AdminResponsesApp() {
     }
   };
 
-  const handleRemoveParticipant = (participantId, displayName) => {
+  const handleRemoveParticipant = async (participantId, displayName) => {
     const summaryName = displayName || "参加者";
     if (!projectId) {
       setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       setParticipantActionMessage("");
       return;
     }
-    participantService.removeParticipant(projectId, participantId);
+    await participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
   };
@@ -1119,6 +1132,16 @@ function AdminResponsesApp() {
             >
               <span aria-hidden="true">＋</span>
               <span>参加者を新規登録</span>
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-zinc-300 hover:text-zinc-800"
+              onClick={() => {
+                setManagementDialogOpen(true);
+              }}
+            >
+              <span aria-hidden="true">🛠</span>
+              <span>新規プロジェクト</span>
             </button>
           </div>
         </div>
@@ -1310,71 +1333,41 @@ function AdminResponsesApp() {
           </div>
         </div>
       )}
-      {removeDialogParticipant && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
-          onClick={closeRemoveParticipantDialog}
-        >
-          <div
-            className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
-            role="dialog"
-            aria-modal="true"
-            aria-label="参加者を削除"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-800">参加者を削除</h2>
-              <button className="text-xs text-zinc-500" onClick={closeRemoveParticipantDialog} disabled={removeInProgress}>
-                閉じる
-              </button>
-            </div>
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                confirmRemoveParticipant();
-              }}
-            >
-              <p className="text-xs text-zinc-500">
-                <span className="font-semibold text-zinc-700">
-                  {removeDialogParticipant.name || "参加者"}
-                </span>
-                を削除するには、確認のため「DELETE」と入力してください。
-              </p>
-              <label className="block text-xs text-zinc-500">
-                確認ワード
-                <input
-                  type="text"
-                  value={removeConfirmText}
-                  onChange={(event) => setRemoveConfirmText(event.target.value.toUpperCase())}
-                  placeholder="DELETE"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  autoFocus
-                  autoComplete="off"
-                  disabled={removeInProgress}
-                />
-              </label>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300"
-                  onClick={closeRemoveParticipantDialog}
-                  disabled={removeInProgress}
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={removeInProgress || removeConfirmText.trim() !== "DELETE"}
-                >
-                  {removeInProgress ? "削除中…" : "削除"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+      <TypeConfirmationDialog
+        open={managementDialogOpen}
+        title="新規プロジェクトを作成"
+        description={
+          <p className="text-xs text-zinc-500">
+            新しい管理画面（空のプロジェクト）を開きます。参加者用URLは引き継がれません。続行するには{" "}
+            <span className="font-mono text-zinc-700">{MANAGEMENT_CONFIRM_WORD}</span> と入力してください。
+          </p>
+        }
+        confirmWord={MANAGEMENT_CONFIRM_WORD}
+        confirmLabel="開く"
+        confirmKind="primary"
+        pending={false}
+        onClose={closeManagementDialog}
+        onConfirm={handleManagementConfirm}
+      />
+
+      <TypeConfirmationDialog
+        open={Boolean(removeDialogParticipant)}
+        title="参加者を削除"
+        description={
+          <p className="text-xs text-zinc-500">
+            参加者{" "}
+            <span className="font-semibold text-zinc-700">{removeDialogParticipant?.name || "参加者"}</span>
+            を削除します。確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+          </p>
+        }
+        confirmWord="DELETE"
+        confirmLabel={removeInProgress ? "削除中…" : "削除"}
+        confirmKind="danger"
+        pending={removeInProgress}
+        onClose={closeRemoveParticipantDialog}
+        onConfirm={confirmRemoveParticipant}
+      />
       {renameDialogParticipant && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"

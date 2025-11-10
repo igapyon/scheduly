@@ -26,6 +26,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 開発時: `npm run dev`（`webpack-dev-server` ポート 5173）でホットリロード。  
 - ビルド: `npm run build` → `npm run postbuild`（`scripts/copy-static.js` が `public` → `dist` を複製）。  
 - **Lint**: UI / ロジック変更時は `npm run lint` をこまめに実行し、共有のコード規約と静的解析の結果を即時フィードバックする。
+- **Typecheck**: 共通型や JSDoc 連携の破綻を早期に検知するため、`npm run typecheck`（TypeScript + `checkJs`）も定期実行する。
 
 ### 1.2 レガシーモック（HTML 版 / アプリスナップショット）
 - 位置: `public/legacy/*.html`
@@ -37,6 +38,10 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
+- オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
+- API サーバは `/api/healthz`（常時 200）と `/api/readyz`（起動直後のみ 503、それ以外は 200）で監視でき、すべてのリクエストに `X-Request-ID` と構造化ログを付与している。ログは JSON 1 行形式で `ts/level/msg/...` を含む。`SCHEDULY_API_BODY_LIMIT` で `express.json` の受信上限（既定: `256kb`）を変更できる。共有URLの基準は `SCHEDULY_SHARE_BASE_URL`（または `BASE_URL`）で上書きでき、未指定の場合はフロントエンドから渡された `baseUrl` を優先する。
+- フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) も API ドライバ時はサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
+- 共通のデータ型は `src/shared/types.ts` に TypeScript で集約している。フロント／サーバ双方で `@typedef {import('../shared/types')...}` を用い、プロジェクトスナップショットや共有トークン、候補・参加者の構造を参照する。
 
 ---
 
@@ -98,19 +103,22 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 最高
-- API バックエンド（揮発性 Node.js in-memory）を実装する（`docs/internal/spec-server-integration-wip.md` の構成・エンドポイントに沿って CRUD/HW/ログを整備）
-- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する（`docs/internal/spec-api-flow.md` 6.8 参照）
-- 共有データ型を `src/shared/types.ts` に集約し、JSDoc/TS 型チェックを導入する（`docs/internal/spec-api-flow.md` 6.9 参照）
-- 楽観更新ヘルパーを実装し、サービス層へ適用する（`docs/internal/spec-api-flow.md` 6.10 参照）
 - 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
 - API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
+- `projectService` 以外のサービス層（候補/参加者/回答など）を driver 化し、API ドライバ有効時は fetch 経由で CRUD を実行する（`src/frontend/services/*-service.js` の各操作を段階的に置換。既存の store 操作は local driver として温存する）。
+- API ドライバ利用時の初期スナップショット同期完了を UI に伝える仕組みと、競合/更新失敗時のロールバック・トースト連携（`admin.jsx` / `user.jsx`）を整備する。現状は `projectService` での `/meta` 同期のみのため、他操作でも 409/422 をユーザーに通知できるよう統一する。
+- 参加者URLの自動表示／遷移仕様を見直し、必要なら管理者URLと同じく発行直後に新URLへ誘導する方針へ揃える。
+- 管理/参加者 UI に「BETA」バッジやロゴを表示し、利用者が試験運用版であると認識できるようにする。
+- 参加者画面ヘッダー右下に控えめサイズの「管理画面へ」リンクを配置し、クリック時は空の管理画面へ遷移（遷移前にダイアログで定型文字を入力させる）。参加者画面のURLは引き継がない。
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
 - `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
-- I/O の日時表現統一（APIはISO8601+TZ、内部はUTC正規化）
+- I/O の日時表現統一
+  - API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
+  - UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
@@ -152,6 +160,11 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 入力制約と並行更新時の振る舞い（version/timestamp/409 ハンドリング）を `docs/internal/spec-api-flow.md` に整理
 - エラーハンドリング標準化（409/413/401/403/ネットワーク）を `docs/internal/spec-api-flow.md` に整理
 - バリデーション共通スキーマ導入計画（Zod ベースの shared/schema）を `docs/internal/spec-api-flow.md` に記載
+- 共有データ型を `src/shared/types.ts` に集約し、TypeScript/JSDoc 型チェックを導入
+- バリデーション共通スキーマ（Zod）を実装し、フロント/サーバが `src/shared/schema` を共有する
+- 楽観更新ヘルパーを実装し、API ドライバ操作（回答/候補/参加者/共有トークン）へ段階的に適用
+- 共有URL再発行時は常に新しい管理者URLへ遷移させる（UIトグル廃止、挙動一本化）
+- 共有URL再発行ボタンへ「REISSUE」入力必須の確認ダイアログを導入し、誤操作防止を強化
 - ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
 - 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
 - サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
@@ -221,6 +234,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ```
 - `npm run lint`
+- `npm run typecheck`
 ```
 
 - コメントを提出する前に、lint やテスト実行コマンドが最新の状態か再確認する。
@@ -296,7 +310,7 @@ Appendix: Excel 出力（参加者 UI）
   - ステータスメッセージは一定時間で自動消滅（最新入力でタイマーを更新）。
 
 実装メモ
-- バリデーションは `src/frontend/shared/validation.js` の薄いヘルパで実施（後で zod に置換可能）。
+- バリデーションは `src/shared/schema/index.js` の Zod スキーマで実施し、フロント／サーバ双方が同じ定義を参照する。
 - 管理UIの候補編集は、未完成フォーマット時は検証スキップ、完成時のみ検証。順序NG時も入力は保存し、赤枠とトーストのみ。
 
 詳細説明は `docs/internal/spec-validation-policy.md` を参照。

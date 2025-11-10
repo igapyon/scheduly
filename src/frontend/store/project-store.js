@@ -1,5 +1,14 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
+/**
+ * @typedef {import("../../shared/types").ShareTokens} ShareTokens
+ * @typedef {import("../../shared/types").ProjectSnapshot} ProjectSnapshot
+ * @typedef {import("../../shared/types").ScheduleCandidate} ScheduleCandidate
+ * @typedef {import("../../shared/types").Participant} ProjectParticipant
+ * @typedef {import("../../shared/types").ParticipantResponse} ProjectResponse
+ * @typedef {import("../../shared/types").VersionState} VersionState
+ */
+
 const { DEFAULT_TZID } = require("../shared/ical-utils");
 
 const DEFAULT_PROJECT_ID = "demo-project";
@@ -103,6 +112,29 @@ const cloneTallies = (tallies) => {
   return next;
 };
 
+const createInitialVersions = () => ({
+  metaVersion: 1,
+  candidatesVersion: 0,
+  candidatesListVersion: 0,
+  participantsVersion: 0,
+  responsesVersion: 0,
+  shareTokensVersion: 1
+});
+
+const sanitizeVersions = (raw) => {
+  const defaults = createInitialVersions();
+  if (!raw || typeof raw !== "object") {
+    return defaults;
+  }
+  Object.keys(defaults).forEach((key) => {
+    const value = raw[key];
+    if (Number.isInteger(value) && value >= 0) {
+      defaults[key] = value;
+    }
+  });
+  return defaults;
+};
+
 const projectStore = new Map();
 const listeners = new Map();
 const participantTokenIndex = new Map();
@@ -190,7 +222,8 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
     candidates: [],
     participants: [],
     responses: [],
-    derived: createInitialDerivedState()
+    derived: createInitialDerivedState(),
+    versions: createInitialVersions()
   };
 };
 
@@ -209,6 +242,7 @@ const ensureProjectStateShape = (projectId, rawState, { includeDemoToken = false
     ...baseDerived,
     tallies: cloneTallies(baseDerived.tallies)
   };
+  nextState.versions = sanitizeVersions(rawState.versions);
   return nextState;
 };
 
@@ -219,10 +253,22 @@ const notify = (projectId) => {
   subs.forEach((callback) => callback(snapshot));
 };
 
+/**
+ * @param {ScheduleCandidate[]} candidates
+ * @returns {ScheduleCandidate[]}
+ */
 const cloneCandidates = (candidates) => candidates.map((item) => ({ ...item }));
 
+/**
+ * @param {ProjectParticipant[]} participants
+ * @returns {ProjectParticipant[]}
+ */
 const cloneParticipants = (participants) => participants.map((item) => ({ ...item }));
 
+/**
+ * @param {ProjectResponse[]} responses
+ * @returns {ProjectResponse[]}
+ */
 const cloneResponses = (responses) => responses.map((item) => ({ ...item }));
 
 function rebuildParticipantTokenIndex(projectId) {
@@ -549,6 +595,25 @@ const updateProjectMeta = (projectId, changes) => {
   return getProjectStateSnapshot(projectId);
 };
 
+const updateProjectVersions = (projectId, changes) => {
+  const state = ensureProjectEntry(projectId);
+  const nextVersions = sanitizeVersions({
+    ...state.versions,
+    ...(changes && typeof changes === "object" ? changes : {})
+  });
+  const current = state.versions || createInitialVersions();
+  const isSame = Object.keys(nextVersions).every((key) => nextVersions[key] === current[key]);
+  if (isSame) {
+    return getProjectStateSnapshot(projectId);
+  }
+  const nextState = {
+    ...state,
+    versions: nextVersions
+  };
+  setProjectState(projectId, nextState);
+  return getProjectStateSnapshot(projectId);
+};
+
 const subscribeProjectState = (projectId, callback) => {
   const subs = listeners.get(projectId) ?? new Set();
   subs.add(callback);
@@ -587,7 +652,8 @@ const sanitizeParticipants = (list) => {
       email: typeof item.email === "string" ? item.email : "",
       comment: typeof item.comment === "string" ? item.comment : "",
       createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
-      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+      version: Number.isInteger(item.version) ? item.version : 1
     });
     return acc;
   }, []);
@@ -633,7 +699,9 @@ const sanitizeResponsesForImport = (list, validParticipantIds, validCandidateIds
       candidateId,
       mark: typeof item.mark === "string" ? item.mark : "",
       comment: typeof item.comment === "string" ? item.comment : "",
-      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+      createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+      updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+      version: Number.isInteger(item.version) ? item.version : 1
     });
     return acc;
   }, []);
@@ -681,6 +749,9 @@ const sanitizeImportedState = (projectId, rawState) => {
   nextState.participants = participants;
   nextState.candidates = candidates;
   nextState.responses = responses;
+  if (rawState?.versions && typeof rawState.versions === "object") {
+    nextState.versions = sanitizeVersions(rawState.versions);
+  }
   return nextState;
 };
 
@@ -710,6 +781,113 @@ const importProjectState = (projectId = DEFAULT_PROJECT_ID, payload = null) => {
   const sanitized = sanitizeImportedState(projectId, rawState);
   setProjectState(projectId, sanitized);
   return getProjectStateSnapshot(projectId);
+};
+
+const convertApiCandidates = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const id = isNonEmptyString(item.candidateId) ? item.candidateId : null;
+      if (!id) return null;
+      return {
+        id,
+        uid: isNonEmptyString(item.uid) ? item.uid : "",
+        summary: typeof item.summary === "string" ? item.summary : "",
+        dtstart: typeof item.dtstart === "string" ? item.dtstart : "",
+        dtend: typeof item.dtend === "string" ? item.dtend : "",
+        tzid: typeof item.tzid === "string" && item.tzid ? item.tzid : DEFAULT_TZID,
+        status: typeof item.status === "string" ? item.status : "TENTATIVE",
+        location: typeof item.location === "string" ? item.location : "",
+        description: typeof item.description === "string" ? item.description : "",
+        sequence: Number.isInteger(item.sequence) ? item.sequence : 0,
+        dtstamp: typeof item.dtstamp === "string" ? item.dtstamp : "",
+        rawICalVevent: null,
+        version: Number.isInteger(item.version) ? item.version : undefined,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
+        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined
+      };
+    })
+    .filter(Boolean);
+};
+
+const convertApiParticipants = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const id = isNonEmptyString(item.participantId) ? item.participantId : null;
+      if (!id) return null;
+      return {
+        id,
+        token: isNonEmptyString(item.token) ? item.token : "",
+        displayName: typeof item.displayName === "string" ? item.displayName : "",
+        email: typeof item.email === "string" ? item.email : "",
+        comment: typeof item.comment === "string" ? item.comment : "",
+        status: typeof item.status === "string" ? item.status : "active",
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString()
+      };
+    })
+    .filter(Boolean);
+};
+
+const convertApiResponses = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const participantId = isNonEmptyString(item.participantId) ? item.participantId : null;
+      const candidateId = isNonEmptyString(item.candidateId) ? item.candidateId : null;
+      if (!participantId || !candidateId) return null;
+      const responseId = isNonEmptyString(item.responseId) ? item.responseId : `${participantId}:${candidateId}`;
+      return {
+        id: responseId,
+        participantId,
+        candidateId,
+        mark: typeof item.mark === "string" ? item.mark : "",
+        comment: typeof item.comment === "string" ? item.comment : "",
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
+        version: Number.isInteger(item.version) ? item.version : 1
+      };
+    })
+    .filter(Boolean);
+};
+
+const replaceStateFromApi = (projectId, snapshot) => {
+  if (!snapshot || typeof snapshot !== "object") {
+    return getProjectStateSnapshot(projectId);
+  }
+
+  const shareTokens = snapshot.shareTokens || {};
+  const basePayload = {
+    version: PROJECT_EXPORT_VERSION,
+    state: {
+      project: {
+        id: snapshot.project?.projectId || projectId,
+        name: typeof snapshot.project?.name === "string" ? snapshot.project.name : "",
+        description: typeof snapshot.project?.description === "string" ? snapshot.project.description : "",
+        defaultTzid:
+          typeof snapshot.project?.defaultTzid === "string" && snapshot.project.defaultTzid
+            ? snapshot.project.defaultTzid
+            : DEFAULT_TZID,
+        shareTokens: {
+          admin: shareTokens.admin,
+          participant: shareTokens.participant
+        },
+        createdAt: typeof snapshot.project?.createdAt === "string" ? snapshot.project.createdAt : undefined,
+        updatedAt: typeof snapshot.project?.updatedAt === "string" ? snapshot.project.updatedAt : undefined
+      },
+      icsText: "",
+      candidates: convertApiCandidates(snapshot.candidates),
+      participants: convertApiParticipants(snapshot.participants),
+      responses: convertApiResponses(snapshot.responses),
+      versions: snapshot.versions
+    }
+  };
+
+  return importProjectState(projectId, basePayload);
 };
 
 const cloneState = (state) => JSON.parse(JSON.stringify(state));
@@ -834,6 +1012,7 @@ module.exports = {
   resolveProjectIdFromLocation,
   getProjectStateSnapshot,
   updateProjectMeta,
+  updateProjectVersions,
   subscribeProjectState,
   getCandidates,
   replaceCandidates,
@@ -844,6 +1023,7 @@ module.exports = {
   getShareTokens,
   findProjectByShareToken,
   updateShareTokens,
+  updateProjectVersions,
   getParticipants,
   replaceParticipants,
   upsertParticipant,
@@ -857,5 +1037,6 @@ module.exports = {
   resetProject,
   exportProjectState,
   importProjectState,
+  replaceStateFromApi,
   replaceTallies
 };

@@ -268,7 +268,7 @@ shareService.rotate(projectId, {
 - **モジュール構成**
   - `src/shared/schema/index.ts`（新規）に Zod スキーマをまとめる。`ProjectMetaSchema`, `CandidateSchema`, `ParticipantSchema`, `ResponseSchema`, `ShareTokensSchema`, `SnapshotSchema` など。
   - `src/shared/types.ts` はスキーマから `z.infer<typeof CandidateSchema>` で型を生成し、既存の型定義を置き換える。
-  - クライアント側の軽量ヘルパ `src/frontend/shared/validation.js` は Zod ベースへリファクタし、UI 向けの `safeParseWithFriendlyErrors(schema, data)` を提供する。
+  - クライアント／サーバ双方で `src/shared/schema/index.js` の Zod スキーマを利用し、`safeParse` からフィールド名を抽出して UI へ返す。
 
 - **サーバ側パイプライン**
   - Express ミドルウェア `validateBody(schema)` / `validateQuery(schema)` を用意し、各ルートで適用。

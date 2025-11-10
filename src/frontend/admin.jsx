@@ -1,16 +1,18 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import { useEffect, useState, useId, useRef, Fragment } from "react";
+import { useEffect, useState, useId, useRef, Fragment, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
 import projectService from "./services/project-service";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
+import runtimeConfig from "./shared/runtime-config";
 import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
+import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
@@ -18,6 +20,7 @@ const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 void Fragment;
 void EventMeta;
 void InfoBadge;
+void TypeConfirmationDialog;
 void ClipboardIcon;
 void CheckIcon;
 
@@ -58,6 +61,35 @@ const ICAL_STATUS_BADGE_CLASSES = {
   CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-600",
   TENTATIVE: "border-amber-200 bg-amber-50 text-amber-600",
   CANCELLED: "border-rose-200 bg-rose-50 text-rose-600"
+};
+
+const CANDIDATE_COMPARE_KEYS = [
+  "summary",
+  "status",
+  "dtstart",
+  "dtend",
+  "tzid",
+  "location",
+  "description",
+  "uid",
+  "sequence",
+  "dtstamp"
+];
+
+const SHARE_REISSUE_WORD = "REISSUE";
+const PROJECT_IMPORT_WORD = "IMPORT";
+const DEMO_IMPORT_WORD = "DEMO";
+
+const normalizeCandidateCompareValue = (value) => {
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value : String(value);
+};
+
+const areCandidatesEqual = (a, b) => {
+  if (!a || !b) return false;
+  return CANDIDATE_COMPARE_KEYS.every(
+    (key) => normalizeCandidateCompareValue(a[key]) === normalizeCandidateCompareValue(b[key])
+  );
 };
 
 function formatIcalStatusLabel(status) {
@@ -118,6 +150,11 @@ const buildICalEventLines = (candidate, { dtstampLine, sequence }) => {
   return veventLines;
 };
 
+const normalizeBaseUrlInput = (value) => {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\/+$/, "");
+};
+
 const joinICalLines = (lines) => lines.filter(Boolean).join(ICAL_LINE_BREAK) + ICAL_LINE_BREAK;
 
 function SectionCard({ title, description, action, children, infoTitle, infoMessage, bodyClassName = "", containerClassName, titleClassName, iconClassName, headerBadge }) {
@@ -145,7 +182,18 @@ function SectionCard({ title, description, action, children, infoTitle, infoMess
   );
 }
 
-function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemove, isOpen = false, onToggleOpen, errors = {} }) {
+function CandidateCard({
+  index,
+  value,
+  onChange,
+  onCommit,
+  onRemove,
+  onExport,
+  disableRemove,
+  isOpen = false,
+  onToggleOpen,
+  errors = {}
+}) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
@@ -226,6 +274,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.summary}
               onChange={(e) => onChange({ ...value, summary: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.summary ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.summary ? "true" : undefined}
               placeholder="例: 秋の合宿 調整会議 Day1"
@@ -241,6 +290,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.status}
               onChange={(e) => onChange({ ...value, status: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.status ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.status ? "true" : undefined}
             >
@@ -256,6 +306,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtstart}
               onChange={(e) => onChange({ ...value, dtstart: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtstart ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.dtstart ? "true" : undefined}
             />
@@ -266,6 +317,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="datetime-local"
               value={value.dtend}
               onChange={(e) => onChange({ ...value, dtend: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.dtend ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.dtend ? "true" : undefined}
             />
@@ -276,6 +328,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
             <select
               value={value.tzid}
               onChange={(e) => onChange({ ...value, tzid: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.tzid ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.tzid ? "true" : undefined}
             >
@@ -292,6 +345,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
               type="text"
               value={value.location}
               onChange={(e) => onChange({ ...value, location: e.target.value })}
+              onBlur={onCommit}
               className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.location ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
               aria-invalid={errors.location ? "true" : undefined}
               placeholder="例: サントリーホール 大ホール"
@@ -309,6 +363,7 @@ function CandidateCard({ index, value, onChange, onRemove, onExport, disableRemo
           <textarea
             value={value.description}
             onChange={(e) => onChange({ ...value, description: e.target.value })}
+            onBlur={onCommit}
             rows={3}
             className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${errors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
             aria-invalid={errors.description ? "true" : undefined}
@@ -465,28 +520,44 @@ function OrganizerApp() {
   const [candidates, setCandidates] = useState([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [shareTokens, setShareTokens] = useState({});
-  const [baseUrl, setBaseUrl] = useState(() => resolveDefaultBaseUrl());
+  const initialBaseUrlRef = useRef(resolveDefaultBaseUrl());
+  const [baseUrlDraft, setBaseUrlDraft] = useState(() => initialBaseUrlRef.current);
+  const [baseUrlEffective, setBaseUrlEffective] = useState(() => initialBaseUrlRef.current);
   const baseUrlTouchedRef = useRef(false);
-  const [navigateAfterGenerate, setNavigateAfterGenerate] = useState(false);
   const [toast, setToast] = useState("");
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
   const autoIssueHandledRef = useRef(false);
   const [projectDeleteDialogOpen, setProjectDeleteDialogOpen] = useState(false);
-  const [projectDeleteConfirm, setProjectDeleteConfirm] = useState("");
   const [projectDeleteInProgress, setProjectDeleteInProgress] = useState(false);
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
-  const [candidateDeleteConfirm, setCandidateDeleteConfirm] = useState("");
   const [candidateDeleteInProgress, setCandidateDeleteInProgress] = useState(false);
   const [openCandidateId, setOpenCandidateId] = useState(null);
   const [candidateErrors, setCandidateErrors] = useState(() => ({}));
   const [metaErrors, setMetaErrors] = useState(() => ({ name: false, description: false }));
-  const metaWarnedRef = useRef({ name: false, description: false });
+  const [metaSyncStatus, setMetaSyncStatus] = useState(() => ({ phase: "idle", message: "" }));
+  const metaWarnedRef = useRef({ nameLength: false, nameRequired: false, descriptionLength: false });
+  const [shareReissueDialogOpen, setShareReissueDialogOpen] = useState(false);
+  const [shareActionInProgress, setShareActionInProgress] = useState(false);
+  const [projectImportDialogOpen, setProjectImportDialogOpen] = useState(false);
+  const [projectImportInProgress, setProjectImportInProgress] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [demoImportDialogOpen, setDemoImportDialogOpen] = useState(false);
+  const [demoImportInProgress, setDemoImportInProgress] = useState(false);
+
+  const popToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 1800);
+  }, []);
 
   // 横スクロール抑止のグローバル適用は不要になったため削除
 
   const isAdminShareMiss = routeContext?.kind === "share-miss" && routeContext?.shareType === "admin";
+
+  useEffect(() => {
+    setMetaSyncStatus({ phase: "idle", message: "" });
+  }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -502,15 +573,17 @@ function OrganizerApp() {
       setRouteContext(resolved.routeContext);
       setInitialRouteContext(resolved.routeContext);
       const state = resolved.state || {};
-      setSummary(state.project?.name || "");
-      setDescription(state.project?.description || "");
-      setCandidates(state.candidates || []);
+      applySyncedMeta(state.project?.name || "", state.project?.description || "");
+      applySyncedCandidates(state.candidates || []);
 
       const tokens = shareService.get(resolved.projectId);
       setShareTokens(tokens);
       const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
+      const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
       baseUrlTouchedRef.current = false;
-      setBaseUrl(derivedBaseUrl);
+      initialBaseUrlRef.current = normalizedBaseUrl;
+      setBaseUrlDraft(normalizedBaseUrl);
+      setBaseUrlEffective(normalizedBaseUrl);
 
       try {
         await ensureDemoProjectData(resolved.projectId);
@@ -524,9 +597,8 @@ function OrganizerApp() {
 
       unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
         if (cancelled || !nextState) return;
-        setSummary(nextState.project?.name || "");
-        setDescription(nextState.project?.description || "");
-        setCandidates(nextState.candidates || []);
+        applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
+        applySyncedCandidates(nextState.candidates || []);
         // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
         setShareTokens(shareService.get(resolved.projectId));
         setRouteContext(projectService.getRouteContext());
@@ -543,44 +615,100 @@ function OrganizerApp() {
     };
   }, []);
 
-  useEffect(() => {
+  const syncedMetaRef = useRef({ name: "", description: "" });
+  const candidateSyncedRef = useRef(new Map());
+  const candidateDraftRef = useRef(new Map());
+
+  const applySyncedMeta = useCallback((nameValue = "", descriptionValue = "") => {
+    const normalizedName = nameValue || "";
+    const normalizedDescription = descriptionValue || "";
+    setSummary(normalizedName);
+    setDescription(normalizedDescription);
+    syncedMetaRef.current = { name: normalizedName, description: normalizedDescription };
+  }, []);
+
+  const applySyncedCandidates = useCallback((list) => {
+    const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
+    setCandidates(normalized);
+    const snapshotMap = new Map();
+    const draftMap = new Map();
+    normalized.forEach((item) => {
+      snapshotMap.set(item.id, { ...item });
+      draftMap.set(item.id, { ...item });
+    });
+    candidateSyncedRef.current = snapshotMap;
+    candidateDraftRef.current = draftMap;
+  }, []);
+
+  const clearCandidateErrors = useCallback((candidateId) => {
+    setCandidateErrors((prev) => {
+      if (!prev[candidateId]) return prev;
+      const next = { ...prev };
+      delete next[candidateId];
+      return next;
+    });
+  }, []);
+
+  const handleMetaBlur = useCallback(() => {
     if (!projectId) return;
+    const currentSynced = syncedMetaRef.current;
+    if (currentSynced.name === summary && currentSynced.description === description) {
+      return;
+    }
     projectService.updateMeta(projectId, { name: summary, description });
+    syncedMetaRef.current = { name: summary, description };
   }, [projectId, summary, description]);
 
   // Project meta live validation (length) with visual cues and one-shot toast
   useEffect(() => {
     const NAME_MAX = 120;
     const DESC_MAX = 2000;
-    const overName = (summary || "").length > NAME_MAX;
+    const rawSummary = summary || "";
+    const missingName = rawSummary.trim().length === 0;
+    const overName = rawSummary.length > NAME_MAX;
     const overDesc = (description || "").length > DESC_MAX;
-    setMetaErrors((prev) =>
-      prev.name !== overName || prev.description !== overDesc
-        ? { name: overName, description: overDesc }
-        : prev
-    );
-    if (overName && !metaWarnedRef.current.name) {
-      metaWarnedRef.current.name = true;
+    const nextErrors = {
+      name: missingName || overName,
+      description: overDesc
+    };
+    setMetaErrors((prev) => {
+      if (prev.name !== nextErrors.name || prev.description !== nextErrors.description) {
+        return nextErrors;
+      }
+      return prev;
+    });
+
+    if (missingName && !metaWarnedRef.current.nameRequired) {
+      metaWarnedRef.current.nameRequired = true;
+      popToast("プロジェクト名を入力してください");
+    } else if (!missingName && metaWarnedRef.current.nameRequired) {
+      metaWarnedRef.current.nameRequired = false;
+    }
+
+    if (overName && !metaWarnedRef.current.nameLength) {
+      metaWarnedRef.current.nameLength = true;
       popToast(`プロジェクト名は ${NAME_MAX} 文字以内で入力してください`);
+    } else if (!overName && metaWarnedRef.current.nameLength) {
+      metaWarnedRef.current.nameLength = false;
     }
-    if (!overName && metaWarnedRef.current.name) {
-      metaWarnedRef.current.name = false;
-    }
-    if (overDesc && !metaWarnedRef.current.description) {
-      metaWarnedRef.current.description = true;
+
+    if (overDesc && !metaWarnedRef.current.descriptionLength) {
+      metaWarnedRef.current.descriptionLength = true;
       popToast(`説明は ${DESC_MAX} 文字以内で入力してください`);
+    } else if (!overDesc && metaWarnedRef.current.descriptionLength) {
+      metaWarnedRef.current.descriptionLength = false;
     }
-    if (!overDesc && metaWarnedRef.current.description) {
-      metaWarnedRef.current.description = false;
-    }
-  }, [summary, description]);
+  }, [summary, description, popToast]);
 
   useEffect(() => {
     if (baseUrlTouchedRef.current) return;
     const derived = deriveBaseUrlFromAdminEntry(shareTokens?.admin);
     if (derived) {
       baseUrlTouchedRef.current = false;
-      setBaseUrl(derived);
+      const normalizedBaseUrl = normalizeBaseUrlInput(derived) || resolveDefaultBaseUrl();
+      initialBaseUrlRef.current = normalizedBaseUrl;
+      setBaseUrlDraft(normalizedBaseUrl);
+      setBaseUrlEffective(normalizedBaseUrl);
     }
   }, [shareTokens]);
 
@@ -599,56 +727,88 @@ function OrganizerApp() {
     }, 0);
   };
 
-  const updateCandidate = (id, next) => {
+  const handleCandidateDraftChange = (id, next) => {
+    setCandidates((prev) => {
+      let replaced = false;
+      const mapped = prev.map((item) => {
+        if (item.id === id) {
+          replaced = true;
+          return next;
+        }
+        return item;
+      });
+      if (replaced) {
+        return mapped;
+      }
+      return prev;
+    });
+    candidateDraftRef.current.set(id, { ...next });
+    clearCandidateErrors(id);
+  };
+
+  const markCandidateFieldErrors = (id, message) => {
+    let fields = [];
+    if (message.includes(":")) {
+      const after = message.split(":").slice(1).join(":").trim();
+      if (after.includes("must be after")) {
+        fields = ["dtstart", "dtend"];
+      } else {
+        fields = after.split(/[,\s]+/).filter(Boolean);
+      }
+    }
+    if (fields.length) {
+      setCandidateErrors((prev) => {
+        const current = prev[id] || {};
+        const nextFlags = { ...current };
+        fields.forEach((f) => {
+          const key = String(f).toLowerCase();
+          nextFlags[key] = true;
+        });
+        return { ...prev, [id]: nextFlags };
+      });
+    }
+  };
+
+  const persistCandidateChanges = async (id) => {
     if (!projectId) return;
+    const draft = candidateDraftRef.current.get(id);
+    const latest = draft || candidates.find((item) => item.id === id);
+    if (!latest) return;
+    const synced = candidateSyncedRef.current.get(id);
+    if (synced && areCandidatesEqual(synced, latest)) {
+      return;
+    }
     try {
-      updateScheduleCandidate(projectId, id, next);
-      // clear errors for this candidate on success
-      setCandidateErrors((prev) => ({ ...prev, [id]: {} }));
+      await updateScheduleCandidate(projectId, id, latest);
+      candidateSyncedRef.current.set(id, { ...latest });
+      clearCandidateErrors(id);
     } catch (error) {
       const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
       const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
       if (isValidation) {
-        // Validation errors are expected during editing; avoid noisy error logs
-        // but keep a lightweight trace for debugging when needed.
         console.debug("updateCandidate validation", msg);
       } else {
         console.error("updateCandidate error", error);
       }
       popToast(msg);
-      // parse fields from message to highlight
-      let fields = [];
-      if (msg.includes(":")) {
-        const after = msg.split(":").slice(1).join(":").trim();
-        if (after.includes("must be after")) {
-          fields = ["dtstart", "dtend"];
-        } else {
-          fields = after.split(/[,\s]+/).filter(Boolean);
-        }
-      }
-      if (fields.length) {
-        setCandidateErrors((prev) => {
-          const current = prev[id] || {};
-          const nextFlags = { ...current };
-          fields.forEach((f) => {
-            const key = String(f).toLowerCase();
-            nextFlags[key] = true;
-          });
-          return { ...prev, [id]: nextFlags };
-        });
-      }
+      markCandidateFieldErrors(id, msg);
     }
   };
 
-  const removeCandidate = (id) => {
+  const removeCandidate = async (id) => {
     if (!projectId) return;
-    removeScheduleCandidate(projectId, id);
+    await removeScheduleCandidate(projectId, id);
   };
 
-  const addCandidate = () => {
+  const addCandidate = async () => {
     if (!projectId) return;
-    addScheduleCandidate(projectId);
-    popToast("日程を追加しました");
+    try {
+      await addScheduleCandidate(projectId);
+      popToast("日程を追加しました");
+    } catch (error) {
+      console.error("Candidate add failed", error);
+      popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+    }
   };
 
   const handleExportAllCandidates = () => {
@@ -695,23 +855,20 @@ function OrganizerApp() {
   const openCandidateDeleteDialog = (candidate) => {
     if (!candidate || !candidate.id) return;
     setCandidateDeleteDialog(candidate);
-    setCandidateDeleteConfirm("");
     setCandidateDeleteInProgress(false);
   };
 
   const closeCandidateDeleteDialog = () => {
     if (candidateDeleteInProgress) return;
     setCandidateDeleteDialog(null);
-    setCandidateDeleteConfirm("");
     setCandidateDeleteInProgress(false);
   };
 
-  const confirmCandidateDelete = () => {
+  const confirmCandidateDelete = async () => {
     if (!candidateDeleteDialog) return;
-    if (candidateDeleteConfirm.trim() !== "DELETE") return;
     setCandidateDeleteInProgress(true);
     try {
-      removeCandidate(candidateDeleteDialog.id);
+      await removeCandidate(candidateDeleteDialog.id);
       popToast(`日程「${candidateDeleteDialog.summary || candidateDeleteDialog.id}」を削除しました`);
       closeCandidateDeleteDialog();
     } catch (error) {
@@ -724,23 +881,20 @@ function OrganizerApp() {
 
   const openProjectDeleteDialog = () => {
     setProjectDeleteDialogOpen(true);
-    setProjectDeleteConfirm("");
     setProjectDeleteInProgress(false);
   };
 
   const closeProjectDeleteDialog = () => {
     if (projectDeleteInProgress) return;
     setProjectDeleteDialogOpen(false);
-    setProjectDeleteConfirm("");
     setProjectDeleteInProgress(false);
   };
 
   const handleDeleteProject = () => {
     if (!projectId) return;
     const fresh = projectService.reset(projectId);
-    setSummary(fresh.project?.name || "");
-    setDescription(fresh.project?.description || "");
-    setCandidates(fresh.candidates || []);
+    applySyncedMeta(fresh.project?.name || "", fresh.project?.description || "");
+    applySyncedCandidates(fresh.candidates || []);
     baseUrlTouchedRef.current = false;
     refreshShareTokensState({ resetWhenMissing: true });
     setRouteContext(projectService.getRouteContext());
@@ -750,7 +904,6 @@ function OrganizerApp() {
   };
 
   const confirmProjectDelete = () => {
-    if (projectDeleteConfirm.trim() !== "DELETE") return;
     setProjectDeleteInProgress(true);
     try {
       handleDeleteProject();
@@ -911,32 +1064,95 @@ function OrganizerApp() {
     event.target.value = "";
   };
 
-  const refreshShareTokensState = (options = {}) => {
+  const refreshShareTokensState = useCallback((options = {}) => {
     if (!projectId) return shareTokens;
     const tokens = shareService.get(projectId);
     setShareTokens(tokens);
-    const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
-    if (derived && !baseUrlTouchedRef.current) {
-      baseUrlTouchedRef.current = false;
-      setBaseUrl(derived);
-    } else if (options.resetWhenMissing && !baseUrlTouchedRef.current) {
-      baseUrlTouchedRef.current = false;
-      setBaseUrl(resolveDefaultBaseUrl());
+    if (!baseUrlTouchedRef.current) {
+      const derived = deriveBaseUrlFromAdminEntry(tokens.admin);
+      if (derived) {
+        const normalized = normalizeBaseUrlInput(derived) || resolveDefaultBaseUrl();
+        initialBaseUrlRef.current = normalized;
+        setBaseUrlDraft(normalized);
+        setBaseUrlEffective(normalized);
+      } else if (options.resetWhenMissing) {
+        const fallback = resolveDefaultBaseUrl();
+        initialBaseUrlRef.current = fallback;
+        setBaseUrlDraft(fallback);
+        setBaseUrlEffective(fallback);
+      }
     }
     return tokens;
-  };
+  }, [projectId, shareTokens]);
 
   const handleBaseUrlBlur = () => {
-    setBaseUrl((prev) => {
-      const value = typeof prev === "string" ? prev.trim() : "";
-      return value.replace(/\/+$/, "");
+    setBaseUrlDraft((prev) => {
+      const normalized = normalizeBaseUrlInput(prev);
+      const resolved = normalized || initialBaseUrlRef.current || resolveDefaultBaseUrl();
+      setBaseUrlEffective((current) => (current === resolved ? current : resolved));
+      return resolved;
     });
   };
 
-  const popToast = (message) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 1800);
-  };
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
+      console.info("[Scheduly][admin] project driver", driver);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (!event || event.projectId !== projectId) return;
+      const { scope, phase, error, meta } = event;
+      if (scope === "meta") {
+        if (phase === "pending" || phase === "sending") {
+          setMetaSyncStatus({ phase: phase === "pending" ? "pending" : "sending", message: "" });
+        } else if (phase === "success") {
+          setMetaSyncStatus({ phase: "idle", message: "" });
+        } else if (phase === "validation-error") {
+          const message =
+            (error && error.payload && (error.payload.message || error.payload.error)) ||
+            "プロジェクト情報の保存に失敗しました。入力内容をご確認ください。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        } else if (phase === "conflict") {
+          const message = "サーバー側でプロジェクト情報が更新されました。最新情報を取得しています…";
+          setMetaSyncStatus({ phase: "refreshing", message });
+          popToast(message);
+        } else if (phase === "error") {
+          const message = "プロジェクト情報の同期中にエラーが発生しました。時間を置いて再度お試しください。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        }
+      } else if (scope === "snapshot") {
+        if (phase === "start") {
+          setMetaSyncStatus((prev) => ({
+            phase: prev.phase === "sending" ? prev.phase : "refreshing",
+            message: prev.message
+          }));
+        } else if (phase === "success") {
+          setMetaSyncStatus({ phase: "idle", message: "" });
+          if (meta && meta.reason === "conflict") {
+            popToast("サーバーの最新状態を反映しました。");
+          }
+        } else if (phase === "error") {
+          const message = "サーバーの最新状態を取得できませんでした。";
+          setMetaSyncStatus({ phase: "error", message });
+          popToast(message);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [projectId, popToast]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][admin] metaSyncStatus", metaSyncStatus);
+    }
+  }, [metaSyncStatus]);
 
   const copyTextToClipboard = async (value) => {
     if (!isNonEmptyString(value)) throw new Error("empty");
@@ -978,19 +1194,16 @@ function OrganizerApp() {
     }
   };
 
-  const handleShareLinkAction = () => {
+  const executeShareLinkAction = async () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってください。");
       return;
     }
-    const hasIssued = hasIssuedShareTokens;
-    if (hasIssued) {
-      const confirmed = window.confirm("共有URLを再発行します。以前のリンクは無効になります。続行しますか？");
-      if (!confirmed) return;
-    }
+    setShareActionInProgress(true);
     try {
+      const hasIssued = hasIssuedShareTokens;
       const action = hasIssued ? shareService.rotate : shareService.generate;
-      const result = action(projectId, { baseUrl, navigateToAdminUrl: navigateAfterGenerate });
+      const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: true });
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
       const notices = [];
@@ -1006,7 +1219,31 @@ function OrganizerApp() {
     } catch (error) {
       console.error("Share link generation error", error);
       popToast("共有URLの生成に失敗しました");
+    } finally {
+      setShareActionInProgress(false);
+      setShareReissueDialogOpen(false);
     }
+  };
+
+  const handleShareLinkAction = () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってください。");
+      return;
+    }
+    if (hasIssuedShareTokens) {
+      setShareReissueDialogOpen(true);
+      return;
+    }
+    void executeShareLinkAction();
+  };
+
+  const handleShareReissueConfirm = () => {
+    void executeShareLinkAction();
+  };
+
+  const closeShareReissueDialog = () => {
+    if (shareActionInProgress) return;
+    setShareReissueDialogOpen(false);
   };
 
   const handleCopyShareUrl = async (type) => {
@@ -1034,35 +1271,51 @@ function OrganizerApp() {
   };
 
   useEffect(() => {
+    const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[Scheduly][admin] project driver", driver);
+    }
     if (!projectId) return;
     if (autoIssueHandledRef.current) return;
-    const adminEntry = shareTokens?.admin || null;
-    const hasValidAdminToken =
-      adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
 
-    if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
-      autoIssueHandledRef.current = true;
-      return;
-    }
+    let cancelled = false;
 
-    if (hasValidAdminToken) {
-      updateLocationToAdminUrl(adminEntry);
-      autoIssueHandledRef.current = true;
-      return;
-    }
+    const run = async () => {
+      const adminEntry = shareTokens?.admin || null;
+      const hasValidAdminToken =
+        adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
 
-    try {
-      const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
-      const tokens = refreshShareTokensState({ resetWhenMissing: true });
-      const nextAdmin = tokens.admin || result.admin;
-      updateLocationToAdminUrl(nextAdmin);
-      popToast("共有URLを発行しました。コピーしてください");
-    } catch (error) {
-      console.error("Auto issue share URLs failed", error);
-    } finally {
-      autoIssueHandledRef.current = true;
-    }
-  }, [projectId, baseUrl, shareTokens, initialRouteContext]);
+      if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
+        autoIssueHandledRef.current = true;
+        return;
+      }
+
+      if (hasValidAdminToken) {
+        updateLocationToAdminUrl(adminEntry);
+        autoIssueHandledRef.current = true;
+        return;
+      }
+
+      try {
+        const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
+        if (cancelled) return;
+        const tokens = refreshShareTokensState({ resetWhenMissing: true });
+        const nextAdmin = tokens.admin || result.admin;
+        updateLocationToAdminUrl(nextAdmin);
+        popToast("共有URLを発行しました。コピーしてください");
+      } catch (error) {
+        console.error("Auto issue share URLs failed", error);
+      } finally {
+        autoIssueHandledRef.current = true;
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, baseUrlEffective, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
 
   const handleExportProjectInfo = () => {
     if (!projectId) {
@@ -1081,21 +1334,33 @@ function OrganizerApp() {
     }
   };
 
-  const handleProjectImportFromFile = async (event) => {
+  const handleProjectImportFromFile = (event) => {
     const file = event.target.files && event.target.files[0];
+    event.target.value = "";
     if (!file) return;
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
-      event.target.value = "";
       return;
     }
+    setPendingImportFile(file);
+    setProjectImportDialogOpen(true);
+  };
+
+  const closeProjectImportDialog = () => {
+    if (projectImportInProgress) return;
+    setProjectImportDialogOpen(false);
+    setPendingImportFile(null);
+  };
+
+  const confirmProjectImportFromFile = async () => {
+    if (!projectId || !pendingImportFile) {
+      popToast("インポートするファイルが見つかりませんでした");
+      closeProjectImportDialog();
+      return;
+    }
+    setProjectImportInProgress(true);
     try {
-      const confirmed = window.confirm("現在のプロジェクトを置き換えます。よろしいですか？");
-      if (!confirmed) {
-        event.target.value = "";
-        return;
-      }
-      const text = await file.text();
+      const text = await pendingImportFile.text();
       let parsed;
       try {
         parsed = JSON.parse(text);
@@ -1107,9 +1372,8 @@ function OrganizerApp() {
       }
       projectService.importState(projectId, parsed);
       const snapshot = projectService.getState(projectId);
-      setSummary(snapshot.project?.name || "");
-      setDescription(snapshot.project?.description || "");
-      setCandidates(snapshot.candidates || []);
+      applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
+      applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
@@ -1118,28 +1382,43 @@ function OrganizerApp() {
       popToast("プロジェクト情報をインポートしました");
     } catch (error) {
       console.error("Project import error", error);
-      popToast("プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+      popToast(
+        "プロジェクト情報のインポートに失敗しました: " + (error instanceof Error ? error.message : String(error))
+      );
     } finally {
-      event.target.value = "";
+      setProjectImportInProgress(false);
+      closeProjectImportDialog();
     }
   };
 
-  const handleProjectImportFromDemo = async () => {
+  const handleProjectImportFromDemo = () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       return;
     }
+    setDemoImportDialogOpen(true);
+  };
+
+  const closeDemoImportDialog = () => {
+    if (demoImportInProgress) return;
+    setDemoImportDialogOpen(false);
+  };
+
+  const confirmDemoImport = async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      closeDemoImportDialog();
+      return;
+    }
+    setDemoImportInProgress(true);
     try {
-      const confirmed = window.confirm("現在のプロジェクトをデモ用データで置き換えます。よろしいですか？");
-      if (!confirmed) return;
       const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const parsed = await res.json();
       projectService.importState(projectId, parsed);
       const snapshot = projectService.getState(projectId);
-      setSummary(snapshot.project?.name || "");
-      setDescription(snapshot.project?.description || "");
-      setCandidates(snapshot.candidates || []);
+      applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
+      applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
       refreshShareTokensState({ resetWhenMissing: true });
       setRouteContext(projectService.getRouteContext());
@@ -1148,7 +1427,12 @@ function OrganizerApp() {
       popToast("デモ用プロジェクトをインポートしました");
     } catch (error) {
       console.error("Demo project import error", error);
-      popToast("デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error)));
+      popToast(
+        "デモ用プロジェクトのインポートに失敗しました: " + (error instanceof Error ? error.message : String(error))
+      );
+    } finally {
+      setDemoImportInProgress(false);
+      closeDemoImportDialog();
     }
   };
 
@@ -1170,6 +1454,9 @@ function OrganizerApp() {
     participantShareEntry &&
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
+  const isMetaSyncSaving = metaSyncStatus.phase === "pending" || metaSyncStatus.phase === "sending";
+  const isMetaSyncRefreshing = metaSyncStatus.phase === "refreshing";
+  const metaSyncErrorMessage = metaSyncStatus.phase === "error" ? metaSyncStatus.message : "";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1189,11 +1476,28 @@ function OrganizerApp() {
                 指定された管理者用URLは無効になっています。新しい共有URLを再発行すると、正しいリンクを参加者と共有できます。
               </div>
             )}
+            {isMetaSyncSaving && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-sky-600">
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-sky-500" aria-hidden="true" />
+                <span>サーバーに保存しています…</span>
+              </div>
+            )}
+            {isMetaSyncRefreshing && !isMetaSyncSaving && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-slate-400" aria-hidden="true" />
+                <span>サーバーから最新の情報を取得しています…</span>
+              </div>
+            )}
+            {metaSyncErrorMessage && (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                {metaSyncErrorMessage}
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const entry = shareTokens?.participant;
                 if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
                   try {
@@ -1208,7 +1512,7 @@ function OrganizerApp() {
                     window.open(entry.url, "_blank");
                   }
                 } else {
-                  const result = shareService.generate(projectId, { baseUrl, navigateToAdminUrl: false });
+                  const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
                   const tokens = refreshShareTokensState({ resetWhenMissing: true });
                   const next = tokens.participant || result.participant;
                   if (next && next.url) {
@@ -1241,8 +1545,9 @@ function OrganizerApp() {
             action={
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300"
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
                 onClick={handleShareLinkAction}
+                disabled={shareActionInProgress}
               >
                 {shareActionLabel}
               </button>
@@ -1253,24 +1558,15 @@ function OrganizerApp() {
                 <span className="text-xs font-semibold text-zinc-500">基準URL</span>
                 <input
                   type="url"
-                  value={baseUrl}
+                  value={baseUrlDraft}
                   onChange={(event) => {
                     baseUrlTouchedRef.current = true;
-                    setBaseUrl(event.target.value);
+                    setBaseUrlDraft(event.target.value);
                   }}
                   onBlur={handleBaseUrlBlur}
                   placeholder="https://scheduly.app"
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                  checked={navigateAfterGenerate}
-                  onChange={(event) => setNavigateAfterGenerate(event.target.checked)}
-                />
-                発行後に管理者URLを開く
               </label>
             </div>
             <div className="space-y-3">
@@ -1351,6 +1647,7 @@ function OrganizerApp() {
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
+                onBlur={handleMetaBlur}
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.name ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクト名を入力"
               />
@@ -1363,6 +1660,7 @@ function OrganizerApp() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleMetaBlur}
                 rows={3}
                 className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm ${metaErrors.description ? "border-rose-300 focus:border-rose-400" : "border-zinc-200"}`}
                 placeholder="プロジェクトの概要を入力"
@@ -1425,7 +1723,8 @@ function OrganizerApp() {
                   index={index}
                   key={candidate.id}
                   value={candidate}
-                  onChange={(next) => updateCandidate(candidate.id, next)}
+                  onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
+                  onCommit={() => persistCandidateChanges(candidate.id)}
                   onRemove={() => openCandidateDeleteDialog(candidate)}
                   onExport={() => handleExportCandidate(candidate.id)}
                   disableRemove={candidates.length === 1}
@@ -1588,145 +1887,136 @@ function OrganizerApp() {
           </div>
         )}
 
-        {candidateDeleteDialog && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
-            onClick={closeCandidateDeleteDialog}
-          >
-            <div
-              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
-              role="dialog"
-              aria-modal="true"
-              aria-label="日程を削除"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-zinc-800">日程を削除</h2>
-                <button
-                  type="button"
-                  className="text-xs text-zinc-500"
-                  onClick={closeCandidateDeleteDialog}
-                  disabled={candidateDeleteInProgress}
-                >
-                  閉じる
-                </button>
-              </div>
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  confirmCandidateDelete();
-                }}
-              >
-                <p className="text-xs text-zinc-500">
-                  <span className="font-semibold text-zinc-700">
-                    {candidateDeleteDialog.summary || candidateDeleteDialog.id}
-                  </span>
-                  を削除するには、確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
-                </p>
-                <label className="block text-xs text-zinc-500">
-                  確認ワード
-                  <input
-                    type="text"
-                    value={candidateDeleteConfirm}
-                    onChange={(event) => setCandidateDeleteConfirm(event.target.value.toUpperCase())}
-                    placeholder="DELETE"
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    autoFocus
-                    autoComplete="off"
-                    disabled={candidateDeleteInProgress}
-                  />
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={closeCandidateDeleteDialog}
-                    disabled={candidateDeleteInProgress}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={candidateDeleteInProgress || candidateDeleteConfirm.trim() !== "DELETE"}
-                  >
-                    {candidateDeleteInProgress ? "削除中…" : "削除"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <TypeConfirmationDialog
+          open={shareReissueDialogOpen}
+          title="共有URLを再発行"
+          description={
+            <p className="text-xs text-zinc-500">
+              共有URLを再発行すると既存の管理者URL・参加者URLが
+              <strong>即座に無効</strong>になります。続行するには{" "}
+              <span className="font-mono text-zinc-700">{SHARE_REISSUE_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={SHARE_REISSUE_WORD}
+          confirmLabel="再発行する"
+          confirmKind="danger"
+          pending={shareActionInProgress}
+          onClose={closeShareReissueDialog}
+          onConfirm={handleShareReissueConfirm}
+        />
+        <TypeConfirmationDialog
+          open={Boolean(candidateDeleteDialog)}
+          title="日程を削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-700">
+                {candidateDeleteDialog?.summary || candidateDeleteDialog?.id || "日程"}
+              </span>
+              を削除します。確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={candidateDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={candidateDeleteInProgress}
+          onClose={closeCandidateDeleteDialog}
+          onConfirm={confirmCandidateDelete}
+        />
 
-        {projectDeleteDialogOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
-            onClick={closeProjectDeleteDialog}
-          >
-            <div
-              className="w-full max-w-sm space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
-              role="dialog"
-              aria-modal="true"
-              aria-label="プロジェクトを削除"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-zinc-800">プロジェクトを削除</h2>
-                <button
-                  type="button"
-                  className="text-xs text-zinc-500"
-                  onClick={closeProjectDeleteDialog}
-                  disabled={projectDeleteInProgress}
-                >
-                  閉じる
-                </button>
-              </div>
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  confirmProjectDelete();
-                }}
-              >
-                <p className="text-xs text-zinc-500">
-                  プロジェクトの候補・参加者・回答データをすべて削除します。確認のため{" "}
-                  <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
-                </p>
-                <label className="block text-xs text-zinc-500">
-                  確認ワード
-                  <input
-                    type="text"
-                    value={projectDeleteConfirm}
-                    onChange={(event) => setProjectDeleteConfirm(event.target.value.toUpperCase())}
-                    placeholder="DELETE"
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                    autoFocus
-                    autoComplete="off"
-                    disabled={projectDeleteInProgress}
-                  />
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={closeProjectDeleteDialog}
-                    disabled={projectDeleteInProgress}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={projectDeleteInProgress || projectDeleteConfirm.trim() !== "DELETE"}
-                  >
-                    {projectDeleteInProgress ? "削除中…" : "削除"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <TypeConfirmationDialog
+          open={projectDeleteDialogOpen}
+          title="プロジェクトを削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              プロジェクトの候補・参加者・回答データをすべて削除します。確認のため{" "}
+              <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={projectDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={projectDeleteInProgress}
+          onClose={closeProjectDeleteDialog}
+          onConfirm={confirmProjectDelete}
+        />
+
+        <TypeConfirmationDialog
+          open={projectImportDialogOpen}
+          title="プロジェクトをインポート"
+          description={
+            <p className="text-xs text-zinc-500">
+              現在のプロジェクトデータを
+              {pendingImportFile?.name ? (
+                <>
+                  <span className="font-semibold text-zinc-700"> {pendingImportFile.name} </span>
+                  に置き換えます。
+                </>
+              ) : (
+                "選択したファイルに置き換えます。"
+              )}
+              確認のため <span className="font-mono text-zinc-700">{PROJECT_IMPORT_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={PROJECT_IMPORT_WORD}
+          confirmLabel={projectImportInProgress ? "インポート中…" : "インポートする"}
+          confirmKind="primary"
+          pending={projectImportInProgress}
+          onClose={closeProjectImportDialog}
+          onConfirm={confirmProjectImportFromFile}
+        />
+
+        <TypeConfirmationDialog
+          open={demoImportDialogOpen}
+          title="デモ用プロジェクトを読み込む"
+          description={
+            <p className="text-xs text-zinc-500">
+              現在のプロジェクトをデモデータに置き換えます。確認のため{" "}
+              <span className="font-mono text-zinc-700">{DEMO_IMPORT_WORD}</span> と入力してください。
+            </p>
+          }
+          confirmWord={DEMO_IMPORT_WORD}
+          confirmLabel={demoImportInProgress ? "読み込み中…" : "読み込む"}
+          confirmKind="primary"
+          pending={demoImportInProgress}
+          onClose={closeDemoImportDialog}
+          onConfirm={confirmDemoImport}
+        />
+
+        <TypeConfirmationDialog
+          open={Boolean(candidateDeleteDialog)}
+          title="日程を削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-700">
+                {candidateDeleteDialog?.summary || candidateDeleteDialog?.id || "日程"}
+              </span>
+              を削除します。確認のため <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={candidateDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={candidateDeleteInProgress}
+          onClose={closeCandidateDeleteDialog}
+          onConfirm={confirmCandidateDelete}
+        />
+
+        <TypeConfirmationDialog
+          open={projectDeleteDialogOpen}
+          title="プロジェクトを削除"
+          description={
+            <p className="text-xs text-zinc-500">
+              プロジェクトの候補・参加者・回答データをすべて削除します。確認のため{" "}
+              <span className="font-mono text-zinc-700">DELETE</span> と入力してください。
+            </p>
+          }
+          confirmWord="DELETE"
+          confirmLabel={projectDeleteInProgress ? "削除中…" : "削除"}
+          confirmKind="danger"
+          pending={projectDeleteInProgress}
+          onClose={closeProjectDeleteDialog}
+          onConfirm={confirmProjectDelete}
+        />
 
         {toast && (
           <div className="pointer-events-none fixed inset-x-0 bottom-8 flex justify-center px-4">
