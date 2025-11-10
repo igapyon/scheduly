@@ -100,7 +100,8 @@
   - 重要操作（共有URL発行、ICS/JSON エクスポート、インポート、デモプロジェクトインポート、プロジェクト削除）は `operation` を `critical` とし、別ストリーム（監査ログ）にも複製。
 
 - **メトリクス**
-  - まずは Application Logs から計算できるサマリ（リクエスト数、4xx/5xx レート、平均レスポンス）を想定。将来的に Prometheus 等を導入する場合は `/api/metrics` エンドポイントで `http_request_duration_seconds` Histogram などを公開する。
+- まずは Application Logs から計算できるサマリ（リクエスト数、4xx/5xx レート、平均レスポンス）を想定。将来的に Prometheus 等を導入する場合は `/api/metrics` エンドポイントで `http_request_duration_seconds` Histogram などを公開する。
+- 実装済み: `/api/metrics` でリクエスト数・エラーレート・ルート別ステータス分布・最近のエラーを JSON で取得できる。Prometheus 等に移行する際はこのルートから移し替える。
   - フロントエンドでも `performance.now()` を用いて主要操作の所要時間を計測し、`debug` レベルで出力（将来の RUM 基盤を見据える）。
 
 - **アラート**
