@@ -110,7 +110,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 優先度: 最高
 - API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
-- 管理/参加者 UI に「BETA」バッジやロゴを表示し、利用者が試験運用版であると認識できるようにする。
 
 ### 優先度: 高
 - サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）

@@ -1447,6 +1447,9 @@ useEffect(() => {
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
               <span aria-hidden="true">📋</span>
               <span>Scheduly 参加者</span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold tracking-wide text-amber-700">
+                BETA
+              </span>
             </h1>
             <p className="mt-2 text-sm text-zinc-600">プロジェクト「{projectName}」の日程と回答状況です。</p>
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}

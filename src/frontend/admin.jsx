@@ -1695,6 +1695,9 @@ const recordCandidateConflict = useCallback(
             <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-bold text-zinc-900">
               <span aria-hidden="true">🗂️</span>
               <span className="break-words">Scheduly 管理</span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold tracking-wide text-amber-700">
+                BETA
+              </span>
             </h1>
             <p className="mt-2 break-words text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
