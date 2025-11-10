@@ -1627,7 +1627,7 @@ const recordCandidateConflict = useCallback(
   const hasIssuedShareTokens =
     (adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token)) ||
     (participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token));
-  const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを生成";
+  const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを発行";
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
   const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
@@ -1651,6 +1651,10 @@ const recordCandidateConflict = useCallback(
     participantShareEntry &&
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
+  const participantButtonLabel = participantShareReady ? "参加者画面を開く" : "共有URL発行待ち";
+  const participantButtonClass = participantShareReady
+    ? "inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+    : "inline-flex cursor-not-allowed items-center justify-center rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-400";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1696,15 +1700,16 @@ const recordCandidateConflict = useCallback(
             <button
               type="button"
               onClick={handleOpenParticipantView}
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+              disabled={!participantShareReady}
+              className={participantButtonClass}
             >
-              参加者画面を開く
+              {participantButtonLabel}
             </button>
           </div>
         </div>
         {!participantShareReady && (
           <p className="mt-1 text-[11px] text-zinc-500">
-            参加者URLが未発行の場合は、「参加者画面を開く」ボタンを押して共有URLを発行してください。発行後にもう一度押すと参加者画面へ移動します。
+            参加者URLが未発行です。右上の「共有URLを発行」ボタンで共有URLを作成すると、このボタンから参加者画面を開けるようになります。
           </p>
         )}
       </header>
