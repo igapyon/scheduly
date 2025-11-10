@@ -11,7 +11,6 @@ import runtimeConfig from "./shared/runtime-config";
 import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
-import { ensureDemoProjectData } from "./shared/demo-data";
 import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { describeMutationToast } from "./shared/mutation-message";
@@ -643,7 +642,7 @@ function OrganizerApp() {
     let cancelled = false;
     let unsubscribe = null;
 
-    const bootstrap = async () => {
+    const bootstrap = () => {
       const resolved = projectService.resolveProjectFromLocation();
       if (cancelled) {
         return;
@@ -664,16 +663,7 @@ function OrganizerApp() {
       initialBaseUrlRef.current = normalizedBaseUrl;
       setBaseUrlDraft(normalizedBaseUrl);
       setBaseUrlEffective(normalizedBaseUrl);
-
-      try {
-        await ensureDemoProjectData(resolved.projectId);
-      } catch (error) {
-        console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
-      } finally {
-        if (!cancelled) {
-          setInitialDataLoaded(true);
-        }
-      }
+      setInitialDataLoaded(true);
 
       unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
         if (cancelled || !nextState) return;
@@ -1593,8 +1583,7 @@ const recordCandidateConflict = useCallback(
             (parseError instanceof Error ? parseError.message : String(parseError))
         );
       }
-      projectService.importState(projectId, parsed);
-      const snapshot = projectService.getState(projectId);
+      const snapshot = await projectService.importState(projectId, parsed);
       applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
       applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
@@ -1638,8 +1627,7 @@ const recordCandidateConflict = useCallback(
       const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const parsed = await res.json();
-      projectService.importState(projectId, parsed);
-      const snapshot = projectService.getState(projectId);
+      const snapshot = await projectService.importState(projectId, parsed);
       applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
       applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;

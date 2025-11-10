@@ -224,9 +224,47 @@ const localExportState = (projectId, options = {}) => {
   return snapshot;
 };
 
+const normalizeImportSnapshot = (payload) => {
+  if (payload && typeof payload === "object" && typeof payload.state === "object") {
+    return payload.state;
+  }
+  return payload;
+};
+
+const getLocalMetaVersion = (projectId) => {
+  const snapshot = projectStore.getProjectStateSnapshot(projectId);
+  const version = snapshot?.versions?.metaVersion;
+  return Number.isInteger(version) && version > 0 ? version : 1;
+};
+
 const localImportState = (projectId, payload) => {
   if (!projectId) throw new Error("projectId is required");
   return projectStore.importProjectState(projectId, payload);
+};
+
+const apiImportState = async (projectId, payload) => {
+  if (!projectId) throw new Error("projectId is required");
+  const snapshotPayload = normalizeImportSnapshot(payload);
+  if (!snapshotPayload || typeof snapshotPayload !== "object") {
+    throw new Error("Invalid import payload");
+  }
+  const requestBody = {
+    version: getLocalMetaVersion(projectId),
+    snapshot: snapshotPayload
+  };
+  const response = await apiClient.post(
+    `/api/projects/${encodeURIComponent(projectId)}/import/json`,
+    requestBody
+  );
+  apiSyncState.readyProjects.delete(projectId);
+  const importedSnapshot = response?.snapshot;
+  if (importedSnapshot && typeof importedSnapshot === "object") {
+    projectStore.replaceStateFromApi(projectId, importedSnapshot);
+  } else {
+    projectStore.importProjectState(projectId, payload);
+  }
+  await syncProjectSnapshot(projectId, { force: true, reason: "import" });
+  return projectStore.getProjectStateSnapshot(projectId);
 };
 
 const localReset = (projectId) => {
@@ -446,13 +484,6 @@ const apiUpdateMeta = (projectId, changes) => {
 const apiReset = (projectId) => {
   const snapshot = localReset(projectId);
   syncProjectSnapshot(projectId, { force: true, reason: "reset" });
-  return snapshot;
-};
-
-const apiImportState = (projectId, payload) => {
-  const snapshot = localImportState(projectId, payload);
-  apiSyncState.readyProjects.delete(projectId);
-  syncProjectSnapshot(projectId, { force: true, reason: "import" });
   return snapshot;
 };
 

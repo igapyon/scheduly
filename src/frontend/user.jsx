@@ -16,7 +16,6 @@ import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
-import { ensureDemoProjectData } from "./shared/demo-data";
 import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
@@ -922,7 +921,7 @@ useEffect(() => {
   let cancelled = false;
   let unsubscribe = null;
 
-  const bootstrap = async () => {
+  const bootstrap = () => {
     const resolved = projectService.resolveProjectFromLocation();
     if (cancelled) return;
     setProjectId(resolved.projectId);
@@ -933,20 +932,9 @@ useEffect(() => {
     refreshParticipantConflictsFromState(resolved.state);
     setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
     setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
-    try {
-      await ensureDemoProjectData(resolved.projectId);
-      if (!cancelled) {
-        setLoadError("");
-      }
-    } catch (error) {
-      console.warn("[Scheduly] failed to seed demo data", error);
-      if (!cancelled) {
-        setLoadError(error instanceof Error ? error.message : String(error));
-      }
-    } finally {
-      if (!cancelled) {
-        setLoading(false);
-      }
+    if (!cancelled) {
+      setLoadError("");
+      setLoading(false);
     }
 
     unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {

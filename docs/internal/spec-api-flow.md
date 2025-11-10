@@ -302,7 +302,7 @@ shareService.rotate(projectId, {
 
 - **フロント側適用**
   - `projectStore`, `responseService`, `share-service`, `summaryService` などで重複している構造体定義を削除し、JSDoc import に置換。
-  - `demo-data.js` は `/** @type {ProjectSnapshot} */` を付け、サンプルデータの整合性を保つ。
+  - `public/proj/scheduly-project-sampledata-001.json` などデモ用サンプルも `/** @type {ProjectSnapshot} */` の型を守る（インポート時にバリデーションする）。
   - `validation.js` やコンポーネントで `import type` もしくは JSDoc 参照を利用し、引数・戻り値の型を共有する。
 
 - **サーバ側適用**
