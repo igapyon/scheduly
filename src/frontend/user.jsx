@@ -913,39 +913,63 @@ const dismissParticipantConflict = useCallback(
     if (currentUrl.pathname === desiredPath) return;
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
-    const resolved = projectService.resolveProjectFromLocation();
-    setRouteContext(resolved.routeContext);
+    let disposed = false;
+    (async () => {
+      try {
+        const resolved = await projectService.resolveProjectFromLocation();
+        if (!disposed && resolved) {
+          setRouteContext(resolved.routeContext);
+        }
+      } catch (error) {
+        console.error("Failed to refresh route context", error);
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
   }, [initialRouteContext, participantShareToken, routeError]);
 
 useEffect(() => {
   let cancelled = false;
   let unsubscribe = null;
 
-  const bootstrap = () => {
-    const resolved = projectService.resolveProjectFromLocation();
-    if (cancelled) return;
-    setProjectId(resolved.projectId);
-    setInitialRouteContext(resolved.routeContext);
-    setRouteContext(resolved.routeContext);
-    setProjectState(resolved.state);
-    projectStateRef.current = resolved.state;
-    refreshParticipantConflictsFromState(resolved.state);
-    setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
-    setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
-    if (!cancelled) {
-      setLoadError("");
-      setLoading(false);
-    }
+  const bootstrap = async () => {
+    try {
+      const resolved = await projectService.resolveProjectFromLocation();
+      if (cancelled || !resolved) return;
+      setProjectId(resolved.projectId);
+      setInitialRouteContext(resolved.routeContext);
+      setRouteContext(resolved.routeContext);
+      setProjectState(resolved.state);
+      projectStateRef.current = resolved.state;
+      refreshParticipantConflictsFromState(resolved.state);
+      setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
+      setParticipantSummaries(
+        summaryService.buildParticipantView(resolved.projectId, { state: resolved.state })
+      );
+      if (!cancelled) {
+        setLoadError("");
+        setLoading(false);
+      }
 
-    unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-      if (cancelled || !nextState) return;
-      setProjectState(nextState);
-      projectStateRef.current = nextState;
-      refreshParticipantConflictsFromState(nextState);
-      setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
-      setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
-      setRouteContext(projectService.getRouteContext());
-    });
+      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+        if (cancelled || !nextState) return;
+        setProjectState(nextState);
+        projectStateRef.current = nextState;
+        refreshParticipantConflictsFromState(nextState);
+        setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
+        setParticipantSummaries(
+          summaryService.buildParticipantView(resolved.projectId, { state: nextState })
+        );
+        setRouteContext(projectService.getRouteContext());
+      });
+    } catch (error) {
+      console.error("Failed to resolve participant project context", error);
+      if (!cancelled) {
+        setLoadError(error instanceof Error ? error.message : "Failed to load project");
+        setLoading(false);
+      }
+    }
   };
 
   bootstrap();

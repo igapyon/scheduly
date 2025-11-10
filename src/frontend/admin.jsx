@@ -581,7 +581,6 @@ const formatShareIssuedAtDisplay = (entry) => {
 function OrganizerApp() {
   const [projectId, setProjectId] = useState(null);
   const [routeContext, setRouteContext] = useState(null);
-  const [initialRouteContext, setInitialRouteContext] = useState(null);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [candidates, setCandidates] = useState([]);
@@ -641,37 +640,40 @@ function OrganizerApp() {
     let cancelled = false;
     let unsubscribe = null;
 
-    const bootstrap = () => {
-      const resolved = projectService.resolveProjectFromLocation();
-      if (cancelled) {
-        return;
+    const bootstrap = async () => {
+      try {
+        const resolved = await projectService.resolveProjectFromLocation();
+        if (cancelled || !resolved) {
+          return;
+        }
+
+        setProjectId(resolved.projectId);
+        setRouteContext(resolved.routeContext);
+        const state = resolved.state || {};
+        applySyncedMeta(state.project?.name || "", state.project?.description || "");
+        applySyncedCandidates(state.candidates || []);
+
+        const tokens = shareService.get(resolved.projectId);
+        setShareTokens(tokens);
+        const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
+        const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
+        baseUrlTouchedRef.current = false;
+        initialBaseUrlRef.current = normalizedBaseUrl;
+        setBaseUrlDraft(normalizedBaseUrl);
+        setBaseUrlEffective(normalizedBaseUrl);
+        setInitialDataLoaded(true);
+
+        unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+          if (cancelled || !nextState) return;
+          applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
+          applySyncedCandidates(nextState.candidates || []);
+          // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
+          setShareTokens(shareService.get(resolved.projectId));
+          setRouteContext(projectService.getRouteContext());
+        });
+      } catch (error) {
+        console.error("Failed to resolve project context", error);
       }
-
-      setProjectId(resolved.projectId);
-      setRouteContext(resolved.routeContext);
-      setInitialRouteContext(resolved.routeContext);
-      const state = resolved.state || {};
-      applySyncedMeta(state.project?.name || "", state.project?.description || "");
-      applySyncedCandidates(state.candidates || []);
-
-      const tokens = shareService.get(resolved.projectId);
-      setShareTokens(tokens);
-      const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
-      const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
-      baseUrlTouchedRef.current = false;
-      initialBaseUrlRef.current = normalizedBaseUrl;
-      setBaseUrlDraft(normalizedBaseUrl);
-      setBaseUrlEffective(normalizedBaseUrl);
-      setInitialDataLoaded(true);
-
-      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-        if (cancelled || !nextState) return;
-        applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
-        applySyncedCandidates(nextState.candidates || []);
-        // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
-        setShareTokens(shareService.get(resolved.projectId));
-        setRouteContext(projectService.getRouteContext());
-      });
     };
 
     bootstrap();
@@ -1381,26 +1383,6 @@ const recordCandidateConflict = useCallback(
       document.execCommand("copy");
     } finally {
       document.body.removeChild(textarea);
-    }
-  };
-
-  const updateLocationToAdminUrl = (entry) => {
-    if (!entry || !isNonEmptyString(entry.url)) return;
-    if (typeof window === "undefined") return;
-    try {
-      const target = new URL(entry.url);
-      const current = new URL(window.location.href);
-      if (target.origin === current.origin) {
-        window.history.replaceState(null, "", target.pathname + target.search + target.hash);
-        const resolved = projectService.resolveProjectFromLocation();
-        setProjectId(resolved.projectId);
-        setRouteContext(resolved.routeContext);
-      } else {
-        window.location.assign(entry.url);
-      }
-    } catch (error) {
-      console.warn("[Scheduly][admin] Failed to update location to admin URL", error);
-      window.location.assign(entry.url);
     }
   };
 

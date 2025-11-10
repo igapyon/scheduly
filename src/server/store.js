@@ -467,6 +467,10 @@ const buildIcsFromState = (state) => {
 class InMemoryProjectStore {
   constructor() {
     this.projects = new Map();
+    this.shareTokenIndex = {
+      admin: new Map(),
+      participant: new Map()
+    };
   }
 
   createProject(metaInput = {}) {
@@ -474,6 +478,7 @@ class InMemoryProjectStore {
     const projectId = generateId("proj");
     const state = createInitialProjectState(projectId, sanitizedMeta);
     this.projects.set(projectId, state);
+    this.#indexShareTokens(projectId, state.shareTokens);
     return this.#serializeProject(projectId);
   }
 
@@ -482,6 +487,7 @@ class InMemoryProjectStore {
     if (!state) {
       state = createInitialProjectState(projectId, {});
       this.projects.set(projectId, state);
+      this.#indexShareTokens(projectId, state.shareTokens);
       return this.#serializeProject(projectId);
     }
     return this.#serializeProject(projectId);
@@ -1062,7 +1068,9 @@ class InMemoryProjectStore {
       versions
     };
 
+    this.#removeShareTokensFromIndex(projectId, state.shareTokens);
     this.projects.set(projectId, nextState);
+    this.#indexShareTokens(projectId, nextState.shareTokens);
     return this.#serializeProject(projectId);
   }
 
@@ -1096,8 +1104,11 @@ class InMemoryProjectStore {
     if (rotatedByValue) {
       nextTokens.admin.lastGeneratedBy = rotatedByValue;
     }
+    const previousTokens = state.shareTokens;
     state.shareTokens = nextTokens;
     state.versions.shareTokensVersion += 1;
+    this.#removeShareTokensFromIndex(projectId, previousTokens);
+    this.#indexShareTokens(projectId, nextTokens);
     const latest = this.#serializeProject(projectId);
     return {
       shareTokens: latest.shareTokens,
@@ -1127,8 +1138,12 @@ class InMemoryProjectStore {
     if (!state.shareTokens || !state.shareTokens[type]) {
       throw new NotFoundError("Share token not found");
     }
+    const existingEntry = state.shareTokens[type];
     delete state.shareTokens[type];
     state.versions.shareTokensVersion += 1;
+    if (existingEntry) {
+      this.#removeShareTokensFromIndex(projectId, { [type]: existingEntry });
+    }
     const latest = this.#serializeProject(projectId);
     return {
       shareTokens: latest.shareTokens,
@@ -1142,6 +1157,46 @@ class InMemoryProjectStore {
       throw new NotFoundError("Project not found");
     }
     return state;
+  }
+
+  resolveProjectByShareToken(type, token) {
+    if (!SHARE_TOKEN_TYPES.includes(type)) {
+      throw new ValidationError("Invalid share token type", ["tokenType"]);
+    }
+    const normalizedToken = sanitizeString(token);
+    if (!normalizedToken) {
+      throw new ValidationError("token is required", ["token"]);
+    }
+    const projectId = this.shareTokenIndex[type].get(normalizedToken);
+    if (!projectId) {
+      throw new NotFoundError("Share token not found");
+    }
+    return {
+      projectId,
+      snapshot: this.#serializeProject(projectId)
+    };
+  }
+
+  #indexShareTokens(projectId, shareTokens = {}) {
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const entry = shareTokens[type];
+      if (entry && isNonEmptyString(entry.token)) {
+        this.shareTokenIndex[type].set(entry.token, projectId);
+      }
+    });
+  }
+
+  #removeShareTokensFromIndex(projectId, shareTokens = null) {
+    const state = this.projects.get(projectId);
+    const source = shareTokens || (state ? state.shareTokens : null) || {};
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const entry = source[type];
+      if (!entry || !isNonEmptyString(entry.token)) return;
+      const currentOwner = this.shareTokenIndex[type].get(entry.token);
+      if (currentOwner === projectId) {
+        this.shareTokenIndex[type].delete(entry.token);
+      }
+    });
   }
 
   #serializeProject(projectId) {

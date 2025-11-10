@@ -31,6 +31,53 @@ const apiSyncState = {
   metaValidationIssues: new Map()
 };
 
+const SESSION_PROJECT_STORAGE_KEY = "scheduly:project-id";
+
+const getStoredSessionProjectId = () => {
+  if (typeof window === "undefined" || !window.sessionStorage) return null;
+  try {
+    return window.sessionStorage.getItem(SESSION_PROJECT_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[Scheduly] Failed to read session project id", error);
+    return null;
+  }
+};
+
+const setStoredSessionProjectId = (projectId) => {
+  if (typeof window === "undefined" || !window.sessionStorage) return;
+  try {
+    if (projectId) {
+      window.sessionStorage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
+    } else {
+      window.sessionStorage.removeItem(SESSION_PROJECT_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("[Scheduly] Failed to write session project id", error);
+  }
+};
+
+const parseRouteFromLocation = () => {
+  if (typeof window === "undefined" || !window.location) {
+    return { kind: "server" };
+  }
+  const pathname = window.location.pathname || "/";
+  const normalized = pathname.replace(/^\/+/, "");
+  if (!normalized || normalized === "index.html" || normalized === "user.html") {
+    return { kind: "root" };
+  }
+  const segments = normalized.split("/");
+  const prefix = segments[0] || "";
+  const rawToken = segments[1] || "";
+  const token = decodeURIComponent(rawToken);
+  if ((prefix === "a" || prefix === "p" || prefix === "r") && token) {
+    return {
+      kind: prefix === "a" ? "admin" : "participant",
+      token
+    };
+  }
+  return { kind: "root" };
+};
+
 const META_SYNC_DELAY_MS = 600;
 const META_NAME_MAX = 120;
 const META_DESCRIPTION_MAX = 2000;
@@ -489,12 +536,102 @@ const apiUpdateMeta = (projectId, changes) => {
   return snapshot;
 };
 
-const apiResolveProjectFromLocation = () => {
-  const resolved = localResolveProjectFromLocation();
-  if (resolved && resolved.projectId) {
-    syncProjectSnapshot(resolved.projectId, { reason: "initial-load" });
+const resolveViaShareToken = async (routeInfo) => {
+  const typePath = routeInfo.kind === "admin" ? "admin" : "participant";
+  try {
+    const response = await apiClient.get(
+      `/api/projects/share/${typePath}/${encodeURIComponent(routeInfo.token)}`
+    );
+    const snapshot = {
+      project: response.project,
+      candidates: response.candidates,
+      participants: response.participants,
+      responses: response.responses,
+      shareTokens: response.shareTokens,
+      versions: response.versions
+    };
+    projectStore.replaceStateFromApi(response.projectId, snapshot);
+    projectStore.setRouteContext({
+      projectId: response.projectId,
+      kind: "share",
+      shareType: typePath,
+      token: routeInfo.token
+    });
+    apiSyncState.readyProjects.add(response.projectId);
+    return {
+      projectId: response.projectId,
+      state: projectStore.getProjectStateSnapshot(response.projectId),
+      routeContext: projectStore.getCurrentRouteContext()
+    };
+  } catch (error) {
+    if (error && error.status === 404) {
+      projectStore.setRouteContext({
+        projectId: projectStore.getDefaultProjectId(),
+        kind: "share-miss",
+        shareType: typePath,
+        token: routeInfo.token
+      });
+      return {
+        projectId: projectStore.getDefaultProjectId(),
+        state: projectStore.getProjectStateSnapshot(projectStore.getDefaultProjectId()),
+        routeContext: projectStore.getCurrentRouteContext()
+      };
+    }
+    throw error;
   }
-  return resolved;
+};
+
+const loadSessionProjectSnapshot = async (projectId) => {
+  projectStore.setRouteContext({ projectId, kind: "default" });
+  const snapshot = await syncProjectSnapshot(projectId, { reason: "initial-load" });
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    projectId,
+    state: projectStore.getProjectStateSnapshot(projectId),
+    routeContext: projectStore.getCurrentRouteContext()
+  };
+};
+
+const createFreshSessionProject = async () => {
+  const created = await apiCreate();
+  if (created && created.projectId) {
+    setStoredSessionProjectId(created.projectId);
+    projectStore.setRouteContext({ projectId: created.projectId, kind: "default" });
+    return {
+      projectId: created.projectId,
+      state: created.state || projectStore.getProjectStateSnapshot(created.projectId),
+      routeContext: projectStore.getCurrentRouteContext()
+    };
+  }
+  const fallbackId = projectStore.getDefaultProjectId();
+  projectStore.setRouteContext({ projectId: fallbackId, kind: "default" });
+  return {
+    projectId: fallbackId,
+    state: projectStore.getProjectStateSnapshot(fallbackId),
+    routeContext: projectStore.getCurrentRouteContext()
+  };
+};
+
+const resolveSessionProject = async () => {
+  const storedProjectId = getStoredSessionProjectId();
+  if (storedProjectId) {
+    const resolved = await loadSessionProjectSnapshot(storedProjectId);
+    if (resolved) {
+      return resolved;
+    }
+    setStoredSessionProjectId(null);
+  }
+  return createFreshSessionProject();
+};
+
+const apiResolveProjectFromLocation = async () => {
+  const routeInfo = parseRouteFromLocation();
+  if (routeInfo.kind === "admin" || routeInfo.kind === "participant") {
+    return resolveViaShareToken(routeInfo);
+  }
+  return resolveSessionProject();
 };
 
 const apiSubscribe = (projectId, callback) => {
@@ -527,7 +664,9 @@ const subscribe = (projectId, callback) =>
   (isApiEnabled() ? apiSubscribe(projectId, callback) : localSubscribe(projectId, callback));
 
 const resolveProjectFromLocation = () =>
-  (isApiEnabled() ? apiResolveProjectFromLocation() : localResolveProjectFromLocation());
+  (isApiEnabled()
+    ? apiResolveProjectFromLocation()
+    : Promise.resolve(localResolveProjectFromLocation()));
 
 const getRouteContext = () => localGetRouteContext();
 
