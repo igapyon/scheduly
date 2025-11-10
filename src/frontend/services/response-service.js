@@ -37,7 +37,7 @@ const mapApiResponse = (response) => {
   const participantId = response.participantId;
   const candidateId = response.candidateId;
   if (!participantId || !candidateId) return null;
-  const id = response.responseId || buildResponseId(participantId, candidateId);
+  const id = buildResponseId(participantId, candidateId);
   return {
     id,
     participantId,
