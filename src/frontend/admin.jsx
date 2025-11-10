@@ -595,7 +595,6 @@ function OrganizerApp() {
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
-  const autoIssueHandledRef = useRef(false);
   const [projectDeleteDialogOpen, setProjectDeleteDialogOpen] = useState(false);
   const [projectDeleteInProgress, setProjectDeleteInProgress] = useState(false);
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
@@ -1488,47 +1487,7 @@ const recordCandidateConflict = useCallback(
     if (process.env.NODE_ENV !== "production") {
       console.info("[Scheduly][admin] project driver", driver);
     }
-    if (!projectId) return;
-    if (autoIssueHandledRef.current) return;
-
-    let cancelled = false;
-
-    const run = async () => {
-      const adminEntry = shareTokens?.admin || null;
-      const hasValidAdminToken =
-        adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
-
-      if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
-        autoIssueHandledRef.current = true;
-        return;
-      }
-
-      if (hasValidAdminToken) {
-        updateLocationToAdminUrl(adminEntry);
-        autoIssueHandledRef.current = true;
-        return;
-      }
-
-      try {
-        const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
-        if (cancelled) return;
-        const tokens = refreshShareTokensState({ resetWhenMissing: true });
-        const nextAdmin = tokens.admin || result.admin;
-        updateLocationToAdminUrl(nextAdmin);
-        popToast("共有URLを発行しました。コピーしてください");
-      } catch (error) {
-        console.error("Auto issue share URLs failed", error);
-      } finally {
-        autoIssueHandledRef.current = true;
-      }
-    };
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, baseUrlEffective, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
+  }, [projectId]);
 
   const handleExportProjectInfo = () => {
     if (!projectId) {
@@ -1647,6 +1606,39 @@ const recordCandidateConflict = useCallback(
     }
   };
 
+  const handleOpenParticipantView = useCallback(async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    const entry = shareTokens?.participant;
+    const ready =
+      entry && !shareService.isPlaceholderToken(entry.token) && isNonEmptyString(entry.url);
+    if (!ready) {
+      try {
+        await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
+        refreshShareTokensState({ resetWhenMissing: true });
+        setRouteContext(projectService.getRouteContext());
+        popToast("参加者URLを発行しました。もう一度ボタンを押すと参加者画面へ移動します。");
+      } catch (error) {
+        console.error("Participant URL auto-issue failed", error);
+        popToast("参加者URLの発行に失敗しました。もう一度お試しください。");
+      }
+      return;
+    }
+    try {
+      const target = new URL(entry.url, window.location.origin);
+      if (target.origin === window.location.origin) {
+        window.location.assign(target.pathname + target.search + target.hash);
+      } else {
+        window.open(entry.url, "_blank");
+      }
+    } catch (error) {
+      void error;
+      window.open(entry.url, "_blank");
+    }
+  }, [projectId, shareTokens, baseUrlEffective, refreshShareTokensState, popToast, setRouteContext]);
+
 
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
@@ -1677,10 +1669,6 @@ const recordCandidateConflict = useCallback(
     participantShareEntry &&
     !shareService.isPlaceholderToken(participantShareEntry.token) &&
     isNonEmptyString(participantShareEntry.url);
-  const participantButtonTitle =
-    participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token)
-      ? "参加者画面を開きます"
-      : "参加者URLが未発行の場合でも、このボタンを押すと自動で発行してから開きます";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1725,35 +1713,7 @@ const recordCandidateConflict = useCallback(
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={async () => {
-                const entry = shareTokens?.participant;
-                if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
-                  try {
-                    const u = new URL(entry.url, window.location.origin);
-                    if (u.origin === window.location.origin) {
-                      window.location.assign(u.pathname + u.search + u.hash);
-                    } else {
-                      window.open(entry.url, "_blank");
-                    }
-                  } catch (error) {
-                    void error;
-                    window.open(entry.url, "_blank");
-                  }
-                } else {
-                  const result = await shareService.generate(projectId, {
-                    baseUrl: baseUrlEffective,
-                    navigateToAdminUrl: false
-                  });
-                  const tokens = refreshShareTokensState({ resetWhenMissing: true });
-                  const next = tokens.participant || result.participant;
-                  if (next && next.url) {
-                    window.location.assign(new URL(next.url, window.location.origin).pathname);
-                    popToast("参加者URLを発行して開きました");
-                  } else {
-                    popToast("参加者URLを開けませんでした");
-                  }
-                }
-              }}
+              onClick={handleOpenParticipantView}
               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
             >
               参加者画面を開く
@@ -1762,7 +1722,7 @@ const recordCandidateConflict = useCallback(
         </div>
         {!participantShareReady && (
           <p className="mt-1 text-[11px] text-zinc-500">
-            参加者URLが未発行でも、「参加者画面を開く」ボタンから自動発行して参加者画面へ移動します。
+            参加者URLが未発行の場合は、「参加者画面を開く」ボタンを押して共有URLを発行してください。発行後にもう一度押すと参加者画面へ移動します。
           </p>
         )}
       </header>
