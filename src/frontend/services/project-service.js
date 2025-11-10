@@ -242,14 +242,14 @@ const localImportState = (projectId, payload) => {
   return projectStore.importProjectState(projectId, payload);
 };
 
-const apiImportState = async (projectId, payload) => {
+const apiImportState = async (projectId, payload, { version } = {}) => {
   if (!projectId) throw new Error("projectId is required");
   const snapshotPayload = normalizeImportSnapshot(payload);
   if (!snapshotPayload || typeof snapshotPayload !== "object") {
     throw new Error("Invalid import payload");
   }
   const requestBody = {
-    version: getLocalMetaVersion(projectId),
+    version: Number.isInteger(version) && version > 0 ? version : getLocalMetaVersion(projectId),
     snapshot: snapshotPayload
   };
   const response = await apiClient.post(
@@ -270,6 +270,14 @@ const apiImportState = async (projectId, payload) => {
 const localReset = (projectId) => {
   if (!projectId) throw new Error("projectId is required");
   return projectStore.resetProject(projectId);
+};
+
+const apiReset = async (projectId) => {
+  if (!projectId) throw new Error("projectId is required");
+  const expectedVersion = getLocalMetaVersion(projectId);
+  projectStore.resetProject(projectId);
+  const blankSnapshot = projectStore.getProjectStateSnapshot(projectId);
+  return apiImportState(projectId, blankSnapshot, { version: expectedVersion });
 };
 
 const localSubscribe = (projectId, callback) => {
@@ -478,12 +486,6 @@ const apiUpdateMeta = (projectId, changes) => {
   }
   clearMetaValidationIssues(projectId);
   scheduleMetaSync(projectId);
-  return snapshot;
-};
-
-const apiReset = (projectId) => {
-  const snapshot = localReset(projectId);
-  syncProjectSnapshot(projectId, { force: true, reason: "reset" });
   return snapshot;
 };
 
