@@ -65,6 +65,8 @@ const escapeIcalText = (value) => {
 const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
 const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
 
+const PLACEHOLDER_PREFIX = "demo-";
+
 const generateId = (prefix) => {
   const random =
     typeof crypto.randomUUID === "function"
@@ -72,6 +74,8 @@ const generateId = (prefix) => {
       : crypto.randomBytes(16).toString("hex");
   return prefix ? `${prefix}_${random}` : random;
 };
+
+const isPlaceholderToken = (token) => typeof token === "string" && token.startsWith(PLACEHOLDER_PREFIX);
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -321,6 +325,12 @@ const createShareTokenEntry = (type, baseUrl = SHARE_BASE_URL) => {
   };
 };
 
+const createPlaceholderShareTokenEntry = (type, projectId) => ({
+  token: `${PLACEHOLDER_PREFIX}${type}-${projectId}`,
+  url: "",
+  issuedAt: ""
+});
+
 const createInitialProjectState = (projectId, metaInput = {}) => {
   const timestamp = new Date().toISOString();
   const meta = {
@@ -332,8 +342,8 @@ const createInitialProjectState = (projectId, metaInput = {}) => {
     updatedAt: timestamp
   };
   const shareTokens = {
-    admin: createShareTokenEntry("admin"),
-    participant: createShareTokenEntry("participant")
+    admin: createPlaceholderShareTokenEntry("admin", projectId),
+    participant: createPlaceholderShareTokenEntry("participant", projectId)
   };
   return {
     project: meta,
@@ -1180,7 +1190,7 @@ class InMemoryProjectStore {
   #indexShareTokens(projectId, shareTokens = {}) {
     SHARE_TOKEN_TYPES.forEach((type) => {
       const entry = shareTokens[type];
-      if (entry && isNonEmptyString(entry.token)) {
+      if (entry && isNonEmptyString(entry.token) && !isPlaceholderToken(entry.token)) {
         this.shareTokenIndex[type].set(entry.token, projectId);
       }
     });
@@ -1191,7 +1201,7 @@ class InMemoryProjectStore {
     const source = shareTokens || (state ? state.shareTokens : null) || {};
     SHARE_TOKEN_TYPES.forEach((type) => {
       const entry = source[type];
-      if (!entry || !isNonEmptyString(entry.token)) return;
+      if (!entry || !isNonEmptyString(entry.token) || isPlaceholderToken(entry.token)) return;
       const currentOwner = this.shareTokenIndex[type].get(entry.token);
       if (currentOwner === projectId) {
         this.shareTokenIndex[type].delete(entry.token);

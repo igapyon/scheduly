@@ -1653,8 +1653,8 @@ const recordCandidateConflict = useCallback(
     isNonEmptyString(participantShareEntry.url);
   const participantButtonLabel = participantShareReady ? "参加者画面を開く" : "共有URL発行待ち";
   const participantButtonClass = participantShareReady
-    ? "inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-    : "inline-flex cursor-not-allowed items-center justify-center rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-400";
+    ? "inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+    : "inline-flex items-center gap-2 cursor-not-allowed rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-400";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1703,13 +1703,16 @@ const recordCandidateConflict = useCallback(
               disabled={!participantShareReady}
               className={participantButtonClass}
             >
-              {participantButtonLabel}
+              <span aria-hidden="true" className="mr-2">
+                📋
+              </span>
+              <span>{participantButtonLabel}</span>
             </button>
           </div>
         </div>
         {!participantShareReady && (
           <p className="mt-1 text-[11px] text-zinc-500">
-            参加者URLが未発行です。右上の「共有URLを発行」ボタンで共有URLを作成すると、このボタンから参加者画面を開けるようになります。
+            参加者URLが未発行です。「共有URLを発行」ボタンで共有URLを作成すると、このボタンから参加者画面を開けるようになります。
           </p>
         )}
       </header>
@@ -1728,11 +1731,12 @@ const recordCandidateConflict = useCallback(
             action={
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
                 onClick={handleShareLinkAction}
                 disabled={shareActionInProgress}
               >
-                {shareActionLabel}
+                <span aria-hidden="true">📝</span>
+                <span>{shareActionLabel}</span>
               </button>
             }
           >
