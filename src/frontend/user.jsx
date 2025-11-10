@@ -952,17 +952,21 @@ useEffect(() => {
         setLoading(false);
       }
 
-      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-        if (cancelled || !nextState) return;
-        setProjectState(nextState);
-        projectStateRef.current = nextState;
-        refreshParticipantConflictsFromState(nextState);
-        setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
-        setParticipantSummaries(
-          summaryService.buildParticipantView(resolved.projectId, { state: nextState })
-        );
-        setRouteContext(projectService.getRouteContext());
-      });
+      const shouldSubscribe =
+        !(resolved.routeContext?.kind === "share-miss" && resolved.routeContext.shareType === "participant");
+      if (shouldSubscribe) {
+        unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+          if (cancelled || !nextState) return;
+          setProjectState(nextState);
+          projectStateRef.current = nextState;
+          refreshParticipantConflictsFromState(nextState);
+          setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
+          setParticipantSummaries(
+            summaryService.buildParticipantView(resolved.projectId, { state: nextState })
+          );
+          setRouteContext(projectService.getRouteContext());
+        });
+      }
     } catch (error) {
       console.error("Failed to resolve participant project context", error);
       if (!cancelled) {
@@ -980,7 +984,7 @@ useEffect(() => {
       unsubscribe();
     }
   };
-}, [routeError]);
+}, [refreshParticipantConflictsFromState]);
 
 
   useEffect(() => {
