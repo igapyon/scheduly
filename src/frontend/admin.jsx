@@ -1673,6 +1673,10 @@ const recordCandidateConflict = useCallback(
     snapshotStatus.phase === "error"
       ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
       : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
+  const participantShareReady =
+    participantShareEntry &&
+    !shareService.isPlaceholderToken(participantShareEntry.token) &&
+    isNonEmptyString(participantShareEntry.url);
   const participantButtonTitle =
     participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token)
       ? "参加者画面を開きます"
@@ -1719,7 +1723,7 @@ const recordCandidateConflict = useCallback(
             {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
+            <button
               type="button"
               onClick={async () => {
                 const entry = shareTokens?.participant;
@@ -1736,7 +1740,10 @@ const recordCandidateConflict = useCallback(
                     window.open(entry.url, "_blank");
                   }
                 } else {
-                  const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
+                  const result = await shareService.generate(projectId, {
+                    baseUrl: baseUrlEffective,
+                    navigateToAdminUrl: false
+                  });
                   const tokens = refreshShareTokensState({ resetWhenMissing: true });
                   const next = tokens.participant || result.participant;
                   if (next && next.url) {
@@ -1748,12 +1755,16 @@ const recordCandidateConflict = useCallback(
                 }
               }}
               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
-              title={participantButtonTitle}
             >
               参加者画面を開く
             </button>
           </div>
         </div>
+        {!participantShareReady && (
+          <p className="mt-1 text-[11px] text-zinc-500">
+            参加者URLが未発行でも、「参加者画面を開く」ボタンから自動発行して参加者画面へ移動します。
+          </p>
+        )}
       </header>
 
       <div className="grid flex-1 gap-5">
