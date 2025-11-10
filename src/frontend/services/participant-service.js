@@ -1,11 +1,11 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const projectStore = require("../store/project-store");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const tallyService = require("./tally-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
+const { createServiceDriver } = require("./service-driver");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -69,8 +69,6 @@ const isDuplicateDisplayName = (projectId, name, ignoreParticipantId = null) => 
     return participant.displayName.trim().toLowerCase() === normalized;
   });
 };
-
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
 const parseParticipantInput = (payload) => {
   const result = participantInputSchema.safeParse(payload);
@@ -208,10 +206,6 @@ const apiAddParticipant = async (projectId, payload) => {
   });
 };
 
-const addParticipant = (projectId, payload) => (
-  isApiEnabled() ? apiAddParticipant(projectId, payload) : localAddParticipant(projectId, payload)
-);
-
 const localUpdateParticipant = (projectId, participantId, changes) => {
   const existing = getParticipant(projectId, participantId);
   if (!existing) {
@@ -287,12 +281,6 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
   });
 };
 
-const updateParticipant = (projectId, participantId, changes) => (
-  isApiEnabled()
-    ? apiUpdateParticipant(projectId, participantId, changes)
-    : localUpdateParticipant(projectId, participantId, changes)
-);
-
 const localRemoveParticipant = (projectId, participantId) => {
   projectStore.removeParticipant(projectId, participantId);
   tallyService.recalculate(projectId);
@@ -327,9 +315,29 @@ const apiRemoveParticipant = async (projectId, participantId) => {
   });
 };
 
-const removeParticipant = (projectId, participantId) => (
-  isApiEnabled() ? apiRemoveParticipant(projectId, participantId) : localRemoveParticipant(projectId, participantId)
-);
+const participantDriver = createServiceDriver({
+  local: {
+    addParticipant: localAddParticipant,
+    updateParticipant: localUpdateParticipant,
+    removeParticipant: localRemoveParticipant
+  },
+  api: {
+    addParticipant: apiAddParticipant,
+    updateParticipant: apiUpdateParticipant,
+    removeParticipant: apiRemoveParticipant
+  }
+});
+
+const addParticipant = (projectId, payload) => participantDriver.run("addParticipant", projectId, payload);
+
+const updateParticipant = (projectId, participantId, changes) =>
+  participantDriver.run("updateParticipant", projectId, participantId, changes);
+
+const removeParticipant = (projectId, participantId) =>
+  participantDriver.run("removeParticipant", projectId, participantId);
+
+const setParticipantServiceDriver = (driverName) => participantDriver.setDriverOverride(driverName);
+const clearParticipantServiceDriver = () => participantDriver.clearDriverOverride();
 
 const bulkUpsertParticipants = (projectId, list) => {
   if (!Array.isArray(list) || list.length === 0) return [];
@@ -400,5 +408,7 @@ module.exports = {
   removeParticipant,
   bulkUpsertParticipants,
   resolveByToken,
-  getToken
+  getToken,
+  setParticipantServiceDriver,
+  clearParticipantServiceDriver
 };

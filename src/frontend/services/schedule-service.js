@@ -3,11 +3,11 @@
 const sharedIcalUtils = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
 const { candidateInputSchema, collectZodIssueFields } = require("../../shared/schema");
+const { createServiceDriver } = require("./service-driver");
 
 const {
   DEFAULT_TZID,
@@ -79,8 +79,6 @@ const findCandidateById = (projectId, candidateId) => {
   const candidates = projectStore.getCandidates(projectId);
   return candidates.find((item) => item && item.id === candidateId) || null;
 };
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
-
 const ICAL_LINE_BREAK = "\r\n";
 const ICAL_HEADER_LINES = [
   "BEGIN:VCALENDAR",
@@ -487,21 +485,27 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
   });
 };
 
-const addCandidate = (projectId) => (
-  isApiEnabled() ? apiAddCandidate(projectId) : Promise.resolve(localAddCandidate(projectId))
-);
+const scheduleDriver = createServiceDriver({
+  local: {
+    addCandidate: (projectId) => Promise.resolve(localAddCandidate(projectId)),
+    updateCandidate: (projectId, candidateId, nextCandidate) =>
+      Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate)),
+    removeCandidate: (projectId, candidateId) => Promise.resolve(localRemoveCandidate(projectId, candidateId))
+  },
+  api: {
+    addCandidate: apiAddCandidate,
+    updateCandidate: apiUpdateCandidate,
+    removeCandidate: apiRemoveCandidate
+  }
+});
 
-const updateCandidate = (projectId, candidateId, nextCandidate) => (
-  isApiEnabled()
-    ? apiUpdateCandidate(projectId, candidateId, nextCandidate)
-    : Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate))
-);
+const addCandidate = (projectId) => scheduleDriver.run("addCandidate", projectId);
+const updateCandidate = (projectId, candidateId, nextCandidate) =>
+  scheduleDriver.run("updateCandidate", projectId, candidateId, nextCandidate);
+const removeCandidate = (projectId, candidateId) => scheduleDriver.run("removeCandidate", projectId, candidateId);
 
-const removeCandidate = (projectId, candidateId) => (
-  isApiEnabled()
-    ? apiRemoveCandidate(projectId, candidateId)
-    : Promise.resolve(localRemoveCandidate(projectId, candidateId))
-);
+const setScheduleServiceDriver = (driverName) => scheduleDriver.setDriverOverride(driverName);
+const clearScheduleServiceDriver = () => scheduleDriver.clearDriverOverride();
 
 module.exports = {
   addCandidate,
@@ -511,5 +515,7 @@ module.exports = {
   exportCandidateToIcs,
   createBlankCandidate,
   createCandidateFromVevent,
-  replaceCandidatesFromImport
+  replaceCandidatesFromImport,
+  setScheduleServiceDriver,
+  clearScheduleServiceDriver
 };
