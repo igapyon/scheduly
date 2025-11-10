@@ -38,7 +38,7 @@
 | 参加者トークン (`participantToken`) | 参加者へ共有する秘密トークン。URL は `https://scheduly.app/p/{participantToken}` または `baseUrl/p/{participantToken}`。旧称「閲覧トークン」。 |
 | Share Link | 管理者・参加者それぞれの URL 全体。 |
 | `ShareTokenEntry` | `token` / `url` / `issuedAt`（ISO8601）と、必要に応じて `lastGeneratedBy` / `revokedAt` を保持するレコード。 |
-| プレースホルダートークン | `demo-` で始まるダミー値。未発行扱いとし、UI では「–– 未発行 ––」表示。 |
+| プレースホルダートークン | `demo-` または `scheduly-` で始まるダミー値。`demo-` は完全な未発行扱い、`scheduly-*` はデモデータ用で URL 欄には反映されても正式トークンではない。UI では「–– 未発行 ––」表示。 |
 | `shareService` | トークン取得・生成・再発行・URL 組み立て・自動遷移を担うサービス層。 |
 
 ## 4. User Stories
