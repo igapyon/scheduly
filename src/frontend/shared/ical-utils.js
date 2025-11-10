@@ -1,8 +1,10 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const DEFAULT_TZID = "Asia/Tokyo";
-const SAMPLE_ICS_RELATIVE_PATH = "ics/scheduly-ics-sampledata-001.ics";
-const SAMPLE_PROJECT_RELATIVE_PATH = "proj/scheduly-project-sampledata-001.json";
+// ルート相対パスにしておかないと /a/... や /p/... 配下で参照した際に
+// historyApiFallback が index.html を返し、デモデータの取得に失敗する。
+const SAMPLE_ICS_RELATIVE_PATH = "/ics/scheduly-ics-sampledata-001.ics";
+const SAMPLE_PROJECT_RELATIVE_PATH = "/proj/scheduly-project-sampledata-001.json";
 const DEFAULT_LOG_SCOPE = "shared";
 
 const ensureICAL = () => {
@@ -33,22 +35,22 @@ const waitForIcal = () => {
 };
 
 const getSampleIcsUrl = () => {
-  if (typeof window === "undefined") return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+  if (typeof window === "undefined") return SAMPLE_ICS_RELATIVE_PATH;
   try {
-    return new URL(SAMPLE_ICS_RELATIVE_PATH, window.location.href).toString();
+    return new URL(SAMPLE_ICS_RELATIVE_PATH, window.location.origin).toString();
   } catch (error) {
     console.warn("[Scheduly][shared] failed to resolve sample ICS URL", error);
-    return `/${SAMPLE_ICS_RELATIVE_PATH}`;
+    return SAMPLE_ICS_RELATIVE_PATH;
   }
 };
 
 const getSampleProjectJsonUrl = () => {
-  if (typeof window === "undefined") return `/${SAMPLE_PROJECT_RELATIVE_PATH}`;
+  if (typeof window === "undefined") return SAMPLE_PROJECT_RELATIVE_PATH;
   try {
-    return new URL(SAMPLE_PROJECT_RELATIVE_PATH, window.location.href).toString();
+    return new URL(SAMPLE_PROJECT_RELATIVE_PATH, window.location.origin).toString();
   } catch (error) {
     console.warn("[Scheduly][shared] failed to resolve sample Project JSON URL", error);
-    return `/${SAMPLE_PROJECT_RELATIVE_PATH}`;
+    return SAMPLE_PROJECT_RELATIVE_PATH;
   }
 };
 

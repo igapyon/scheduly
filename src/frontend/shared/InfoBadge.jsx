@@ -10,7 +10,7 @@ function InfoBadge({ ariaLabel = "ヘルプ", title = "ヘルプ", message, chil
   const triggerRef = useRef(null);
   const bubbleRef = useRef(null);
   const tooltipId = useId();
-  const [bubbleStyle, setBubbleStyle] = useState({ top: "calc(100% + 10px)", right: 0 });
+  const [bubbleStyle, setBubbleStyle] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -28,23 +28,15 @@ function InfoBadge({ ariaLabel = "ヘルプ", title = "ヘルプ", message, chil
   useEffect(() => {
     if (!open) return undefined;
     const updatePosition = () => {
-      if (!containerRef.current || !triggerRef.current || !bubbleRef.current) return;
-      const containerRect = containerRef.current.getBoundingClientRect();
+      if (!triggerRef.current || !bubbleRef.current) return;
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const bubbleRect = bubbleRef.current.getBoundingClientRect();
-
       const viewportPadding = 12;
-      const containerLeft = containerRect.left;
-      let desiredLeft = triggerRect.left + triggerRect.width / 2 - bubbleRect.width / 2;
-      desiredLeft = Math.max(viewportPadding, desiredLeft);
-      desiredLeft = Math.min(window.innerWidth - viewportPadding - bubbleRect.width, desiredLeft);
-
-      const leftWithinContainer = desiredLeft - containerLeft;
-      const minTop = viewportPadding;
-      const desiredTop = triggerRect.bottom + 10;
-      const topWithinContainer = Math.max(desiredTop - containerRect.top, minTop - containerRect.top);
-
-      setBubbleStyle({ left: Math.max(leftWithinContainer, 0), right: "auto", top: topWithinContainer });
+      let left = triggerRect.left + triggerRect.width / 2 - bubbleRect.width / 2;
+      left = Math.max(viewportPadding, left);
+      left = Math.min(window.innerWidth - viewportPadding - bubbleRect.width, left);
+      const top = Math.max(viewportPadding, triggerRect.bottom + 10);
+      setBubbleStyle({ left, top });
     };
 
     const raf = requestAnimationFrame(updatePosition);
@@ -83,7 +75,7 @@ function InfoBadge({ ariaLabel = "ヘルプ", title = "ヘルプ", message, chil
           id={tooltipId}
           role="dialog"
           aria-label={title}
-          className="absolute z-30 w-64 rounded-xl border border-blue-100 bg-white p-3 text-xs text-zinc-600 shadow-lg"
+          className="fixed z-40 max-w-[calc(100vw-24px)] sm:w-64 rounded-xl border border-blue-100 bg-white p-3 text-xs text-zinc-600 shadow-lg"
           style={bubbleStyle}
         >
           <div className="flex items-start gap-2">

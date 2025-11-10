@@ -3,14 +3,17 @@
 function EventMeta({
   summary,
   summaryClassName = "text-sm font-semibold text-zinc-800",
+  summaryTitle,
   dateTime,
   dateTimeClassName = "flex flex-wrap items-center gap-1 text-sm text-zinc-600",
   timezone,
   timezoneClassName = "text-xs text-zinc-400",
   description,
   descriptionClassName = "text-xs text-zinc-500",
+  descriptionTitle,
   location,
   locationClassName = "flex flex-wrap items-center gap-2 text-xs text-zinc-500",
+  locationTitle,
   showLocationIcon = false,
   statusText,
   statusPrefix = "状態:",
@@ -22,8 +25,8 @@ function EventMeta({
   const shouldShowTimezone = Boolean(normalizedTimezone && !dateTimeText.includes(`(${normalizedTimezone})`));
 
   return (
-    <div className="space-y-1">
-      {summary ? <div className={summaryClassName}>{summary}</div> : null}
+    <div className="space-y-1 min-w-0 max-w-full">
+      {summary ? <div className={`${summaryClassName} break-words`} title={summaryTitle}>{summary}</div> : null}
       {(dateTime || shouldShowTimezone) ? (
         <div className={dateTimeClassName}>
           {dateTime ? <span>{dateTime}</span> : null}
@@ -31,9 +34,13 @@ function EventMeta({
           {shouldShowTimezone ? <span className={timezoneClassName}>{normalizedTimezone}</span> : null}
         </div>
       ) : null}
-      {description ? <div className={descriptionClassName}>{description}</div> : null}
+      {description ? (
+        <div className={`${descriptionClassName} break-words`} title={descriptionTitle}>
+          {description}
+        </div>
+      ) : null}
       {(location || statusText) ? (
-        <div className={locationClassName}>
+        <div className={`${locationClassName} break-words`} title={locationTitle}>
           {location ? (
             <span className={showLocationIcon ? "inline-flex items-center gap-1" : undefined}>
               {showLocationIcon ? <span aria-hidden="true">📍</span> : null}

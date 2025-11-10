@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -6,8 +7,7 @@ const isProduction = process.env.NODE_ENV === "production";
 module.exports = {
   entry: {
     index: path.resolve(__dirname, "src/frontend/admin.jsx"),
-    user: path.resolve(__dirname, "src/frontend/user.jsx"),
-    userEdit: path.resolve(__dirname, "src/frontend/user-edit.jsx")
+    user: path.resolve(__dirname, "src/frontend/user.jsx")
   },
   output: {
     filename: "[name].bundle.js",
@@ -54,7 +54,7 @@ module.exports = {
       rewrites: [
         { from: /^\/a(?:\/.*)?$/, to: "/index.html" },
         { from: /^\/p(?:\/.*)?$/, to: "/user.html" },
-        { from: /^\/r(?:\/.*)?$/, to: "/user-edit.html" }
+        { from: /^\/r(?:\/.*)?$/, to: "/user.html" }
       ]
     },
     hot: true,
@@ -67,4 +67,15 @@ module.exports = {
       target: ["index.html"]
     }
   }
+  ,
+  plugins: [
+    new webpack.DefinePlugin({
+      "process.env.API_BASE_URL": JSON.stringify(process.env.API_BASE_URL || ""),
+      "process.env.BASE_URL": JSON.stringify(process.env.BASE_URL || ""),
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || (isProduction ? "production" : "development")),
+      "process.env.CORS_ALLOWED_ORIGINS": JSON.stringify(process.env.CORS_ALLOWED_ORIGINS || ""),
+      "process.env.SCHEDULY_PROJECT_DRIVER": JSON.stringify(process.env.SCHEDULY_PROJECT_DRIVER || ""),
+      "process.env.SCHEDULY_API_BASE_URL": JSON.stringify(process.env.SCHEDULY_API_BASE_URL || "")
+    })
+  ]
 };
