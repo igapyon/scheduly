@@ -221,6 +221,8 @@ function InlineResponseEditor({
   const [statusMessage, setStatusMessage] = useState("");
   const [commentError, setCommentError] = useState(false);
   const statusTimerRef = useRef(null);
+  const lastAttemptRef = useRef(null);
+  const [conflictInfo, setConflictInfo] = useState(null);
 
   useEffect(() => {
     setCurrentMark(initialMark && initialMark !== "pending" ? initialMark : null);
@@ -239,10 +241,41 @@ function InlineResponseEditor({
     };
   }, []);
 
+  useEffect(() => {
+    if (!projectId || !participantId || !schedule?.id) return () => {};
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (
+        !event ||
+        event.projectId !== projectId ||
+        event.scope !== "mutation" ||
+        event.entity !== "response" ||
+        event.phase !== "conflict"
+      ) {
+        return;
+      }
+      const meta = event.meta || {};
+      if (meta.participantId !== participantId || meta.candidateId !== schedule.id) {
+        return;
+      }
+      const attempt = lastAttemptRef.current;
+      setConflictInfo({
+        attempt,
+        timestamp: Date.now()
+      });
+      setStatusMessage("最新の回答と競合しました。内容を確認して再度保存してください。");
+    });
+    return unsubscribe;
+  }, [participantId, projectId, schedule?.id]);
+
   const commitUpdate = useCallback(
     async (nextMark, nextComment) => {
       if (!projectId || !participantId || !schedule?.id) return;
       try {
+        lastAttemptRef.current = {
+          mark: nextMark || "pending",
+          comment: nextComment || ""
+        };
+        setConflictInfo(null);
         await responseService.upsertResponse(projectId, {
           participantId,
           candidateId: schedule.id,
@@ -257,6 +290,8 @@ function InlineResponseEditor({
           setStatusMessage("");
           statusTimerRef.current = null;
         }, 1800);
+        lastAttemptRef.current = null;
+        setConflictInfo(null);
       } catch (error) {
         const msg = error && error.message ? String(error.message) : "保存に失敗しました";
         const isValidation = error && (error.code === 422 || /validation/i.test(msg));
@@ -367,6 +402,54 @@ function InlineResponseEditor({
           </a>
         ) : null}
       </div>
+      {conflictInfo && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          <p className="font-semibold text-amber-700">最新の回答と競合しました</p>
+          <p className="mt-1">
+            他の参加者が同じ日程の回答を先に更新したため、あなたの入力は保存されていません。内容を確認して再度保存してください。
+          </p>
+          {conflictInfo.attempt && (
+            <div className="mt-2 rounded-lg border border-amber-100 bg-white/80 px-3 py-2 text-[11px] text-zinc-600">
+              <div className="text-[10px] font-semibold text-zinc-400">あなたの入力</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className={`${markBadgeClass(conflictInfo.attempt.mark || "pending")} px-2 py-0.5 text-xs font-semibold`}>
+                  {MARK_SYMBOL[conflictInfo.attempt.mark || "pending"] ?? "？"}
+                </span>
+                <span className="text-zinc-600">{conflictInfo.attempt.comment || "コメントなし"}</span>
+              </div>
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+              onClick={() => {
+                const attempt = conflictInfo.attempt;
+                if (attempt) {
+                  setCurrentMark(attempt.mark && attempt.mark !== "pending" ? attempt.mark : null);
+                  setCurrentComment(attempt.comment || "");
+                  commitUpdate(attempt.mark, attempt.comment);
+                } else {
+                  commitUpdate(currentMark, currentComment);
+                }
+              }}
+            >
+              もう一度保存
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+              onClick={() => {
+                setConflictInfo(null);
+                lastAttemptRef.current = null;
+                setStatusMessage("最新の回答を表示しています");
+              }}
+            >
+              最新の回答を使う
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

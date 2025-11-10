@@ -407,11 +407,11 @@ const apiAddCandidate = async (projectId) => {
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyCandidateMutation(projectId, "add", "conflict", error);
+        notifyCandidateMutation(projectId, "add", "conflict", error, { candidateId: placeholder.id });
       }
     },
     onError: (error) => {
-      notifyCandidateMutation(projectId, "add", "error", error);
+      notifyCandidateMutation(projectId, "add", "error", error, { candidateId: placeholder.id });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -460,11 +460,11 @@ const apiUpdateCandidate = async (projectId, candidateId, changes = {}) => {
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyCandidateMutation(projectId, "update", "conflict", error);
+        notifyCandidateMutation(projectId, "update", "conflict", error, { candidateId });
       }
     },
     onError: (error) => {
-      notifyCandidateMutation(projectId, "update", "error", error);
+      notifyCandidateMutation(projectId, "update", "error", error, { candidateId });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -495,11 +495,11 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyCandidateMutation(projectId, "remove", "conflict", error);
+        notifyCandidateMutation(projectId, "remove", "conflict", error, { candidateId });
       }
     },
     onError: (error) => {
-      notifyCandidateMutation(projectId, "remove", "error", error);
+      notifyCandidateMutation(projectId, "remove", "error", error, { candidateId });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -544,13 +544,14 @@ module.exports = {
   setScheduleServiceDriver,
   clearScheduleServiceDriver
 };
-const notifyCandidateMutation = (projectId, action, phase, error) => {
+const notifyCandidateMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;
   emitMutationEvent({
     projectId,
     entity: "candidate",
     action,
     phase,
-    error
+    error,
+    meta
   });
 };

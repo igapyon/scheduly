@@ -76,6 +76,31 @@ const CANDIDATE_COMPARE_KEYS = [
   "sequence",
   "dtstamp"
 ];
+const CANDIDATE_FIELD_LABELS = {
+  summary: "タイトル",
+  status: "ステータス",
+  dtstart: "開始日時",
+  dtend: "終了日時",
+  tzid: "タイムゾーン",
+  location: "場所",
+  description: "説明"
+};
+const CANDIDATE_FIELD_ORDER = ["summary", "status", "dtstart", "dtend", "tzid", "location", "description"];
+
+const diffCandidateFields = (local = {}, server = {}) =>
+  CANDIDATE_FIELD_ORDER.filter((field) => {
+    const localValue = local && Object.prototype.hasOwnProperty.call(local, field) ? local[field] ?? "" : "";
+    const serverValue = server && Object.prototype.hasOwnProperty.call(server, field) ? server[field] ?? "" : "";
+    return localValue !== serverValue;
+  });
+
+const formatCandidateFieldValue = (candidate, field) => {
+  const value = candidate && Object.prototype.hasOwnProperty.call(candidate, field) ? candidate[field] : "";
+  if (value === undefined || value === null || value === "") {
+    return "（未設定）";
+  }
+  return String(value);
+};
 
 const SHARE_REISSUE_WORD = "REISSUE";
 const PROJECT_IMPORT_WORD = "IMPORT";
@@ -193,7 +218,10 @@ function CandidateCard({
   disableRemove,
   isOpen = false,
   onToggleOpen,
-  errors = {}
+  errors = {},
+  conflict = null,
+  onResolveConflict,
+  onRetryConflict
 }) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
@@ -268,6 +296,45 @@ function CandidateCard({
       </summary>
 
       <div className={`space-y-4 px-5 py-5 ${open ? "rounded-b-2xl border border-emerald-200 bg-emerald-50/60" : "border-t border-zinc-200"}`}>
+        {conflict && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <p className="font-semibold text-amber-700">サーバー上の最新更新と競合しました</p>
+            <p className="mt-1 text-amber-700">
+              他のメンバーが同じ日程を更新したため、あなたの変更は保存されていません。差分を確認して操作を選択してください。
+            </p>
+            {(conflict.diffFields && conflict.diffFields.length ? conflict.diffFields : CANDIDATE_FIELD_ORDER).map((field) => (
+              <div key={field} className="mt-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-[11px] text-zinc-600">
+                <div className="font-semibold text-amber-700">{CANDIDATE_FIELD_LABELS[field] || field}</div>
+                <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-400">サーバー</span>
+                    <div className="mt-0.5 text-zinc-700">{formatCandidateFieldValue(conflict.serverSnapshot, field)}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-400">あなたの編集</span>
+                    <div className="mt-0.5 text-zinc-700">{formatCandidateFieldValue(conflict.localDraft, field)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+                onClick={onRetryConflict}
+              >
+                編集内容を再保存
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+                onClick={onResolveConflict}
+              >
+                最新の内容を反映
+              </button>
+            </div>
+          </div>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
@@ -628,9 +695,36 @@ function OrganizerApp() {
     };
   }, []);
 
-  const syncedMetaRef = useRef({ name: "", description: "" });
-  const candidateSyncedRef = useRef(new Map());
-  const candidateDraftRef = useRef(new Map());
+const syncedMetaRef = useRef({ name: "", description: "" });
+const candidateSyncedRef = useRef(new Map());
+const candidateDraftRef = useRef(new Map());
+const candidateConflictsRef = useRef(new Map());
+const [candidateConflicts, setCandidateConflicts] = useState({});
+
+const publishCandidateConflicts = useCallback(() => {
+  if (!candidateConflictsRef.current.size) {
+    setCandidateConflicts({});
+    return;
+  }
+  const snapshot = {};
+  candidateConflictsRef.current.forEach((value, key) => {
+    snapshot[key] = {
+      ...value,
+      localDraft: value.localDraft ? { ...value.localDraft } : null,
+      serverSnapshot: value.serverSnapshot ? { ...value.serverSnapshot } : null
+    };
+  });
+  setCandidateConflicts(snapshot);
+}, []);
+
+const clearCandidateConflict = useCallback(
+  (candidateId) => {
+    if (!candidateConflictsRef.current.has(candidateId)) return;
+    candidateConflictsRef.current.delete(candidateId);
+    publishCandidateConflicts();
+  },
+  [publishCandidateConflicts]
+);
 
   const applySyncedMeta = useCallback((nameValue = "", descriptionValue = "") => {
     const normalizedName = nameValue || "";
@@ -640,18 +734,46 @@ function OrganizerApp() {
     syncedMetaRef.current = { name: normalizedName, description: normalizedDescription };
   }, []);
 
-  const applySyncedCandidates = useCallback((list) => {
-    const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
-    setCandidates(normalized);
-    const snapshotMap = new Map();
-    const draftMap = new Map();
-    normalized.forEach((item) => {
-      snapshotMap.set(item.id, { ...item });
-      draftMap.set(item.id, { ...item });
-    });
-    candidateSyncedRef.current = snapshotMap;
-    candidateDraftRef.current = draftMap;
-  }, []);
+  const applySyncedCandidates = useCallback(
+    (list) => {
+      const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
+      const snapshotMap = new Map();
+      normalized.forEach((item) => {
+        snapshotMap.set(item.id, { ...item });
+      });
+      candidateSyncedRef.current = snapshotMap;
+
+      const draftMap = new Map();
+      const renderedList = normalized.map((item) => {
+        const conflict = candidateConflictsRef.current.get(item.id);
+        if (conflict && conflict.localDraft) {
+          conflict.serverSnapshot = { ...item };
+          const preserved = { ...conflict.localDraft };
+          draftMap.set(item.id, preserved);
+          return preserved;
+        }
+        const clone = { ...item };
+        draftMap.set(item.id, clone);
+        return clone;
+      });
+      candidateDraftRef.current = draftMap;
+      setCandidates(renderedList);
+
+      let conflictsChanged = false;
+      Array.from(candidateConflictsRef.current.keys()).forEach((candidateId) => {
+        if (!snapshotMap.has(candidateId)) {
+          candidateConflictsRef.current.delete(candidateId);
+          conflictsChanged = true;
+        }
+      });
+      if (candidateConflictsRef.current.size > 0 || conflictsChanged) {
+        publishCandidateConflicts();
+      } else {
+        setCandidateConflicts({});
+      }
+    },
+    [publishCandidateConflicts]
+  );
 
   const clearCandidateErrors = useCallback((candidateId) => {
     setCandidateErrors((prev) => {
@@ -759,28 +881,48 @@ function OrganizerApp() {
     clearCandidateErrors(id);
   };
 
-  const markCandidateFieldErrors = (id, message) => {
-    let fields = [];
-    if (message.includes(":")) {
-      const after = message.split(":").slice(1).join(":").trim();
-      if (after.includes("must be after")) {
-        fields = ["dtstart", "dtend"];
-      } else {
-        fields = after.split(/[,\s]+/).filter(Boolean);
-      }
+const markCandidateFieldErrors = (id, message) => {
+  let fields = [];
+  if (message.includes(":")) {
+    const after = message.split(":").slice(1).join(":").trim();
+    if (after.includes("must be after")) {
+      fields = ["dtstart", "dtend"];
+    } else {
+      fields = after.split(/[,\s]+/).filter(Boolean);
     }
-    if (fields.length) {
-      setCandidateErrors((prev) => {
-        const current = prev[id] || {};
-        const nextFlags = { ...current };
-        fields.forEach((f) => {
-          const key = String(f).toLowerCase();
-          nextFlags[key] = true;
-        });
-        return { ...prev, [id]: nextFlags };
+  }
+  if (fields.length) {
+    setCandidateErrors((prev) => {
+      const current = prev[id] || {};
+      const nextFlags = { ...current };
+      fields.forEach((f) => {
+        const key = String(f).toLowerCase();
+        nextFlags[key] = true;
       });
-    }
-  };
+      return { ...prev, [id]: nextFlags };
+    });
+  }
+};
+
+const recordCandidateConflict = useCallback(
+  (candidateId, eventMeta = {}) => {
+    if (!candidateId) return;
+    const draft = candidateDraftRef.current.get(candidateId);
+    const server = candidateSyncedRef.current.get(candidateId);
+    const draftSnapshot = draft ? { ...draft } : null;
+    if (!draftSnapshot && !server) return;
+    const existing = candidateConflictsRef.current.get(candidateId) || {};
+    candidateConflictsRef.current.set(candidateId, {
+      candidateId,
+      action: eventMeta.action || existing.action || "update",
+      localDraft: draftSnapshot || existing.localDraft || null,
+      serverSnapshot: server ? { ...server } : existing.serverSnapshot || null,
+      timestamp: Date.now()
+    });
+    publishCandidateConflicts();
+  },
+  [publishCandidateConflicts]
+);
 
   const persistCandidateChanges = async (id) => {
     if (!projectId) return;
@@ -795,6 +937,7 @@ function OrganizerApp() {
       await updateScheduleCandidate(projectId, id, latest);
       candidateSyncedRef.current.set(id, { ...latest });
       clearCandidateErrors(id);
+      clearCandidateConflict(id);
     } catch (error) {
       const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
       const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
@@ -814,7 +957,37 @@ function OrganizerApp() {
   const removeCandidate = async (id) => {
     if (!projectId) return;
     await removeScheduleCandidate(projectId, id);
+    clearCandidateConflict(id);
   };
+
+  const applyServerCandidateState = useCallback(
+    (candidateId) => {
+      const server = candidateSyncedRef.current.get(candidateId);
+      if (!server) {
+        clearCandidateConflict(candidateId);
+        return;
+      }
+      const snapshot = { ...server };
+      candidateDraftRef.current.set(candidateId, snapshot);
+      setCandidates((prev) => prev.map((item) => (item.id === candidateId ? snapshot : item)));
+      clearCandidateErrors(candidateId);
+      clearCandidateConflict(candidateId);
+    },
+    [clearCandidateConflict, clearCandidateErrors]
+  );
+
+  const retryCandidateConflict = useCallback(
+    (candidateId) => {
+      const entry = candidateConflictsRef.current.get(candidateId);
+      if (entry && entry.localDraft) {
+        const snapshot = { ...entry.localDraft };
+        candidateDraftRef.current.set(candidateId, snapshot);
+        setCandidates((prev) => prev.map((item) => (item.id === candidateId ? snapshot : item)));
+      }
+      persistCandidateChanges(candidateId);
+    },
+    [persistCandidateChanges]
+  );
 
   const addCandidate = async () => {
     if (!projectId) return;
@@ -1179,7 +1352,12 @@ function OrganizerApp() {
           popToast(message);
         }
       } else if (scope === "mutation") {
-        if (phase === "conflict" || phase === "error") {
+        if (event.entity === "candidate" && phase === "conflict") {
+          const targetId = event.meta?.candidateId || event.meta?.targetId;
+          recordCandidateConflict(targetId, event);
+          const candidateName = targetId ? candidateDraftRef.current.get(targetId)?.summary || "日程" : "日程";
+          popToast(`${candidateName} の編集が他の操作と競合しました。カード内の差分を確認してください。`);
+        } else if (phase === "conflict" || phase === "error") {
           const message = describeMutationToast(event);
           if (message) {
             popToast(message);
@@ -1189,7 +1367,7 @@ function OrganizerApp() {
     });
 
     return unsubscribe;
-  }, [isApiDriver, projectId, popToast]);
+  }, [isApiDriver, projectId, popToast, recordCandidateConflict]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -1769,21 +1947,33 @@ function OrganizerApp() {
                 日程がまだありません。右上のボタンから追加してください。
               </div>
             ) : (
-              candidates.map((candidate, index) => (
-                <CandidateCard
-                  index={index}
-                  key={candidate.id}
-                  value={candidate}
-                  onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
-                  onCommit={() => persistCandidateChanges(candidate.id)}
-                  onRemove={() => openCandidateDeleteDialog(candidate)}
-                  onExport={() => handleExportCandidate(candidate.id)}
-                  disableRemove={candidates.length === 1}
-                  isOpen={openCandidateId === candidate.id}
-                  onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
-                  errors={candidateErrors[candidate.id] || {}}
-                />
-              ))
+              candidates.map((candidate, index) => {
+                const conflictEntry = candidateConflicts[candidate.id] || null;
+                const conflictPayload = conflictEntry
+                  ? {
+                      ...conflictEntry,
+                      diffFields: diffCandidateFields(conflictEntry.localDraft, conflictEntry.serverSnapshot)
+                    }
+                  : null;
+                return (
+                  <CandidateCard
+                    index={index}
+                    key={candidate.id}
+                    value={candidate}
+                    onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
+                    onCommit={() => persistCandidateChanges(candidate.id)}
+                    onRemove={() => openCandidateDeleteDialog(candidate)}
+                    onExport={() => handleExportCandidate(candidate.id)}
+                    disableRemove={candidates.length === 1}
+                    isOpen={openCandidateId === candidate.id}
+                    onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
+                    errors={candidateErrors[candidate.id] || {}}
+                    conflict={conflictPayload}
+                    onResolveConflict={() => applyServerCandidateState(candidate.id)}
+                    onRetryConflict={() => retryCandidateConflict(candidate.id)}
+                  />
+                );
+              })
             )}
           </SectionCard>
         </main>

@@ -166,11 +166,17 @@ const apiUpsertResponse = async (projectId, payload) => {
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "responses_conflict" }),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyResponseMutation(projectId, "upsert", "conflict", error);
+        notifyResponseMutation(projectId, "upsert", "conflict", error, {
+          participantId: parsed.participantId,
+          candidateId: parsed.candidateId
+        });
       }
     },
     onError: (error) => {
-      notifyResponseMutation(projectId, "upsert", "error", error);
+      notifyResponseMutation(projectId, "upsert", "error", error, {
+        participantId: parsed.participantId,
+        candidateId: parsed.candidateId
+      });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -249,13 +255,14 @@ module.exports = {
   setResponseServiceDriver,
   clearResponseServiceDriver
 };
-const notifyResponseMutation = (projectId, action, phase, error) => {
+const notifyResponseMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;
   emitMutationEvent({
     projectId,
     entity: "response",
     action,
     phase,
-    error
+    error,
+    meta
   });
 };
