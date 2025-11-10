@@ -184,6 +184,10 @@ const apiAddParticipant = async (projectId, payload) => {
     comment: payload?.comment || ""
   });
   const body = { participant: { ...payload, ...participantPayload } };
+  const metaInfo = {
+    participantId: payload?.id || null,
+    displayName: participantPayload.displayName || payload?.displayName || ""
+  };
   return runOptimisticUpdate({
     request: () =>
       apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/participants`, body),
@@ -200,11 +204,11 @@ const apiAddParticipant = async (projectId, payload) => {
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyParticipantMutation(projectId, "add", "conflict", error);
+        notifyParticipantMutation(projectId, "add", "conflict", error, metaInfo);
       }
     },
     onError: (error) => {
-      notifyParticipantMutation(projectId, "add", "error", error);
+      notifyParticipantMutation(projectId, "add", "error", error, metaInfo);
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -283,11 +287,11 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyParticipantMutation(projectId, "update", "conflict", error);
+        notifyParticipantMutation(projectId, "update", "conflict", error, { participantId });
       }
     },
     onError: (error) => {
-      notifyParticipantMutation(projectId, "update", "error", error);
+      notifyParticipantMutation(projectId, "update", "error", error, { participantId });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -325,11 +329,11 @@ const apiRemoveParticipant = async (projectId, participantId) => {
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
     onConflict: (error) => {
       if (error && error.status === 409) {
-        notifyParticipantMutation(projectId, "remove", "conflict", error);
+        notifyParticipantMutation(projectId, "remove", "conflict", error, { participantId });
       }
     },
     onError: (error) => {
-      notifyParticipantMutation(projectId, "remove", "error", error);
+      notifyParticipantMutation(projectId, "remove", "error", error, { participantId });
     },
     transformError: (error) => {
       if (error && error.status === 409) {
@@ -437,13 +441,14 @@ module.exports = {
   setParticipantServiceDriver,
   clearParticipantServiceDriver
 };
-const notifyParticipantMutation = (projectId, action, phase, error) => {
+const notifyParticipantMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;
   emitMutationEvent({
     projectId,
     entity: "participant",
     action,
     phase,
-    error
+    error,
+    meta
   });
 };

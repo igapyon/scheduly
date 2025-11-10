@@ -464,7 +464,10 @@ function ParticipantSummary({
   canRemove = true,
   projectId,
   inlineEditorTarget,
-  onToggleInlineEdit
+  onToggleInlineEdit,
+  conflict = null,
+  onRetryConflict = () => {},
+  onDismissConflict = () => {}
 }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(false);
@@ -529,6 +532,42 @@ function ParticipantSummary({
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
+      {conflict && (
+        <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          <p className="font-semibold text-amber-700">サーバー上の最新更新と競合しました</p>
+          <p className="mt-1">
+            他のメンバーがこの参加者情報を更新したため、あなたの変更は保存されていません。内容を確認して操作を選択してください。
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <span className="text-[10px] font-semibold text-zinc-400">サーバー</span>
+              <div className="mt-0.5 text-zinc-700">
+                {conflict.serverSnapshot?.displayName || participant.name || "（名前未設定）"}
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-zinc-400">あなたの編集</span>
+              <div className="mt-0.5 text-zinc-700">{conflict.localDraft?.displayName || "（入力なし）"}</div>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+              onClick={onRetryConflict}
+            >
+              もう一度保存
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+              onClick={onDismissConflict}
+            >
+              最新の内容を使う
+            </button>
+          </div>
+        </div>
+      )}
       <ul className="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
         {participant.responses.map((response) => {
           const schedule = scheduleLookup ? scheduleLookup.get(response.scheduleId) : null;
@@ -697,6 +736,7 @@ function AdminResponsesApp() {
   }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(null);
+  const projectStateRef = useRef(null);
   const [schedules, setSchedules] = useState([]);
   const [participantSummaries, setParticipantSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -723,6 +763,123 @@ function AdminResponsesApp() {
     setToast(message);
     window.setTimeout(() => setToast(""), 2000);
   }, []);
+  const participantAttemptRef = useRef(new Map());
+  const participantConflictsRef = useRef(new Map());
+  const [participantConflicts, setParticipantConflicts] = useState({});
+
+  const publishParticipantConflicts = useCallback(() => {
+    if (!participantConflictsRef.current.size) {
+      setParticipantConflicts({});
+      return;
+    }
+    const snapshot = {};
+    participantConflictsRef.current.forEach((value, key) => {
+      snapshot[key] = {
+        ...value,
+        localDraft: value.localDraft ? { ...value.localDraft } : null,
+        serverSnapshot: value.serverSnapshot ? { ...value.serverSnapshot } : null
+      };
+    });
+    setParticipantConflicts(snapshot);
+  }, []);
+
+  const clearParticipantConflict = useCallback(
+    (participantId) => {
+      if (!participantId || !participantConflictsRef.current.has(participantId)) return;
+      participantConflictsRef.current.delete(participantId);
+      publishParticipantConflicts();
+    },
+    [publishParticipantConflicts]
+  );
+
+  const recordParticipantConflict = useCallback(
+    (participantId, meta = {}) => {
+      if (!participantId) return;
+      const participants = projectStateRef.current?.participants || [];
+      const server = participants.find((p) => p.id === participantId) || null;
+      const attempt = participantAttemptRef.current.get(participantId) || null;
+      if (!attempt && !server) return;
+      participantConflictsRef.current.set(participantId, {
+        participantId,
+        action: meta.action || "update",
+        localDraft: attempt ? { ...attempt } : null,
+        serverSnapshot: server ? { ...server } : null,
+        timestamp: Date.now()
+      });
+      publishParticipantConflicts();
+    },
+    [publishParticipantConflicts]
+  );
+
+  const refreshParticipantConflictsFromState = useCallback(
+    (state) => {
+      if (!participantConflictsRef.current.size) return;
+      const participants = state?.participants || [];
+      let changed = false;
+      participantConflictsRef.current.forEach((entry, participantId) => {
+        const server = participants.find((p) => p.id === participantId);
+        if (!server) {
+          participantConflictsRef.current.delete(participantId);
+          participantAttemptRef.current.delete(participantId);
+          changed = true;
+        } else {
+          entry.serverSnapshot = { ...server };
+          changed = true;
+        }
+      });
+      if (changed) {
+        publishParticipantConflicts();
+      }
+    },
+    [publishParticipantConflicts]
+  );
+
+  const retryParticipantConflict = useCallback(
+    async (participantId) => {
+      if (!participantId) return;
+      const conflict = participantConflictsRef.current.get(participantId);
+      const attempt = conflict?.localDraft || participantAttemptRef.current.get(participantId);
+      const displayName = attempt?.displayName;
+      if (!displayName) {
+        popToast("再保存できる内容が見つかりませんでした");
+        return;
+      }
+      if (!projectId) {
+        setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+        setParticipantActionMessage("");
+        return;
+      }
+      participantAttemptRef.current.set(participantId, { displayName });
+      try {
+        await participantService.updateParticipant(projectId, participantId, { displayName });
+        participantAttemptRef.current.delete(participantId);
+        clearParticipantConflict(participantId);
+        setParticipantActionMessage(`参加者「${displayName}」の名前を更新しました`);
+        setParticipantActionError("");
+      } catch (error) {
+        if (error && error.status === 409) {
+          // 再度競合。イベントリスナーが処理する
+        } else {
+          console.error("[Scheduly] participant retry failed", error);
+          setParticipantActionError(
+            error instanceof Error ? error.message : "参加者名の更新に失敗しました。しばらく待ってから再度お試しください。"
+          );
+        }
+      }
+    },
+    [projectId, clearParticipantConflict, popToast]
+  );
+
+const dismissParticipantConflict = useCallback(
+  (participantId) => {
+    if (!participantId) return;
+    participantAttemptRef.current.delete(participantId);
+    clearParticipantConflict(participantId);
+    setParticipantActionMessage("最新の参加者情報を表示しています");
+    setParticipantActionError("");
+  },
+  [clearParticipantConflict]
+);
 
   const participantShareToken = useMemo(() => {
     if (routeError) return "";
@@ -774,6 +931,8 @@ function AdminResponsesApp() {
       setInitialRouteContext(resolved.routeContext);
       setRouteContext(resolved.routeContext);
       setProjectState(resolved.state);
+      projectStateRef.current = resolved.state;
+      refreshParticipantConflictsFromState(resolved.state);
       setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
       setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
       try {
@@ -795,6 +954,8 @@ function AdminResponsesApp() {
       unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
         if (cancelled || !nextState) return;
         setProjectState(nextState);
+        projectStateRef.current = nextState;
+        refreshParticipantConflictsFromState(nextState);
         setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
         setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
         setRouteContext(projectService.getRouteContext());
@@ -809,7 +970,11 @@ function AdminResponsesApp() {
         unsubscribe();
       }
     };
-  }, [routeError]);
+  }, [refreshParticipantConflictsFromState, routeError]);
+
+  useEffect(() => {
+    refreshParticipantConflictsFromState(projectState);
+  }, [projectState, refreshParticipantConflictsFromState]);
 
   useEffect(() => {
     if (!isApiDriver || !projectId) return;
@@ -843,7 +1008,7 @@ function AdminResponsesApp() {
     if (!projectId) return undefined;
     const unsubscribe = projectService.addSyncListener((event) => {
       if (!event || event.projectId !== projectId) return;
-      const { scope, phase, meta } = event;
+      const { scope, phase, meta, entity } = event;
       if (scope === "snapshot") {
         if (phase === "start" && isApiDriver) {
           setSnapshotStatus((prev) => {
@@ -868,7 +1033,19 @@ function AdminResponsesApp() {
           popToast(message);
         }
       } else if (scope === "mutation") {
-        if (phase === "conflict" || phase === "error") {
+        let handled = false;
+        if (entity === "participant" && phase === "conflict") {
+          const targetId = meta?.participantId;
+          recordParticipantConflict(targetId, event);
+          const participantsList = projectStateRef.current?.participants || [];
+          const serverName =
+            (participantsList.find((p) => p.id === targetId)?.displayName ||
+              participantAttemptRef.current.get(targetId)?.displayName ||
+              "参加者");
+          popToast(`${serverName} の情報が他の操作と競合しました。カード内の案内を確認してください。`);
+          handled = true;
+        }
+        if (!handled && (phase === "conflict" || phase === "error")) {
           const message = describeMutationToast(event);
           if (message) {
             popToast(message);
@@ -877,7 +1054,7 @@ function AdminResponsesApp() {
       }
     });
     return unsubscribe;
-  }, [isApiDriver, popToast, projectId]);
+  }, [isApiDriver, popToast, projectId, recordParticipantConflict]);
 
   const closeManagementDialog = () => {
     setManagementDialogOpen(false);
@@ -1206,23 +1383,33 @@ function AdminResponsesApp() {
       setRenameError("参加者名を入力してください");
       return;
     }
-    if (!projectId) {
-      setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
-      return;
+  if (!projectId) {
+    setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+    return;
+  }
+  setRenameInProgress(true);
+  const targetId = renameDialogParticipant.id;
+  participantAttemptRef.current.set(targetId, { displayName: trimmed });
+  try {
+    await participantService.updateParticipant(projectId, targetId, { displayName: trimmed });
+    participantAttemptRef.current.delete(targetId);
+    clearParticipantConflict(targetId);
+    setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
+    setParticipantActionError("");
+    closeRenameParticipantDialog();
+  } catch (error) {
+    console.error("[Scheduly] failed to rename participant", error);
+    if (error && error.status === 409) {
+      setRenameError("他の変更と競合しました。カード内の案内を確認してください。");
+    } else {
+      setRenameError(
+        error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。"
+      );
     }
-    setRenameInProgress(true);
-    try {
-      await participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
-      setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
-      setParticipantActionError("");
-      closeRenameParticipantDialog();
-    } catch (error) {
-      console.error("[Scheduly] failed to rename participant", error);
-      setRenameError(error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。");
-    } finally {
-      setRenameInProgress(false);
-    }
-  };
+  } finally {
+    setRenameInProgress(false);
+  }
+};
 
   const handleRemoveParticipant = async (participantId, displayName) => {
     const summaryName = displayName || "参加者";
@@ -1234,6 +1421,8 @@ function AdminResponsesApp() {
     await participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
+    participantAttemptRef.current.delete(participantId);
+    clearParticipantConflict(participantId);
   };
 
   useEffect(() => {
@@ -1356,19 +1545,25 @@ function AdminResponsesApp() {
           )}
           <div className="space-y-3">
             {participantSummaries.length ? (
-              participantSummaries.map((participant) => (
-                <ParticipantSummary
-                  key={participant.id}
-                  participant={participant}
-                  scheduleLookup={scheduleLookup}
-                  onRemove={() => openRemoveParticipantDialog(participant)}
-                  onRename={() => openRenameParticipantDialog(participant)}
-                  canRemove={participantSummaries.length > 1}
-                  projectId={projectId}
-                inlineEditorTarget={inlineEditorTarget}
-                onToggleInlineEdit={toggleInlineEditor}
-              />
-              ))
+              participantSummaries.map((participant) => {
+                const conflict = participantConflicts[participant.id] || null;
+                return (
+                  <ParticipantSummary
+                    key={participant.id}
+                    participant={participant}
+                    scheduleLookup={scheduleLookup}
+                    onRemove={() => openRemoveParticipantDialog(participant)}
+                    onRename={() => openRenameParticipantDialog(participant)}
+                    canRemove={participantSummaries.length > 1}
+                    projectId={projectId}
+                    inlineEditorTarget={inlineEditorTarget}
+                    onToggleInlineEdit={toggleInlineEditor}
+                    conflict={conflict}
+                    onRetryConflict={() => retryParticipantConflict(participant.id)}
+                    onDismissConflict={() => dismissParticipantConflict(participant.id)}
+                  />
+                );
+              })
             ) : (
               <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
                 表示できる参加者がありません。
