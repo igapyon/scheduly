@@ -109,12 +109,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ## 6. TODO バックログ
 
-### 優先度: 最高
-- API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
-
 ### 優先度: 高
-- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
-- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
