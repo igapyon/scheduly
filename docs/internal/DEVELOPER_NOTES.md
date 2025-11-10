@@ -47,6 +47,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `src/frontend/services/service-driver.js` に共通の driver セレクタを追加。`runtimeConfig.getProjectDriver()` の結果または個別オーバーライドで `local` / `api` を選択できる。
 - 参加者・回答・候補・共有トークンの各サービスは `createServiceDriver` で実装を束ね、`set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` をエクスポートしている。E2E や Storybook 等でモックしたい場合はこれらのフックを使って強制的に local/api を切り替える。
 - local driver は従来どおり `projectStore` を直接操作し、API driver は `apiClient` 経由の fetch + 楽観更新を行う。UI から見た場合はいずれも同じ Promise ベースのインターフェースとなる。
+- `src/frontend/services/sync-events.js` でサーバー同期イベント（`scope: 'snapshot' | 'meta' | 'mutation'` など）を一元配信する。React 側は `projectService.addSyncListener`（内部で同イベントを再エクスポート）を購読しており、Admin/User 画面では初期スナップショット完了・競合によるロールバック・更新失敗をバナー／トーストで通知する。
 
 ---
 

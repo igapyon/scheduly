@@ -8,6 +8,7 @@ const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
 const { candidateInputSchema, collectZodIssueFields } = require("../../shared/schema");
 const { createServiceDriver } = require("./service-driver");
+const { emitMutationEvent } = require("./sync-events");
 
 const {
   DEFAULT_TZID,
@@ -404,6 +405,14 @@ const apiAddCandidate = async (projectId) => {
       return mapped;
     },
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "add", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "add", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate creation conflict";
@@ -449,6 +458,14 @@ const apiUpdateCandidate = async (projectId, candidateId, changes = {}) => {
       return mapped;
     },
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "update", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "update", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate version mismatch";
@@ -476,6 +493,14 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
         { version: expectedVersion }
       ),
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "remove", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "remove", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate removal conflict";
@@ -518,4 +543,14 @@ module.exports = {
   replaceCandidatesFromImport,
   setScheduleServiceDriver,
   clearScheduleServiceDriver
+};
+const notifyCandidateMutation = (projectId, action, phase, error) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "candidate",
+    action,
+    phase,
+    error
+  });
 };

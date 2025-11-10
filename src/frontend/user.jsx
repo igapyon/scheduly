@@ -10,6 +10,8 @@ import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import summaryService from "./services/summary-service";
 import responseService from "./services/response-service";
+import runtimeConfig from "./shared/runtime-config";
+import { describeMutationToast } from "./shared/mutation-message";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
@@ -628,6 +630,16 @@ function AdminResponsesApp() {
   const [renameInProgress, setRenameInProgress] = useState(false);
   const [renameError, setRenameError] = useState("");
   const [inlineEditorTarget, setInlineEditorTarget] = useState(null);
+  const isApiDriver = runtimeConfig.isProjectDriverApi();
+  const [snapshotStatus, setSnapshotStatus] = useState(() => ({
+    phase: isApiDriver ? "loading" : "ready",
+    message: isApiDriver ? "サーバーの初期データを取得しています…" : ""
+  }));
+  const [toast, setToast] = useState("");
+  const popToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2000);
+  }, []);
 
   const participantShareToken = useMemo(() => {
     if (routeError) return "";
@@ -646,6 +658,12 @@ function AdminResponsesApp() {
     }
     return "";
   }, [initialRouteContext, projectState, routeContext, routeError]);
+
+  const snapshotBannerVisible = isApiDriver && snapshotStatus.phase !== "ready" && snapshotStatus.message;
+  const snapshotBannerClasses =
+    snapshotStatus.phase === "error"
+      ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
+      : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
 
   useEffect(() => {
     if (routeError) return;
@@ -710,6 +728,13 @@ function AdminResponsesApp() {
     };
   }, [routeError]);
 
+  useEffect(() => {
+    if (!isApiDriver || !projectId) return;
+    if (projectService.isProjectReady(projectId)) {
+      setSnapshotStatus({ phase: "ready", message: "" });
+    }
+  }, [isApiDriver, projectId]);
+
   const participants = projectState?.participants || [];
 
   const scheduleLookup = useMemo(() => {
@@ -730,6 +755,46 @@ function AdminResponsesApp() {
       return { participantId, scheduleId };
     });
   };
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (!event || event.projectId !== projectId) return;
+      const { scope, phase, meta } = event;
+      if (scope === "snapshot") {
+        if (phase === "start" && isApiDriver) {
+          setSnapshotStatus((prev) => {
+            if (prev.phase === "ready") return prev;
+            return {
+              phase: "loading",
+              message: "サーバーの最新情報を取得しています…"
+            };
+          });
+        } else if (phase === "success") {
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "ready", message: "" });
+          }
+          if (meta?.reason === "conflict") {
+            popToast("サーバーの最新回答を読み込み直しました。");
+          }
+        } else if (phase === "error") {
+          const message = "サーバーの最新状態を取得できませんでした。時間を置いて再度お試しください。";
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "error", message });
+          }
+          popToast(message);
+        }
+      } else if (scope === "mutation") {
+        if (phase === "conflict" || phase === "error") {
+          const message = describeMutationToast(event);
+          if (message) {
+            popToast(message);
+          }
+        }
+      }
+    });
+    return unsubscribe;
+  }, [isApiDriver, popToast, projectId]);
 
   const closeManagementDialog = () => {
     setManagementDialogOpen(false);
@@ -1120,6 +1185,7 @@ function AdminResponsesApp() {
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
             <p className="mt-1 text-xs text-zinc-500">締切目安: {DASHBOARD_META.deadline}</p>
             <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
+            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
@@ -1450,6 +1516,13 @@ function AdminResponsesApp() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-8 flex justify-center px-4">
+          <div className="pointer-events-auto rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm text-emerald-700 shadow-lg">
+            {toast}
           </div>
         </div>
       )}

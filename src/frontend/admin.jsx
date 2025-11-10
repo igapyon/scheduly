@@ -14,6 +14,7 @@ import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import { ensureDemoProjectData } from "./shared/demo-data";
 import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { describeMutationToast } from "./shared/mutation-message";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 
@@ -545,6 +546,11 @@ function OrganizerApp() {
   const [pendingImportFile, setPendingImportFile] = useState(null);
   const [demoImportDialogOpen, setDemoImportDialogOpen] = useState(false);
   const [demoImportInProgress, setDemoImportInProgress] = useState(false);
+  const isApiDriver = runtimeConfig.isProjectDriverApi();
+  const [snapshotStatus, setSnapshotStatus] = useState(() => ({
+    phase: isApiDriver ? "loading" : "ready",
+    message: isApiDriver ? "サーバーの初期データを取得しています…" : ""
+  }));
 
   const popToast = useCallback((message) => {
     setToast(message);
@@ -558,6 +564,13 @@ function OrganizerApp() {
   useEffect(() => {
     setMetaSyncStatus({ phase: "idle", message: "" });
   }, [projectId]);
+
+  useEffect(() => {
+    if (!isApiDriver || !projectId) return;
+    if (projectService.isProjectReady(projectId)) {
+      setSnapshotStatus({ phase: "ready", message: "" });
+    }
+  }, [isApiDriver, projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -785,13 +798,16 @@ function OrganizerApp() {
     } catch (error) {
       const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
       const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
+      const isConflict = error && error.status === 409;
       if (isValidation) {
         console.debug("updateCandidate validation", msg);
-      } else {
+      } else if (!isConflict) {
         console.error("updateCandidate error", error);
       }
-      popToast(msg);
-      markCandidateFieldErrors(id, msg);
+      if (!isConflict) {
+        popToast(msg);
+        markCandidateFieldErrors(id, msg);
+      }
     }
   };
 
@@ -807,7 +823,9 @@ function OrganizerApp() {
       popToast("日程を追加しました");
     } catch (error) {
       console.error("Candidate add failed", error);
-      popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+      if (!(error && error.status === 409)) {
+        popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+      }
     }
   };
 
@@ -873,7 +891,9 @@ function OrganizerApp() {
       closeCandidateDeleteDialog();
     } catch (error) {
       console.error("Candidate removal failed", error);
-      popToast("日程の削除に失敗しました。時間を置いて再度お試しください。");
+      if (!(error && error.status === 409)) {
+        popToast("日程の削除に失敗しました。時間を置いて再度お試しください。");
+      }
     } finally {
       setCandidateDeleteInProgress(false);
     }
@@ -1096,10 +1116,9 @@ function OrganizerApp() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
-      console.info("[Scheduly][admin] project driver", driver);
+      console.info("[Scheduly][admin] project driver", isApiDriver ? "api" : "local");
     }
-  }, []);
+  }, [isApiDriver]);
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -1132,21 +1151,45 @@ function OrganizerApp() {
             phase: prev.phase === "sending" ? prev.phase : "refreshing",
             message: prev.message
           }));
+          if (isApiDriver) {
+            setSnapshotStatus((prev) => {
+              if (prev.phase === "ready") return prev;
+              return {
+                phase: "loading",
+                message: "サーバーの最新情報を取得しています…"
+              };
+            });
+          }
         } else if (phase === "success") {
           setMetaSyncStatus({ phase: "idle", message: "" });
-          if (meta && meta.reason === "conflict") {
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "ready", message: "" });
+          }
+          if (meta?.reason === "conflict") {
             popToast("サーバーの最新状態を反映しました。");
+          } else if (meta?.firstReady) {
+            popToast("サーバーの最新情報を読み込みました");
           }
         } else if (phase === "error") {
           const message = "サーバーの最新状態を取得できませんでした。";
           setMetaSyncStatus({ phase: "error", message });
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "error", message });
+          }
           popToast(message);
+        }
+      } else if (scope === "mutation") {
+        if (phase === "conflict" || phase === "error") {
+          const message = describeMutationToast(event);
+          if (message) {
+            popToast(message);
+          }
         }
       }
     });
 
     return unsubscribe;
-  }, [projectId, popToast]);
+  }, [isApiDriver, projectId, popToast]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -1218,7 +1261,9 @@ function OrganizerApp() {
       popToast(message);
     } catch (error) {
       console.error("Share link generation error", error);
-      popToast("共有URLの生成に失敗しました");
+      if (!(error && error.status === 409)) {
+        popToast("共有URLの生成に失敗しました");
+      }
     } finally {
       setShareActionInProgress(false);
       setShareReissueDialogOpen(false);
@@ -1457,6 +1502,11 @@ function OrganizerApp() {
   const isMetaSyncSaving = metaSyncStatus.phase === "pending" || metaSyncStatus.phase === "sending";
   const isMetaSyncRefreshing = metaSyncStatus.phase === "refreshing";
   const metaSyncErrorMessage = metaSyncStatus.phase === "error" ? metaSyncStatus.message : "";
+  const snapshotBannerVisible = isApiDriver && snapshotStatus.phase !== "ready" && snapshotStatus.message;
+  const snapshotBannerClasses =
+    snapshotStatus.phase === "error"
+      ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
+      : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1493,6 +1543,7 @@ function OrganizerApp() {
                 {metaSyncErrorMessage}
               </div>
             )}
+            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button

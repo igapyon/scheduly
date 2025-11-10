@@ -7,6 +7,7 @@ const projectService = require("./project-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { responseInputSchema, collectZodIssueFields } = require("../../shared/schema");
 const { createServiceDriver } = require("./service-driver");
+const { emitMutationEvent } = require("./sync-events");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
 
@@ -163,6 +164,14 @@ const apiUpsertResponse = async (projectId, payload) => {
       return mapped;
     },
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "responses_conflict" }),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyResponseMutation(projectId, "upsert", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyResponseMutation(projectId, "upsert", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Response version mismatch";
@@ -239,4 +248,14 @@ module.exports = {
   clearResponsesForParticipant,
   setResponseServiceDriver,
   clearResponseServiceDriver
+};
+const notifyResponseMutation = (projectId, action, phase, error) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "response",
+    action,
+    phase,
+    error
+  });
 };

@@ -3,6 +3,7 @@ const sharedIcalUtils = require("../shared/ical-utils");
 const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
+const { emitMutationEvent } = require("./sync-events");
 const { createServiceDriver } = require("./service-driver");
 
 const { createLogger } = sharedIcalUtils;
@@ -265,6 +266,14 @@ const apiRotate = async (projectId, options = {}) => {
       };
     },
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyShareMutation(projectId, "rotate", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyShareMutation(projectId, "rotate", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Share tokens version mismatch";
@@ -314,6 +323,14 @@ const apiInvalidate = async (projectId, type) => {
       return true;
     },
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyShareMutation(projectId, "invalidate", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyShareMutation(projectId, "invalidate", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Share token invalidation conflict";
@@ -355,4 +372,14 @@ module.exports = {
   isPlaceholderToken,
   setShareServiceDriver,
   clearShareServiceDriver
+};
+const notifyShareMutation = (projectId, action, phase, error) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "share",
+    action,
+    phase,
+    error
+  });
 };

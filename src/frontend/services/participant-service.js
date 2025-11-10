@@ -6,6 +6,7 @@ const tallyService = require("./tally-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
 const { createServiceDriver } = require("./service-driver");
+const { emitMutationEvent } = require("./sync-events");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -197,6 +198,14 @@ const apiAddParticipant = async (projectId, payload) => {
       return participant;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "add", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "add", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant creation conflict";
@@ -272,6 +281,14 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
       return participant;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "update", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "update", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant version mismatch";
@@ -306,6 +323,14 @@ const apiRemoveParticipant = async (projectId, participantId) => {
       return true;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "remove", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "remove", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant removal conflict";
@@ -411,4 +436,14 @@ module.exports = {
   getToken,
   setParticipantServiceDriver,
   clearParticipantServiceDriver
+};
+const notifyParticipantMutation = (projectId, action, phase, error) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "participant",
+    action,
+    phase,
+    error
+  });
 };

@@ -5,6 +5,7 @@ const projectStore = require("../store/project-store");
 const participantService = require("./participant-service");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
+const { addSyncListener, emitSyncEvent } = require("./sync-events");
 
 const randomProjectId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -122,26 +123,6 @@ const rememberMetaValidationIssues = (projectId, issues) => {
 
 const clearMetaValidationIssues = (projectId) => {
   apiSyncState.metaValidationIssues.delete(projectId);
-};
-
-const syncListeners = new Set();
-const emitSyncEvent = (event) => {
-  if (!event || typeof event !== "object") return;
-  syncListeners.forEach((listener) => {
-    try {
-      listener(event);
-    } catch (error) {
-      console.warn("[Scheduly] sync listener failed", error);
-    }
-  });
-};
-
-const addSyncListener = (listener) => {
-  if (typeof listener !== "function") return () => {};
-  syncListeners.add(listener);
-  return () => {
-    syncListeners.delete(listener);
-  };
 };
 
 const emitMetaValidationError = (projectId, issues) => {
@@ -286,6 +267,7 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
   emitSyncEvent({ scope: "snapshot", phase: "start", projectId, meta: { reason } });
   const promise = (async () => {
     try {
+      const wasReady = apiSyncState.readyProjects.has(projectId);
       const snapshot = await apiClient.get(`/api/projects/${encodeURIComponent(projectId)}/snapshot`);
       if (snapshot && snapshot.project) {
         projectStore.replaceStateFromApi(projectId, snapshot);
@@ -293,7 +275,13 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
         if (process.env.NODE_ENV !== "production") {
           console.info("[Scheduly][projectService] syncProjectSnapshot success", { projectId, reason });
         }
-        emitSyncEvent({ scope: "snapshot", phase: "success", projectId, payload: snapshot, meta: { reason } });
+        emitSyncEvent({
+          scope: "snapshot",
+          phase: "success",
+          projectId,
+          payload: snapshot,
+          meta: { reason, firstReady: !wasReady }
+        });
       }
       return snapshot;
     } catch (error) {
@@ -312,7 +300,7 @@ const scheduleMetaSync = (projectId) => {
   if (!isApiEnabled() || !projectId) return;
 
   if (!apiSyncState.readyProjects.has(projectId)) {
-    syncProjectSnapshot(projectId).then(() => {
+    syncProjectSnapshot(projectId, { reason: "meta-prereq" }).then(() => {
       if (apiSyncState.readyProjects.has(projectId)) {
         scheduleMetaSync(projectId);
       }
@@ -426,7 +414,7 @@ const apiCreate = async (payload = {}) => {
 const apiLoad = (identifier = null) => {
   const result = localLoad(identifier);
   if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId);
+    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
   }
   return result;
 };
@@ -434,7 +422,7 @@ const apiLoad = (identifier = null) => {
 const apiLoadByParticipantToken = (token) => {
   const result = localLoadByParticipantToken(token);
   if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId);
+    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
   }
   return result;
 };
@@ -457,28 +445,28 @@ const apiUpdateMeta = (projectId, changes) => {
 
 const apiReset = (projectId) => {
   const snapshot = localReset(projectId);
-  syncProjectSnapshot(projectId, { force: true });
+  syncProjectSnapshot(projectId, { force: true, reason: "reset" });
   return snapshot;
 };
 
 const apiImportState = (projectId, payload) => {
   const snapshot = localImportState(projectId, payload);
   apiSyncState.readyProjects.delete(projectId);
-  syncProjectSnapshot(projectId, { force: true });
+  syncProjectSnapshot(projectId, { force: true, reason: "import" });
   return snapshot;
 };
 
 const apiResolveProjectFromLocation = () => {
   const resolved = localResolveProjectFromLocation();
   if (resolved && resolved.projectId) {
-    syncProjectSnapshot(resolved.projectId);
+    syncProjectSnapshot(resolved.projectId, { reason: "initial-load" });
   }
   return resolved;
 };
 
 const apiSubscribe = (projectId, callback) => {
   if (projectId) {
-    syncProjectSnapshot(projectId);
+    syncProjectSnapshot(projectId, { reason: "subscription" });
   }
   return localSubscribe(projectId, callback);
 };
@@ -510,6 +498,8 @@ const resolveProjectFromLocation = () =>
 
 const getRouteContext = () => localGetRouteContext();
 
+const isProjectReady = (projectId) => apiSyncState.readyProjects.has(projectId);
+
 module.exports = {
   create,
   load,
@@ -524,5 +514,6 @@ module.exports = {
   addSyncListener,
   getDefaultProjectId: projectStore.getDefaultProjectId,
   getState: localGetState,
-  syncProjectSnapshot
+  syncProjectSnapshot,
+  isProjectReady
 };
