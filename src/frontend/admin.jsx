@@ -1673,6 +1673,10 @@ const recordCandidateConflict = useCallback(
     snapshotStatus.phase === "error"
       ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
       : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
+  const participantButtonTitle =
+    participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token)
+      ? "参加者画面を開きます"
+      : "参加者URLが未発行の場合でも、このボタンを押すと自動で発行してから開きます";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1744,6 +1748,7 @@ const recordCandidateConflict = useCallback(
                 }
               }}
               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+              title={participantButtonTitle}
             >
               参加者画面を開く
             </button>
