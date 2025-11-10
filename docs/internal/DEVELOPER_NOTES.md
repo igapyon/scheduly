@@ -121,8 +121,9 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
  - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
- - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
- - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
+- 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
+- README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
+- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ### 優先度: 中
  - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
