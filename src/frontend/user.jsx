@@ -317,11 +317,9 @@ function InlineResponseEditor({
   );
 
   const handleSelectMark = (markKey) => {
-    setCurrentMark((prev) => {
-      const next = prev === markKey ? null : markKey;
-      commitUpdate(next, currentComment);
-      return next;
-    });
+    const next = currentMark === markKey ? null : markKey;
+    setCurrentMark(next);
+    commitUpdate(next, currentComment);
   };
 
   // commit-on-blur for comment; mark commits immediately
@@ -920,61 +918,58 @@ const dismissParticipantConflict = useCallback(
     setRouteContext(resolved.routeContext);
   }, [initialRouteContext, participantShareToken, routeError]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let unsubscribe = null;
+useEffect(() => {
+  let cancelled = false;
+  let unsubscribe = null;
 
-    const bootstrap = async () => {
-      const resolved = projectService.resolveProjectFromLocation();
-      if (cancelled) return;
-      setProjectId(resolved.projectId);
-      setInitialRouteContext(resolved.routeContext);
-      setRouteContext(resolved.routeContext);
-      setProjectState(resolved.state);
-      projectStateRef.current = resolved.state;
-      refreshParticipantConflictsFromState(resolved.state);
-      setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
-      setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
-      try {
-        await ensureDemoProjectData(resolved.projectId);
-        if (!cancelled) {
-          setLoadError("");
-        }
-      } catch (error) {
-        console.warn("[Scheduly] failed to seed demo data", error);
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+  const bootstrap = async () => {
+    const resolved = projectService.resolveProjectFromLocation();
+    if (cancelled) return;
+    setProjectId(resolved.projectId);
+    setInitialRouteContext(resolved.routeContext);
+    setRouteContext(resolved.routeContext);
+    setProjectState(resolved.state);
+    projectStateRef.current = resolved.state;
+    refreshParticipantConflictsFromState(resolved.state);
+    setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
+    setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
+    try {
+      await ensureDemoProjectData(resolved.projectId);
+      if (!cancelled) {
+        setLoadError("");
       }
-
-      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-        if (cancelled || !nextState) return;
-        setProjectState(nextState);
-        projectStateRef.current = nextState;
-        refreshParticipantConflictsFromState(nextState);
-        setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
-        setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
-        setRouteContext(projectService.getRouteContext());
-      });
-    };
-
-    bootstrap();
-
-    return () => {
-      cancelled = true;
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+    } catch (error) {
+      console.warn("[Scheduly] failed to seed demo data", error);
+      if (!cancelled) {
+        setLoadError(error instanceof Error ? error.message : String(error));
       }
-    };
-  }, [refreshParticipantConflictsFromState, routeError]);
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    }
 
-  useEffect(() => {
-    refreshParticipantConflictsFromState(projectState);
-  }, [projectState, refreshParticipantConflictsFromState]);
+    unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+      if (cancelled || !nextState) return;
+      setProjectState(nextState);
+      projectStateRef.current = nextState;
+      refreshParticipantConflictsFromState(nextState);
+      setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
+      setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
+      setRouteContext(projectService.getRouteContext());
+    });
+  };
+
+  bootstrap();
+
+  return () => {
+    cancelled = true;
+    if (typeof unsubscribe === "function") {
+      unsubscribe();
+    }
+  };
+}, [routeError]);
+
 
   useEffect(() => {
     if (!isApiDriver || !projectId) return;
