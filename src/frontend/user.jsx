@@ -1014,6 +1014,24 @@ useEffect(() => {
       return { participantId, scheduleId };
     });
   };
+  const EmptyParticipantCallout = ({ className = "" } = {}) => (
+    <div className={`rounded-2xl border border-dashed border-emerald-200 bg-white/80 p-5 text-center ${className}`}>
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl">
+        👥
+      </div>
+      <p className="text-sm font-semibold text-zinc-800">まだ参加者がいません</p>
+      <p className="mt-2 text-xs text-zinc-500">まずは参加者を登録し、回答用リンクを共有しましょう。</p>
+      <div className="mt-4 flex flex-wrap justify-center">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-emerald-700"
+          onClick={() => setParticipantDialogOpen(true)}
+        >
+          <span className="text-sm">＋</span> 参加者を新規登録
+        </button>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -1503,6 +1521,7 @@ useEffect(() => {
 
       {activeTab === "schedule" && (
         <section className="space-y-3">
+          {participants.length === 0 && <EmptyParticipantCallout className="mb-3" />}
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
             <span>日程ごとの回答サマリー</span>
             <InfoBadge
@@ -1526,13 +1545,14 @@ useEffect(() => {
               />
             ))
           ) : (
-            <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
-              表示できる日程がありません。
+            <>
+              <EmptyParticipantCallout />
               {loadError && (
-                <span className="mt-2 block text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
+                <span className="mt-3 block text-center text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
               )}
-            </div>
+            </>
           )}
+          {participants.length === 0 && schedules.length > 0 && <EmptyParticipantCallout className="mt-3" />}
         </section>
       )}
 
@@ -1579,9 +1599,7 @@ useEffect(() => {
                 );
               })
             ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
-                表示できる参加者がありません。
-              </div>
+              <EmptyParticipantCallout />
             )}
           </div>
 
