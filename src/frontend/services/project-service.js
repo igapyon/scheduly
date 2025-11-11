@@ -5,6 +5,7 @@ const projectStore = require("../store/project-store");
 const participantService = require("./participant-service");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
+const { addSyncListener, emitSyncEvent } = require("./sync-events");
 
 const randomProjectId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -28,6 +29,53 @@ const apiSyncState = {
   snapshotPromises: new Map(),
   metaTimers: new Map(),
   metaValidationIssues: new Map()
+};
+
+const SESSION_PROJECT_STORAGE_KEY = "scheduly:project-id";
+
+const getStoredSessionProjectId = () => {
+  if (typeof window === "undefined" || !window.sessionStorage) return null;
+  try {
+    return window.sessionStorage.getItem(SESSION_PROJECT_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[Scheduly] Failed to read session project id", error);
+    return null;
+  }
+};
+
+const setStoredSessionProjectId = (projectId) => {
+  if (typeof window === "undefined" || !window.sessionStorage) return;
+  try {
+    if (projectId) {
+      window.sessionStorage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
+    } else {
+      window.sessionStorage.removeItem(SESSION_PROJECT_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("[Scheduly] Failed to write session project id", error);
+  }
+};
+
+const parseRouteFromLocation = () => {
+  if (typeof window === "undefined" || !window.location) {
+    return { kind: "server" };
+  }
+  const pathname = window.location.pathname || "/";
+  const normalized = pathname.replace(/^\/+/, "");
+  if (!normalized || normalized === "index.html" || normalized === "user.html") {
+    return { kind: "root" };
+  }
+  const segments = normalized.split("/");
+  const prefix = segments[0] || "";
+  const rawToken = segments[1] || "";
+  const token = decodeURIComponent(rawToken);
+  if ((prefix === "a" || prefix === "p" || prefix === "r") && token) {
+    return {
+      kind: prefix === "a" ? "admin" : "participant",
+      token
+    };
+  }
+  return { kind: "root" };
 };
 
 const META_SYNC_DELAY_MS = 600;
@@ -122,26 +170,6 @@ const rememberMetaValidationIssues = (projectId, issues) => {
 
 const clearMetaValidationIssues = (projectId) => {
   apiSyncState.metaValidationIssues.delete(projectId);
-};
-
-const syncListeners = new Set();
-const emitSyncEvent = (event) => {
-  if (!event || typeof event !== "object") return;
-  syncListeners.forEach((listener) => {
-    try {
-      listener(event);
-    } catch (error) {
-      console.warn("[Scheduly] sync listener failed", error);
-    }
-  });
-};
-
-const addSyncListener = (listener) => {
-  if (typeof listener !== "function") return () => {};
-  syncListeners.add(listener);
-  return () => {
-    syncListeners.delete(listener);
-  };
 };
 
 const emitMetaValidationError = (projectId, issues) => {
@@ -243,14 +271,60 @@ const localExportState = (projectId, options = {}) => {
   return snapshot;
 };
 
+const normalizeImportSnapshot = (payload) => {
+  if (payload && typeof payload === "object" && typeof payload.state === "object") {
+    return payload.state;
+  }
+  return payload;
+};
+
+const getLocalMetaVersion = (projectId) => {
+  const snapshot = projectStore.getProjectStateSnapshot(projectId);
+  const version = snapshot?.versions?.metaVersion;
+  return Number.isInteger(version) && version > 0 ? version : 1;
+};
+
 const localImportState = (projectId, payload) => {
   if (!projectId) throw new Error("projectId is required");
   return projectStore.importProjectState(projectId, payload);
 };
 
+const apiImportState = async (projectId, payload, { version } = {}) => {
+  if (!projectId) throw new Error("projectId is required");
+  const snapshotPayload = normalizeImportSnapshot(payload);
+  if (!snapshotPayload || typeof snapshotPayload !== "object") {
+    throw new Error("Invalid import payload");
+  }
+  const requestBody = {
+    version: Number.isInteger(version) && version > 0 ? version : getLocalMetaVersion(projectId),
+    snapshot: snapshotPayload
+  };
+  const response = await apiClient.post(
+    `/api/projects/${encodeURIComponent(projectId)}/import/json`,
+    requestBody
+  );
+  apiSyncState.readyProjects.delete(projectId);
+  const importedSnapshot = response?.snapshot;
+  if (importedSnapshot && typeof importedSnapshot === "object") {
+    projectStore.replaceStateFromApi(projectId, importedSnapshot);
+  } else {
+    projectStore.importProjectState(projectId, payload);
+  }
+  await syncProjectSnapshot(projectId, { force: true, reason: "import" });
+  return projectStore.getProjectStateSnapshot(projectId);
+};
+
 const localReset = (projectId) => {
   if (!projectId) throw new Error("projectId is required");
   return projectStore.resetProject(projectId);
+};
+
+const apiReset = async (projectId) => {
+  if (!projectId) throw new Error("projectId is required");
+  const expectedVersion = getLocalMetaVersion(projectId);
+  projectStore.resetProject(projectId);
+  const blankSnapshot = projectStore.getProjectStateSnapshot(projectId);
+  return apiImportState(projectId, blankSnapshot, { version: expectedVersion });
 };
 
 const localSubscribe = (projectId, callback) => {
@@ -286,6 +360,7 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
   emitSyncEvent({ scope: "snapshot", phase: "start", projectId, meta: { reason } });
   const promise = (async () => {
     try {
+      const wasReady = apiSyncState.readyProjects.has(projectId);
       const snapshot = await apiClient.get(`/api/projects/${encodeURIComponent(projectId)}/snapshot`);
       if (snapshot && snapshot.project) {
         projectStore.replaceStateFromApi(projectId, snapshot);
@@ -293,7 +368,13 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
         if (process.env.NODE_ENV !== "production") {
           console.info("[Scheduly][projectService] syncProjectSnapshot success", { projectId, reason });
         }
-        emitSyncEvent({ scope: "snapshot", phase: "success", projectId, payload: snapshot, meta: { reason } });
+        emitSyncEvent({
+          scope: "snapshot",
+          phase: "success",
+          projectId,
+          payload: snapshot,
+          meta: { reason, firstReady: !wasReady }
+        });
       }
       return snapshot;
     } catch (error) {
@@ -312,7 +393,7 @@ const scheduleMetaSync = (projectId) => {
   if (!isApiEnabled() || !projectId) return;
 
   if (!apiSyncState.readyProjects.has(projectId)) {
-    syncProjectSnapshot(projectId).then(() => {
+    syncProjectSnapshot(projectId, { reason: "meta-prereq" }).then(() => {
       if (apiSyncState.readyProjects.has(projectId)) {
         scheduleMetaSync(projectId);
       }
@@ -426,7 +507,7 @@ const apiCreate = async (payload = {}) => {
 const apiLoad = (identifier = null) => {
   const result = localLoad(identifier);
   if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId);
+    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
   }
   return result;
 };
@@ -434,7 +515,7 @@ const apiLoad = (identifier = null) => {
 const apiLoadByParticipantToken = (token) => {
   const result = localLoadByParticipantToken(token);
   if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId);
+    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
   }
   return result;
 };
@@ -455,30 +536,107 @@ const apiUpdateMeta = (projectId, changes) => {
   return snapshot;
 };
 
-const apiReset = (projectId) => {
-  const snapshot = localReset(projectId);
-  syncProjectSnapshot(projectId, { force: true });
-  return snapshot;
-};
-
-const apiImportState = (projectId, payload) => {
-  const snapshot = localImportState(projectId, payload);
-  apiSyncState.readyProjects.delete(projectId);
-  syncProjectSnapshot(projectId, { force: true });
-  return snapshot;
-};
-
-const apiResolveProjectFromLocation = () => {
-  const resolved = localResolveProjectFromLocation();
-  if (resolved && resolved.projectId) {
-    syncProjectSnapshot(resolved.projectId);
+const resolveViaShareToken = async (routeInfo) => {
+  const typePath = routeInfo.kind === "admin" ? "admin" : "participant";
+  try {
+    const response = await apiClient.get(
+      `/api/projects/share/${typePath}/${encodeURIComponent(routeInfo.token)}`
+    );
+    const snapshot = {
+      project: response.project,
+      candidates: response.candidates,
+      participants: response.participants,
+      responses: response.responses,
+      shareTokens: response.shareTokens,
+      versions: response.versions
+    };
+    projectStore.replaceStateFromApi(response.projectId, snapshot);
+    projectStore.setRouteContext({
+      projectId: response.projectId,
+      kind: "share",
+      shareType: typePath,
+      token: routeInfo.token
+    });
+    apiSyncState.readyProjects.add(response.projectId);
+    return {
+      projectId: response.projectId,
+      state: projectStore.getProjectStateSnapshot(response.projectId),
+      routeContext: projectStore.getCurrentRouteContext()
+    };
+  } catch (error) {
+    if (error && error.status === 404) {
+      projectStore.setRouteContext({
+        projectId: projectStore.getDefaultProjectId(),
+        kind: "share-miss",
+        shareType: typePath,
+        token: routeInfo.token
+      });
+      return {
+        projectId: projectStore.getDefaultProjectId(),
+        state: projectStore.getProjectStateSnapshot(projectStore.getDefaultProjectId()),
+        routeContext: projectStore.getCurrentRouteContext()
+      };
+    }
+    throw error;
   }
-  return resolved;
+};
+
+const loadSessionProjectSnapshot = async (projectId) => {
+  projectStore.setRouteContext({ projectId, kind: "default" });
+  const snapshot = await syncProjectSnapshot(projectId, { reason: "initial-load" });
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    projectId,
+    state: projectStore.getProjectStateSnapshot(projectId),
+    routeContext: projectStore.getCurrentRouteContext()
+  };
+};
+
+const createFreshSessionProject = async () => {
+  const created = await apiCreate();
+  if (created && created.projectId) {
+    setStoredSessionProjectId(created.projectId);
+    projectStore.setRouteContext({ projectId: created.projectId, kind: "default" });
+    return {
+      projectId: created.projectId,
+      state: created.state || projectStore.getProjectStateSnapshot(created.projectId),
+      routeContext: projectStore.getCurrentRouteContext()
+    };
+  }
+  const fallbackId = projectStore.getDefaultProjectId();
+  projectStore.setRouteContext({ projectId: fallbackId, kind: "default" });
+  return {
+    projectId: fallbackId,
+    state: projectStore.getProjectStateSnapshot(fallbackId),
+    routeContext: projectStore.getCurrentRouteContext()
+  };
+};
+
+const resolveSessionProject = async () => {
+  const storedProjectId = getStoredSessionProjectId();
+  if (storedProjectId) {
+    const resolved = await loadSessionProjectSnapshot(storedProjectId);
+    if (resolved) {
+      return resolved;
+    }
+    setStoredSessionProjectId(null);
+  }
+  return createFreshSessionProject();
+};
+
+const apiResolveProjectFromLocation = async () => {
+  const routeInfo = parseRouteFromLocation();
+  if (routeInfo.kind === "admin" || routeInfo.kind === "participant") {
+    return resolveViaShareToken(routeInfo);
+  }
+  return resolveSessionProject();
 };
 
 const apiSubscribe = (projectId, callback) => {
   if (projectId) {
-    syncProjectSnapshot(projectId);
+    syncProjectSnapshot(projectId, { reason: "subscription" });
   }
   return localSubscribe(projectId, callback);
 };
@@ -506,9 +664,13 @@ const subscribe = (projectId, callback) =>
   (isApiEnabled() ? apiSubscribe(projectId, callback) : localSubscribe(projectId, callback));
 
 const resolveProjectFromLocation = () =>
-  (isApiEnabled() ? apiResolveProjectFromLocation() : localResolveProjectFromLocation());
+  (isApiEnabled()
+    ? apiResolveProjectFromLocation()
+    : Promise.resolve(localResolveProjectFromLocation()));
 
 const getRouteContext = () => localGetRouteContext();
+
+const isProjectReady = (projectId) => apiSyncState.readyProjects.has(projectId);
 
 module.exports = {
   create,
@@ -524,5 +686,6 @@ module.exports = {
   addSyncListener,
   getDefaultProjectId: projectStore.getDefaultProjectId,
   getState: localGetState,
-  syncProjectSnapshot
+  syncProjectSnapshot,
+  isProjectReady
 };

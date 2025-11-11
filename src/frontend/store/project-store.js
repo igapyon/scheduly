@@ -1038,5 +1038,6 @@ module.exports = {
   exportProjectState,
   importProjectState,
   replaceStateFromApi,
-  replaceTallies
+  replaceTallies,
+  setRouteContext
 };

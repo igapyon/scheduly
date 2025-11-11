@@ -65,6 +65,8 @@ const escapeIcalText = (value) => {
 const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
 const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
 
+const PLACEHOLDER_PREFIX = "demo-";
+
 const generateId = (prefix) => {
   const random =
     typeof crypto.randomUUID === "function"
@@ -72,6 +74,8 @@ const generateId = (prefix) => {
       : crypto.randomBytes(16).toString("hex");
   return prefix ? `${prefix}_${random}` : random;
 };
+
+const isPlaceholderToken = (token) => typeof token === "string" && token.startsWith(PLACEHOLDER_PREFIX);
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -321,6 +325,12 @@ const createShareTokenEntry = (type, baseUrl = SHARE_BASE_URL) => {
   };
 };
 
+const createPlaceholderShareTokenEntry = (type, projectId) => ({
+  token: `${PLACEHOLDER_PREFIX}${type}-${projectId}`,
+  url: "",
+  issuedAt: ""
+});
+
 const createInitialProjectState = (projectId, metaInput = {}) => {
   const timestamp = new Date().toISOString();
   const meta = {
@@ -332,8 +342,8 @@ const createInitialProjectState = (projectId, metaInput = {}) => {
     updatedAt: timestamp
   };
   const shareTokens = {
-    admin: createShareTokenEntry("admin"),
-    participant: createShareTokenEntry("participant")
+    admin: createPlaceholderShareTokenEntry("admin", projectId),
+    participant: createPlaceholderShareTokenEntry("participant", projectId)
   };
   return {
     project: meta,
@@ -467,6 +477,10 @@ const buildIcsFromState = (state) => {
 class InMemoryProjectStore {
   constructor() {
     this.projects = new Map();
+    this.shareTokenIndex = {
+      admin: new Map(),
+      participant: new Map()
+    };
   }
 
   createProject(metaInput = {}) {
@@ -474,6 +488,7 @@ class InMemoryProjectStore {
     const projectId = generateId("proj");
     const state = createInitialProjectState(projectId, sanitizedMeta);
     this.projects.set(projectId, state);
+    this.#indexShareTokens(projectId, state.shareTokens);
     return this.#serializeProject(projectId);
   }
 
@@ -482,6 +497,7 @@ class InMemoryProjectStore {
     if (!state) {
       state = createInitialProjectState(projectId, {});
       this.projects.set(projectId, state);
+      this.#indexShareTokens(projectId, state.shareTokens);
       return this.#serializeProject(projectId);
     }
     return this.#serializeProject(projectId);
@@ -1062,7 +1078,9 @@ class InMemoryProjectStore {
       versions
     };
 
+    this.#removeShareTokensFromIndex(projectId, state.shareTokens);
     this.projects.set(projectId, nextState);
+    this.#indexShareTokens(projectId, nextState.shareTokens);
     return this.#serializeProject(projectId);
   }
 
@@ -1096,8 +1114,11 @@ class InMemoryProjectStore {
     if (rotatedByValue) {
       nextTokens.admin.lastGeneratedBy = rotatedByValue;
     }
+    const previousTokens = state.shareTokens;
     state.shareTokens = nextTokens;
     state.versions.shareTokensVersion += 1;
+    this.#removeShareTokensFromIndex(projectId, previousTokens);
+    this.#indexShareTokens(projectId, nextTokens);
     const latest = this.#serializeProject(projectId);
     return {
       shareTokens: latest.shareTokens,
@@ -1127,8 +1148,12 @@ class InMemoryProjectStore {
     if (!state.shareTokens || !state.shareTokens[type]) {
       throw new NotFoundError("Share token not found");
     }
+    const existingEntry = state.shareTokens[type];
     delete state.shareTokens[type];
     state.versions.shareTokensVersion += 1;
+    if (existingEntry) {
+      this.#removeShareTokensFromIndex(projectId, { [type]: existingEntry });
+    }
     const latest = this.#serializeProject(projectId);
     return {
       shareTokens: latest.shareTokens,
@@ -1142,6 +1167,46 @@ class InMemoryProjectStore {
       throw new NotFoundError("Project not found");
     }
     return state;
+  }
+
+  resolveProjectByShareToken(type, token) {
+    if (!SHARE_TOKEN_TYPES.includes(type)) {
+      throw new ValidationError("Invalid share token type", ["tokenType"]);
+    }
+    const normalizedToken = sanitizeString(token);
+    if (!normalizedToken) {
+      throw new ValidationError("token is required", ["token"]);
+    }
+    const projectId = this.shareTokenIndex[type].get(normalizedToken);
+    if (!projectId) {
+      throw new NotFoundError("Share token not found");
+    }
+    return {
+      projectId,
+      snapshot: this.#serializeProject(projectId)
+    };
+  }
+
+  #indexShareTokens(projectId, shareTokens = {}) {
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const entry = shareTokens[type];
+      if (entry && isNonEmptyString(entry.token) && !isPlaceholderToken(entry.token)) {
+        this.shareTokenIndex[type].set(entry.token, projectId);
+      }
+    });
+  }
+
+  #removeShareTokensFromIndex(projectId, shareTokens = null) {
+    const state = this.projects.get(projectId);
+    const source = shareTokens || (state ? state.shareTokens : null) || {};
+    SHARE_TOKEN_TYPES.forEach((type) => {
+      const entry = source[type];
+      if (!entry || !isNonEmptyString(entry.token) || isPlaceholderToken(entry.token)) return;
+      const currentOwner = this.shareTokenIndex[type].get(entry.token);
+      if (currentOwner === projectId) {
+        this.shareTokenIndex[type].delete(entry.token);
+      }
+    });
   }
 
   #serializeProject(projectId) {

@@ -10,11 +10,12 @@ import participantService from "./services/participant-service";
 import shareService from "./services/share-service";
 import summaryService from "./services/summary-service";
 import responseService from "./services/response-service";
+import runtimeConfig from "./shared/runtime-config";
+import { describeMutationToast } from "./shared/mutation-message";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
 import EventMeta from "./shared/EventMeta.jsx";
 import ErrorScreen from "./shared/ErrorScreen.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
-import { ensureDemoProjectData } from "./shared/demo-data";
 import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 
 const { DEFAULT_TZID, createLogger } = sharedIcalUtils;
@@ -219,6 +220,8 @@ function InlineResponseEditor({
   const [statusMessage, setStatusMessage] = useState("");
   const [commentError, setCommentError] = useState(false);
   const statusTimerRef = useRef(null);
+  const lastAttemptRef = useRef(null);
+  const [conflictInfo, setConflictInfo] = useState(null);
 
   useEffect(() => {
     setCurrentMark(initialMark && initialMark !== "pending" ? initialMark : null);
@@ -237,10 +240,41 @@ function InlineResponseEditor({
     };
   }, []);
 
+  useEffect(() => {
+    if (!projectId || !participantId || !schedule?.id) return () => {};
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (
+        !event ||
+        event.projectId !== projectId ||
+        event.scope !== "mutation" ||
+        event.entity !== "response" ||
+        event.phase !== "conflict"
+      ) {
+        return;
+      }
+      const meta = event.meta || {};
+      if (meta.participantId !== participantId || meta.candidateId !== schedule.id) {
+        return;
+      }
+      const attempt = lastAttemptRef.current;
+      setConflictInfo({
+        attempt,
+        timestamp: Date.now()
+      });
+      setStatusMessage("最新の回答と競合しました。内容を確認して再度保存してください。");
+    });
+    return unsubscribe;
+  }, [participantId, projectId, schedule?.id]);
+
   const commitUpdate = useCallback(
     async (nextMark, nextComment) => {
       if (!projectId || !participantId || !schedule?.id) return;
       try {
+        lastAttemptRef.current = {
+          mark: nextMark || "pending",
+          comment: nextComment || ""
+        };
+        setConflictInfo(null);
         await responseService.upsertResponse(projectId, {
           participantId,
           candidateId: schedule.id,
@@ -255,6 +289,8 @@ function InlineResponseEditor({
           setStatusMessage("");
           statusTimerRef.current = null;
         }, 1800);
+        lastAttemptRef.current = null;
+        setConflictInfo(null);
       } catch (error) {
         const msg = error && error.message ? String(error.message) : "保存に失敗しました";
         const isValidation = error && (error.code === 422 || /validation/i.test(msg));
@@ -280,11 +316,9 @@ function InlineResponseEditor({
   );
 
   const handleSelectMark = (markKey) => {
-    setCurrentMark((prev) => {
-      const next = prev === markKey ? null : markKey;
-      commitUpdate(next, currentComment);
-      return next;
-    });
+    const next = currentMark === markKey ? null : markKey;
+    setCurrentMark(next);
+    commitUpdate(next, currentComment);
   };
 
   // commit-on-blur for comment; mark commits immediately
@@ -365,6 +399,54 @@ function InlineResponseEditor({
           </a>
         ) : null}
       </div>
+      {conflictInfo && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          <p className="font-semibold text-amber-700">最新の回答と競合しました</p>
+          <p className="mt-1">
+            他の参加者が同じ日程の回答を先に更新したため、あなたの入力は保存されていません。内容を確認して再度保存してください。
+          </p>
+          {conflictInfo.attempt && (
+            <div className="mt-2 rounded-lg border border-amber-100 bg-white/80 px-3 py-2 text-[11px] text-zinc-600">
+              <div className="text-[10px] font-semibold text-zinc-400">あなたの入力</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className={`${markBadgeClass(conflictInfo.attempt.mark || "pending")} px-2 py-0.5 text-xs font-semibold`}>
+                  {MARK_SYMBOL[conflictInfo.attempt.mark || "pending"] ?? "？"}
+                </span>
+                <span className="text-zinc-600">{conflictInfo.attempt.comment || "コメントなし"}</span>
+              </div>
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+              onClick={() => {
+                const attempt = conflictInfo.attempt;
+                if (attempt) {
+                  setCurrentMark(attempt.mark && attempt.mark !== "pending" ? attempt.mark : null);
+                  setCurrentComment(attempt.comment || "");
+                  commitUpdate(attempt.mark, attempt.comment);
+                } else {
+                  commitUpdate(currentMark, currentComment);
+                }
+              }}
+            >
+              もう一度保存
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+              onClick={() => {
+                setConflictInfo(null);
+                lastAttemptRef.current = null;
+                setStatusMessage("最新の回答を表示しています");
+              }}
+            >
+              最新の回答を使う
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,7 +461,10 @@ function ParticipantSummary({
   canRemove = true,
   projectId,
   inlineEditorTarget,
-  onToggleInlineEdit
+  onToggleInlineEdit,
+  conflict = null,
+  onRetryConflict = () => {},
+  onDismissConflict = () => {}
 }) {
   const totals = useMemo(() => participantTotals(participant), [participant]);
   const [open, setOpen] = useState(false);
@@ -444,6 +529,42 @@ function ParticipantSummary({
           <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-zinc-600">未回答 {totals.pending}</span>
         </div>
       </summary>
+      {conflict && (
+        <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          <p className="font-semibold text-amber-700">サーバー上の最新更新と競合しました</p>
+          <p className="mt-1">
+            他のメンバーがこの参加者情報を更新したため、あなたの変更は保存されていません。内容を確認して操作を選択してください。
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <span className="text-[10px] font-semibold text-zinc-400">サーバー</span>
+              <div className="mt-0.5 text-zinc-700">
+                {conflict.serverSnapshot?.displayName || participant.name || "（名前未設定）"}
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-zinc-400">あなたの編集</span>
+              <div className="mt-0.5 text-zinc-700">{conflict.localDraft?.displayName || "（入力なし）"}</div>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+              onClick={onRetryConflict}
+            >
+              もう一度保存
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+              onClick={onDismissConflict}
+            >
+              最新の内容を使う
+            </button>
+          </div>
+        </div>
+      )}
       <ul className="space-y-2 border-t border-zinc-200 bg-white px-4 py-3 text-sm">
         {participant.responses.map((response) => {
           const schedule = scheduleLookup ? scheduleLookup.get(response.scheduleId) : null;
@@ -612,6 +733,7 @@ function AdminResponsesApp() {
   }, [initialRouteContext]);
   const [activeTab, setActiveTab] = useState("schedule");
   const [projectState, setProjectState] = useState(null);
+  const projectStateRef = useRef(null);
   const [schedules, setSchedules] = useState([]);
   const [participantSummaries, setParticipantSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -628,6 +750,133 @@ function AdminResponsesApp() {
   const [renameInProgress, setRenameInProgress] = useState(false);
   const [renameError, setRenameError] = useState("");
   const [inlineEditorTarget, setInlineEditorTarget] = useState(null);
+  const isApiDriver = runtimeConfig.isProjectDriverApi();
+  const [snapshotStatus, setSnapshotStatus] = useState(() => ({
+    phase: isApiDriver ? "loading" : "ready",
+    message: isApiDriver ? "サーバーの初期データを取得しています…" : ""
+  }));
+  const [toast, setToast] = useState("");
+  const popToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2000);
+  }, []);
+  const participantAttemptRef = useRef(new Map());
+  const participantConflictsRef = useRef(new Map());
+  const [participantConflicts, setParticipantConflicts] = useState({});
+
+  const publishParticipantConflicts = useCallback(() => {
+    if (!participantConflictsRef.current.size) {
+      setParticipantConflicts({});
+      return;
+    }
+    const snapshot = {};
+    participantConflictsRef.current.forEach((value, key) => {
+      snapshot[key] = {
+        ...value,
+        localDraft: value.localDraft ? { ...value.localDraft } : null,
+        serverSnapshot: value.serverSnapshot ? { ...value.serverSnapshot } : null
+      };
+    });
+    setParticipantConflicts(snapshot);
+  }, []);
+
+  const clearParticipantConflict = useCallback(
+    (participantId) => {
+      if (!participantId || !participantConflictsRef.current.has(participantId)) return;
+      participantConflictsRef.current.delete(participantId);
+      publishParticipantConflicts();
+    },
+    [publishParticipantConflicts]
+  );
+
+  const recordParticipantConflict = useCallback(
+    (participantId, meta = {}) => {
+      if (!participantId) return;
+      const participants = projectStateRef.current?.participants || [];
+      const server = participants.find((p) => p.id === participantId) || null;
+      const attempt = participantAttemptRef.current.get(participantId) || null;
+      if (!attempt && !server) return;
+      participantConflictsRef.current.set(participantId, {
+        participantId,
+        action: meta.action || "update",
+        localDraft: attempt ? { ...attempt } : null,
+        serverSnapshot: server ? { ...server } : null,
+        timestamp: Date.now()
+      });
+      publishParticipantConflicts();
+    },
+    [publishParticipantConflicts]
+  );
+
+  const refreshParticipantConflictsFromState = useCallback(
+    (state) => {
+      if (!participantConflictsRef.current.size) return;
+      const participants = state?.participants || [];
+      let changed = false;
+      participantConflictsRef.current.forEach((entry, participantId) => {
+        const server = participants.find((p) => p.id === participantId);
+        if (!server) {
+          participantConflictsRef.current.delete(participantId);
+          participantAttemptRef.current.delete(participantId);
+          changed = true;
+        } else {
+          entry.serverSnapshot = { ...server };
+          changed = true;
+        }
+      });
+      if (changed) {
+        publishParticipantConflicts();
+      }
+    },
+    [publishParticipantConflicts]
+  );
+
+  const retryParticipantConflict = useCallback(
+    async (participantId) => {
+      if (!participantId) return;
+      const conflict = participantConflictsRef.current.get(participantId);
+      const attempt = conflict?.localDraft || participantAttemptRef.current.get(participantId);
+      const displayName = attempt?.displayName;
+      if (!displayName) {
+        popToast("再保存できる内容が見つかりませんでした");
+        return;
+      }
+      if (!projectId) {
+        setParticipantActionError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+        setParticipantActionMessage("");
+        return;
+      }
+      participantAttemptRef.current.set(participantId, { displayName });
+      try {
+        await participantService.updateParticipant(projectId, participantId, { displayName });
+        participantAttemptRef.current.delete(participantId);
+        clearParticipantConflict(participantId);
+        setParticipantActionMessage(`参加者「${displayName}」の名前を更新しました`);
+        setParticipantActionError("");
+      } catch (error) {
+        if (error && error.status === 409) {
+          // 再度競合。イベントリスナーが処理する
+        } else {
+          console.error("[Scheduly] participant retry failed", error);
+          setParticipantActionError(
+            error instanceof Error ? error.message : "参加者名の更新に失敗しました。しばらく待ってから再度お試しください。"
+          );
+        }
+      }
+    },
+    [projectId, clearParticipantConflict, popToast]
+  );
+
+const dismissParticipantConflict = useCallback(
+  (participantId) => {
+    if (!participantId) return;
+    participantAttemptRef.current.delete(participantId);
+    clearParticipantConflict(participantId);
+    setParticipantActionMessage("最新の参加者情報を表示しています");
+    setParticipantActionError("");
+  },
+  [clearParticipantConflict]
+);
 
   const participantShareToken = useMemo(() => {
     if (routeError) return "";
@@ -647,6 +896,12 @@ function AdminResponsesApp() {
     return "";
   }, [initialRouteContext, projectState, routeContext, routeError]);
 
+  const snapshotBannerVisible = isApiDriver && snapshotStatus.phase !== "ready" && snapshotStatus.message;
+  const snapshotBannerClasses =
+    snapshotStatus.phase === "error"
+      ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
+      : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
+
   useEffect(() => {
     if (routeError) return;
     if (typeof window === "undefined") return;
@@ -658,57 +913,86 @@ function AdminResponsesApp() {
     if (currentUrl.pathname === desiredPath) return;
     currentUrl.pathname = desiredPath;
     window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
-    const resolved = projectService.resolveProjectFromLocation();
-    setRouteContext(resolved.routeContext);
+    let disposed = false;
+    (async () => {
+      try {
+        const resolved = await projectService.resolveProjectFromLocation();
+        if (!disposed && resolved) {
+          setRouteContext(resolved.routeContext);
+        }
+      } catch (error) {
+        console.error("Failed to refresh route context", error);
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
   }, [initialRouteContext, participantShareToken, routeError]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let unsubscribe = null;
+useEffect(() => {
+  let cancelled = false;
+  let unsubscribe = null;
 
-    const bootstrap = async () => {
-      const resolved = projectService.resolveProjectFromLocation();
-      if (cancelled) return;
+  const bootstrap = async () => {
+    try {
+      const resolved = await projectService.resolveProjectFromLocation();
+      if (cancelled || !resolved) return;
       setProjectId(resolved.projectId);
       setInitialRouteContext(resolved.routeContext);
       setRouteContext(resolved.routeContext);
       setProjectState(resolved.state);
+      projectStateRef.current = resolved.state;
+      refreshParticipantConflictsFromState(resolved.state);
       setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: resolved.state }));
-      setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: resolved.state }));
-      try {
-        await ensureDemoProjectData(resolved.projectId);
-        if (!cancelled) {
-          setLoadError("");
-        }
-      } catch (error) {
-        console.warn("[Scheduly] failed to seed demo data", error);
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      setParticipantSummaries(
+        summaryService.buildParticipantView(resolved.projectId, { state: resolved.state })
+      );
+      if (!cancelled) {
+        setLoadError("");
+        setLoading(false);
       }
 
-      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-        if (cancelled || !nextState) return;
-        setProjectState(nextState);
-        setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
-        setParticipantSummaries(summaryService.buildParticipantView(resolved.projectId, { state: nextState }));
-        setRouteContext(projectService.getRouteContext());
-      });
-    };
-
-    bootstrap();
-
-    return () => {
-      cancelled = true;
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+      const shouldSubscribe =
+        !(resolved.routeContext?.kind === "share-miss" && resolved.routeContext.shareType === "participant");
+      if (shouldSubscribe) {
+        unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+          if (cancelled || !nextState) return;
+          setProjectState(nextState);
+          projectStateRef.current = nextState;
+          refreshParticipantConflictsFromState(nextState);
+          setSchedules(summaryService.buildScheduleView(resolved.projectId, { state: nextState }));
+          setParticipantSummaries(
+            summaryService.buildParticipantView(resolved.projectId, { state: nextState })
+          );
+          setRouteContext(projectService.getRouteContext());
+        });
       }
-    };
-  }, [routeError]);
+    } catch (error) {
+      console.error("Failed to resolve participant project context", error);
+      if (!cancelled) {
+        setLoadError(error instanceof Error ? error.message : "Failed to load project");
+        setLoading(false);
+      }
+    }
+  };
+
+  bootstrap();
+
+  return () => {
+    cancelled = true;
+    if (typeof unsubscribe === "function") {
+      unsubscribe();
+    }
+  };
+}, [refreshParticipantConflictsFromState]);
+
+
+  useEffect(() => {
+    if (!isApiDriver || !projectId) return;
+    if (projectService.isProjectReady(projectId)) {
+      setSnapshotStatus({ phase: "ready", message: "" });
+    }
+  }, [isApiDriver, projectId]);
 
   const participants = projectState?.participants || [];
 
@@ -730,6 +1014,76 @@ function AdminResponsesApp() {
       return { participantId, scheduleId };
     });
   };
+  const EmptyParticipantCallout = ({ className = "" } = {}) => (
+    <div className={`rounded-2xl border border-dashed border-emerald-200 bg-white/80 p-5 text-center ${className}`}>
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl">
+        👥
+      </div>
+      <p className="text-sm font-semibold text-zinc-800">まだ参加者がいません</p>
+      <p className="mt-2 text-xs text-zinc-500">まずは参加者を登録し、回答用リンクを共有しましょう。</p>
+      <div className="mt-4 flex flex-wrap justify-center">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-emerald-700"
+          onClick={() => setParticipantDialogOpen(true)}
+        >
+          <span className="text-sm">＋</span> 参加者を新規登録
+        </button>
+      </div>
+    </div>
+  );
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    const unsubscribe = projectService.addSyncListener((event) => {
+      if (!event || event.projectId !== projectId) return;
+      const { scope, phase, meta, entity } = event;
+      if (scope === "snapshot") {
+        if (phase === "start" && isApiDriver) {
+          setSnapshotStatus((prev) => {
+            if (prev.phase === "ready") return prev;
+            return {
+              phase: "loading",
+              message: "サーバーの最新情報を取得しています…"
+            };
+          });
+        } else if (phase === "success") {
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "ready", message: "" });
+          }
+          if (meta?.reason === "conflict") {
+            popToast("サーバーの最新回答を読み込み直しました。");
+          }
+        } else if (phase === "error") {
+          const message = "サーバーの最新状態を取得できませんでした。時間を置いて再度お試しください。";
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "error", message });
+          }
+          popToast(message);
+        }
+      } else if (scope === "mutation") {
+        let handled = false;
+        if (entity === "participant" && phase === "conflict") {
+          const targetId = meta?.participantId;
+          recordParticipantConflict(targetId, event);
+          const participantsList = projectStateRef.current?.participants || [];
+          const serverName =
+            (participantsList.find((p) => p.id === targetId)?.displayName ||
+              participantAttemptRef.current.get(targetId)?.displayName ||
+              "参加者");
+          popToast(`${serverName} の情報が他の操作と競合しました。カード内の案内を確認してください。`);
+          handled = true;
+        }
+        if (!handled && (phase === "conflict" || phase === "error")) {
+          const message = describeMutationToast(event);
+          if (message) {
+            popToast(message);
+          }
+        }
+      }
+    });
+    return unsubscribe;
+  }, [isApiDriver, popToast, projectId, recordParticipantConflict]);
 
   const closeManagementDialog = () => {
     setManagementDialogOpen(false);
@@ -1058,23 +1412,33 @@ function AdminResponsesApp() {
       setRenameError("参加者名を入力してください");
       return;
     }
-    if (!projectId) {
-      setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
-      return;
+  if (!projectId) {
+    setRenameError("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+    return;
+  }
+  setRenameInProgress(true);
+  const targetId = renameDialogParticipant.id;
+  participantAttemptRef.current.set(targetId, { displayName: trimmed });
+  try {
+    await participantService.updateParticipant(projectId, targetId, { displayName: trimmed });
+    participantAttemptRef.current.delete(targetId);
+    clearParticipantConflict(targetId);
+    setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
+    setParticipantActionError("");
+    closeRenameParticipantDialog();
+  } catch (error) {
+    console.error("[Scheduly] failed to rename participant", error);
+    if (error && error.status === 409) {
+      setRenameError("他の変更と競合しました。カード内の案内を確認してください。");
+    } else {
+      setRenameError(
+        error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。"
+      );
     }
-    setRenameInProgress(true);
-    try {
-      await participantService.updateParticipant(projectId, renameDialogParticipant.id, { displayName: trimmed });
-      setParticipantActionMessage(`参加者\u300c${trimmed}\u300dの名前を変更しました`);
-      setParticipantActionError("");
-      closeRenameParticipantDialog();
-    } catch (error) {
-      console.error("[Scheduly] failed to rename participant", error);
-      setRenameError(error instanceof Error ? error.message : "参加者名の変更に失敗しました。しばらく待ってから再度お試しください。");
-    } finally {
-      setRenameInProgress(false);
-    }
-  };
+  } finally {
+    setRenameInProgress(false);
+  }
+};
 
   const handleRemoveParticipant = async (participantId, displayName) => {
     const summaryName = displayName || "参加者";
@@ -1086,6 +1450,8 @@ function AdminResponsesApp() {
     await participantService.removeParticipant(projectId, participantId);
     setParticipantActionMessage(`${summaryName}を削除しました`);
     setParticipantActionError("");
+    participantAttemptRef.current.delete(participantId);
+    clearParticipantConflict(participantId);
   };
 
   useEffect(() => {
@@ -1115,11 +1481,15 @@ function AdminResponsesApp() {
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
               <span aria-hidden="true">📋</span>
               <span>Scheduly 参加者</span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold tracking-wide text-amber-700">
+                BETA
+              </span>
             </h1>
             <p className="mt-2 text-sm text-zinc-600">プロジェクト「{projectName}」の日程と回答状況です。</p>
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
             <p className="mt-1 text-xs text-zinc-500">締切目安: {DASHBOARD_META.deadline}</p>
             <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
+            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
@@ -1151,6 +1521,7 @@ function AdminResponsesApp() {
 
       {activeTab === "schedule" && (
         <section className="space-y-3">
+          {participants.length === 0 && <EmptyParticipantCallout className="mb-3" />}
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
             <span>日程ごとの回答サマリー</span>
             <InfoBadge
@@ -1174,13 +1545,14 @@ function AdminResponsesApp() {
               />
             ))
           ) : (
-            <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
-              表示できる日程がありません。
+            <>
+              <EmptyParticipantCallout />
               {loadError && (
-                <span className="mt-2 block text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
+                <span className="mt-3 block text-center text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
               )}
-            </div>
+            </>
           )}
+          {participants.length === 0 && schedules.length > 0 && <EmptyParticipantCallout className="mt-3" />}
         </section>
       )}
 
@@ -1207,23 +1579,27 @@ function AdminResponsesApp() {
           )}
           <div className="space-y-3">
             {participantSummaries.length ? (
-              participantSummaries.map((participant) => (
-                <ParticipantSummary
-                  key={participant.id}
-                  participant={participant}
-                  scheduleLookup={scheduleLookup}
-                  onRemove={() => openRemoveParticipantDialog(participant)}
-                  onRename={() => openRenameParticipantDialog(participant)}
-                  canRemove={participantSummaries.length > 1}
-                  projectId={projectId}
-                inlineEditorTarget={inlineEditorTarget}
-                onToggleInlineEdit={toggleInlineEditor}
-              />
-              ))
+              participantSummaries.map((participant) => {
+                const conflict = participantConflicts[participant.id] || null;
+                return (
+                  <ParticipantSummary
+                    key={participant.id}
+                    participant={participant}
+                    scheduleLookup={scheduleLookup}
+                    onRemove={() => openRemoveParticipantDialog(participant)}
+                    onRename={() => openRenameParticipantDialog(participant)}
+                    canRemove={participantSummaries.length > 1}
+                    projectId={projectId}
+                    inlineEditorTarget={inlineEditorTarget}
+                    onToggleInlineEdit={toggleInlineEditor}
+                    conflict={conflict}
+                    onRetryConflict={() => retryParticipantConflict(participant.id)}
+                    onDismissConflict={() => dismissParticipantConflict(participant.id)}
+                  />
+                );
+              })
             ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-6 text-center text-xs text-zinc-500">
-                表示できる参加者がありません。
-              </div>
+              <EmptyParticipantCallout />
             )}
           </div>
 
@@ -1450,6 +1826,13 @@ function AdminResponsesApp() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-8 flex justify-center px-4">
+          <div className="pointer-events-auto rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm text-emerald-700 shadow-lg">
+            {toast}
           </div>
         </div>
       )}

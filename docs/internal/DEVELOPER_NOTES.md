@@ -39,9 +39,16 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
+- `/api/metrics` で直近のアクセス統計（リクエスト数・平均応答時間・ルート別ステータス分布・最新エラー）を JSON で取得できる。簡易監視やローカル検証時に活用する。
 - API サーバは `/api/healthz`（常時 200）と `/api/readyz`（起動直後のみ 503、それ以外は 200）で監視でき、すべてのリクエストに `X-Request-ID` と構造化ログを付与している。ログは JSON 1 行形式で `ts/level/msg/...` を含む。`SCHEDULY_API_BODY_LIMIT` で `express.json` の受信上限（既定: `256kb`）を変更できる。共有URLの基準は `SCHEDULY_SHARE_BASE_URL`（または `BASE_URL`）で上書きでき、未指定の場合はフロントエンドから渡された `baseUrl` を優先する。
 - フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) も API ドライバ時はサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
 - 共通のデータ型は `src/shared/types.ts` に TypeScript で集約している。フロント／サーバ双方で `@typedef {import('../shared/types')...}` を用い、プロジェクトスナップショットや共有トークン、候補・参加者の構造を参照する。
+
+### 1.4 サービスドライバの切り替え
+- `src/frontend/services/service-driver.js` に共通の driver セレクタを追加。`runtimeConfig.getProjectDriver()` の結果または個別オーバーライドで `local` / `api` を選択できる。
+- 参加者・回答・候補・共有トークンの各サービスは `createServiceDriver` で実装を束ね、`set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` をエクスポートしている。E2E や Storybook 等でモックしたい場合はこれらのフックを使って強制的に local/api を切り替える。
+- local driver は従来どおり `projectStore` を直接操作し、API driver は `apiClient` 経由の fetch + 楽観更新を行う。UI から見た場合はいずれも同じ Promise ベースのインターフェースとなる。
+- `src/frontend/services/sync-events.js` でサーバー同期イベント（`scope: 'snapshot' | 'meta' | 'mutation'` など）を一元配信する。React 側は `projectService.addSyncListener`（内部で同イベントを再エクスポート）を購読しており、Admin/User 画面では初期スナップショット完了・競合によるロールバック・更新失敗をバナー／トーストで通知する。
 
 ---
 
@@ -102,18 +109,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ## 6. TODO バックログ
 
-### 優先度: 最高
-- 回答/候補編集の競合解決 UI を実装し、差分表示・再入力フローを整備する (`docs/internal/spec-api-flow.md` 6.11 参照)
-- API エラーログとアクセス監視基盤を実装する（構造化ログ/監査ログ方針は `docs/internal/spec-server-integration-wip.md`「ログ／モニタリング基盤」参照)
-- `projectService` 以外のサービス層（候補/参加者/回答など）を driver 化し、API ドライバ有効時は fetch 経由で CRUD を実行する（`src/frontend/services/*-service.js` の各操作を段階的に置換。既存の store 操作は local driver として温存する）。
-- API ドライバ利用時の初期スナップショット同期完了を UI に伝える仕組みと、競合/更新失敗時のロールバック・トースト連携（`admin.jsx` / `user.jsx`）を整備する。現状は `projectService` での `/meta` 同期のみのため、他操作でも 409/422 をユーザーに通知できるよう統一する。
-- 参加者URLの自動表示／遷移仕様を見直し、必要なら管理者URLと同じく発行直後に新URLへ誘導する方針へ揃える。
-- 管理/参加者 UI に「BETA」バッジやロゴを表示し、利用者が試験運用版であると認識できるようにする。
-- 参加者画面ヘッダー右下に控えめサイズの「管理画面へ」リンクを配置し、クリック時は空の管理画面へ遷移（遷移前にダイアログで定型文字を入力させる）。参加者画面のURLは引き継がない。
-
 ### 優先度: 高
-- サービス層の driver 化（`driver: 'local'|'api'`、現状は `local` 実装で等価動作）
-- `projectStore` の役割固定（キャッシュ/購読/派生計算トリガーに限定、永続はAPI側）
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
@@ -125,8 +121,9 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
  - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
- - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
- - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
+- 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
+- README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
+- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ### 優先度: 中
  - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）

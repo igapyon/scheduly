@@ -11,9 +11,9 @@ import runtimeConfig from "./shared/runtime-config";
 import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
 import { formatDateTimeRangeLabel } from "./shared/date-utils";
-import { ensureDemoProjectData } from "./shared/demo-data";
 import TypeConfirmationDialog from "./shared/TypeConfirmationDialog.jsx";
 import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { describeMutationToast } from "./shared/mutation-message";
 
 const { DEFAULT_TZID, ensureICAL } = sharedIcalUtils;
 
@@ -75,6 +75,31 @@ const CANDIDATE_COMPARE_KEYS = [
   "sequence",
   "dtstamp"
 ];
+const CANDIDATE_FIELD_LABELS = {
+  summary: "タイトル",
+  status: "ステータス",
+  dtstart: "開始日時",
+  dtend: "終了日時",
+  tzid: "タイムゾーン",
+  location: "場所",
+  description: "説明"
+};
+const CANDIDATE_FIELD_ORDER = ["summary", "status", "dtstart", "dtend", "tzid", "location", "description"];
+
+const diffCandidateFields = (local = {}, server = {}) =>
+  CANDIDATE_FIELD_ORDER.filter((field) => {
+    const localValue = local && Object.prototype.hasOwnProperty.call(local, field) ? local[field] ?? "" : "";
+    const serverValue = server && Object.prototype.hasOwnProperty.call(server, field) ? server[field] ?? "" : "";
+    return localValue !== serverValue;
+  });
+
+const formatCandidateFieldValue = (candidate, field) => {
+  const value = candidate && Object.prototype.hasOwnProperty.call(candidate, field) ? candidate[field] : "";
+  if (value === undefined || value === null || value === "") {
+    return "（未設定）";
+  }
+  return String(value);
+};
 
 const SHARE_REISSUE_WORD = "REISSUE";
 const PROJECT_IMPORT_WORD = "IMPORT";
@@ -192,7 +217,10 @@ function CandidateCard({
   disableRemove,
   isOpen = false,
   onToggleOpen,
-  errors = {}
+  errors = {},
+  conflict = null,
+  onResolveConflict,
+  onRetryConflict
 }) {
   const open = Boolean(isOpen);
   const dialogTitleId = useId();
@@ -267,6 +295,45 @@ function CandidateCard({
       </summary>
 
       <div className={`space-y-4 px-5 py-5 ${open ? "rounded-b-2xl border border-emerald-200 bg-emerald-50/60" : "border-t border-zinc-200"}`}>
+        {conflict && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <p className="font-semibold text-amber-700">サーバー上の最新更新と競合しました</p>
+            <p className="mt-1 text-amber-700">
+              他のメンバーが同じ日程を更新したため、あなたの変更は保存されていません。差分を確認して操作を選択してください。
+            </p>
+            {(conflict.diffFields && conflict.diffFields.length ? conflict.diffFields : CANDIDATE_FIELD_ORDER).map((field) => (
+              <div key={field} className="mt-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-[11px] text-zinc-600">
+                <div className="font-semibold text-amber-700">{CANDIDATE_FIELD_LABELS[field] || field}</div>
+                <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-400">サーバー</span>
+                    <div className="mt-0.5 text-zinc-700">{formatCandidateFieldValue(conflict.serverSnapshot, field)}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-400">あなたの編集</span>
+                    <div className="mt-0.5 text-zinc-700">{formatCandidateFieldValue(conflict.localDraft, field)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-700 hover:border-emerald-400"
+                onClick={onRetryConflict}
+              >
+                編集内容を再保存
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:border-zinc-300"
+                onClick={onResolveConflict}
+              >
+                最新の内容を反映
+              </button>
+            </div>
+          </div>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
             <span className="text-xs font-semibold text-zinc-500">タイトル（SUMMARY）</span>
@@ -514,7 +581,6 @@ const formatShareIssuedAtDisplay = (entry) => {
 function OrganizerApp() {
   const [projectId, setProjectId] = useState(null);
   const [routeContext, setRouteContext] = useState(null);
-  const [initialRouteContext, setInitialRouteContext] = useState(null);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [candidates, setCandidates] = useState([]);
@@ -528,7 +594,6 @@ function OrganizerApp() {
   const importInputRef = useRef(null);
   const projectImportInputRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null);
-  const autoIssueHandledRef = useRef(false);
   const [projectDeleteDialogOpen, setProjectDeleteDialogOpen] = useState(false);
   const [projectDeleteInProgress, setProjectDeleteInProgress] = useState(false);
   const [candidateDeleteDialog, setCandidateDeleteDialog] = useState(null);
@@ -545,6 +610,11 @@ function OrganizerApp() {
   const [pendingImportFile, setPendingImportFile] = useState(null);
   const [demoImportDialogOpen, setDemoImportDialogOpen] = useState(false);
   const [demoImportInProgress, setDemoImportInProgress] = useState(false);
+  const isApiDriver = runtimeConfig.isProjectDriverApi();
+  const [snapshotStatus, setSnapshotStatus] = useState(() => ({
+    phase: isApiDriver ? "loading" : "ready",
+    message: isApiDriver ? "サーバーの初期データを取得しています…" : ""
+  }));
 
   const popToast = useCallback((message) => {
     setToast(message);
@@ -560,49 +630,50 @@ function OrganizerApp() {
   }, [projectId]);
 
   useEffect(() => {
+    if (!isApiDriver || !projectId) return;
+    if (projectService.isProjectReady(projectId)) {
+      setSnapshotStatus({ phase: "ready", message: "" });
+    }
+  }, [isApiDriver, projectId]);
+
+  useEffect(() => {
     let cancelled = false;
     let unsubscribe = null;
 
     const bootstrap = async () => {
-      const resolved = projectService.resolveProjectFromLocation();
-      if (cancelled) {
-        return;
-      }
-
-      setProjectId(resolved.projectId);
-      setRouteContext(resolved.routeContext);
-      setInitialRouteContext(resolved.routeContext);
-      const state = resolved.state || {};
-      applySyncedMeta(state.project?.name || "", state.project?.description || "");
-      applySyncedCandidates(state.candidates || []);
-
-      const tokens = shareService.get(resolved.projectId);
-      setShareTokens(tokens);
-      const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
-      const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
-      baseUrlTouchedRef.current = false;
-      initialBaseUrlRef.current = normalizedBaseUrl;
-      setBaseUrlDraft(normalizedBaseUrl);
-      setBaseUrlEffective(normalizedBaseUrl);
-
       try {
-        await ensureDemoProjectData(resolved.projectId);
-      } catch (error) {
-        console.warn("[Scheduly] demo data load failed; proceeding with empty state", error);
-      } finally {
-        if (!cancelled) {
-          setInitialDataLoaded(true);
+        const resolved = await projectService.resolveProjectFromLocation();
+        if (cancelled || !resolved) {
+          return;
         }
-      }
 
-      unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
-        if (cancelled || !nextState) return;
-        applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
-        applySyncedCandidates(nextState.candidates || []);
-        // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
-        setShareTokens(shareService.get(resolved.projectId));
-        setRouteContext(projectService.getRouteContext());
-      });
+        setProjectId(resolved.projectId);
+        setRouteContext(resolved.routeContext);
+        const state = resolved.state || {};
+        applySyncedMeta(state.project?.name || "", state.project?.description || "");
+        applySyncedCandidates(state.candidates || []);
+
+        const tokens = shareService.get(resolved.projectId);
+        setShareTokens(tokens);
+        const derivedBaseUrl = deriveBaseUrlFromAdminEntry(tokens.admin) ?? resolveDefaultBaseUrl();
+        const normalizedBaseUrl = normalizeBaseUrlInput(derivedBaseUrl) || resolveDefaultBaseUrl();
+        baseUrlTouchedRef.current = false;
+        initialBaseUrlRef.current = normalizedBaseUrl;
+        setBaseUrlDraft(normalizedBaseUrl);
+        setBaseUrlEffective(normalizedBaseUrl);
+        setInitialDataLoaded(true);
+
+        unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
+          if (cancelled || !nextState) return;
+          applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
+          applySyncedCandidates(nextState.candidates || []);
+          // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
+          setShareTokens(shareService.get(resolved.projectId));
+          setRouteContext(projectService.getRouteContext());
+        });
+      } catch (error) {
+        console.error("Failed to resolve project context", error);
+      }
     };
 
     bootstrap();
@@ -615,9 +686,36 @@ function OrganizerApp() {
     };
   }, []);
 
-  const syncedMetaRef = useRef({ name: "", description: "" });
-  const candidateSyncedRef = useRef(new Map());
-  const candidateDraftRef = useRef(new Map());
+const syncedMetaRef = useRef({ name: "", description: "" });
+const candidateSyncedRef = useRef(new Map());
+const candidateDraftRef = useRef(new Map());
+const candidateConflictsRef = useRef(new Map());
+const [candidateConflicts, setCandidateConflicts] = useState({});
+
+const publishCandidateConflicts = useCallback(() => {
+  if (!candidateConflictsRef.current.size) {
+    setCandidateConflicts({});
+    return;
+  }
+  const snapshot = {};
+  candidateConflictsRef.current.forEach((value, key) => {
+    snapshot[key] = {
+      ...value,
+      localDraft: value.localDraft ? { ...value.localDraft } : null,
+      serverSnapshot: value.serverSnapshot ? { ...value.serverSnapshot } : null
+    };
+  });
+  setCandidateConflicts(snapshot);
+}, []);
+
+const clearCandidateConflict = useCallback(
+  (candidateId) => {
+    if (!candidateConflictsRef.current.has(candidateId)) return;
+    candidateConflictsRef.current.delete(candidateId);
+    publishCandidateConflicts();
+  },
+  [publishCandidateConflicts]
+);
 
   const applySyncedMeta = useCallback((nameValue = "", descriptionValue = "") => {
     const normalizedName = nameValue || "";
@@ -627,18 +725,46 @@ function OrganizerApp() {
     syncedMetaRef.current = { name: normalizedName, description: normalizedDescription };
   }, []);
 
-  const applySyncedCandidates = useCallback((list) => {
-    const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
-    setCandidates(normalized);
-    const snapshotMap = new Map();
-    const draftMap = new Map();
-    normalized.forEach((item) => {
-      snapshotMap.set(item.id, { ...item });
-      draftMap.set(item.id, { ...item });
-    });
-    candidateSyncedRef.current = snapshotMap;
-    candidateDraftRef.current = draftMap;
-  }, []);
+  const applySyncedCandidates = useCallback(
+    (list) => {
+      const normalized = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
+      const snapshotMap = new Map();
+      normalized.forEach((item) => {
+        snapshotMap.set(item.id, { ...item });
+      });
+      candidateSyncedRef.current = snapshotMap;
+
+      const draftMap = new Map();
+      const renderedList = normalized.map((item) => {
+        const conflict = candidateConflictsRef.current.get(item.id);
+        if (conflict && conflict.localDraft) {
+          conflict.serverSnapshot = { ...item };
+          const preserved = { ...conflict.localDraft };
+          draftMap.set(item.id, preserved);
+          return preserved;
+        }
+        const clone = { ...item };
+        draftMap.set(item.id, clone);
+        return clone;
+      });
+      candidateDraftRef.current = draftMap;
+      setCandidates(renderedList);
+
+      let conflictsChanged = false;
+      Array.from(candidateConflictsRef.current.keys()).forEach((candidateId) => {
+        if (!snapshotMap.has(candidateId)) {
+          candidateConflictsRef.current.delete(candidateId);
+          conflictsChanged = true;
+        }
+      });
+      if (candidateConflictsRef.current.size > 0 || conflictsChanged) {
+        publishCandidateConflicts();
+      } else {
+        setCandidateConflicts({});
+      }
+    },
+    [publishCandidateConflicts]
+  );
 
   const clearCandidateErrors = useCallback((candidateId) => {
     setCandidateErrors((prev) => {
@@ -746,28 +872,48 @@ function OrganizerApp() {
     clearCandidateErrors(id);
   };
 
-  const markCandidateFieldErrors = (id, message) => {
-    let fields = [];
-    if (message.includes(":")) {
-      const after = message.split(":").slice(1).join(":").trim();
-      if (after.includes("must be after")) {
-        fields = ["dtstart", "dtend"];
-      } else {
-        fields = after.split(/[,\s]+/).filter(Boolean);
-      }
+const markCandidateFieldErrors = (id, message) => {
+  let fields = [];
+  if (message.includes(":")) {
+    const after = message.split(":").slice(1).join(":").trim();
+    if (after.includes("must be after")) {
+      fields = ["dtstart", "dtend"];
+    } else {
+      fields = after.split(/[,\s]+/).filter(Boolean);
     }
-    if (fields.length) {
-      setCandidateErrors((prev) => {
-        const current = prev[id] || {};
-        const nextFlags = { ...current };
-        fields.forEach((f) => {
-          const key = String(f).toLowerCase();
-          nextFlags[key] = true;
-        });
-        return { ...prev, [id]: nextFlags };
+  }
+  if (fields.length) {
+    setCandidateErrors((prev) => {
+      const current = prev[id] || {};
+      const nextFlags = { ...current };
+      fields.forEach((f) => {
+        const key = String(f).toLowerCase();
+        nextFlags[key] = true;
       });
-    }
-  };
+      return { ...prev, [id]: nextFlags };
+    });
+  }
+};
+
+const recordCandidateConflict = useCallback(
+  (candidateId, eventMeta = {}) => {
+    if (!candidateId) return;
+    const draft = candidateDraftRef.current.get(candidateId);
+    const server = candidateSyncedRef.current.get(candidateId);
+    const draftSnapshot = draft ? { ...draft } : null;
+    if (!draftSnapshot && !server) return;
+    const existing = candidateConflictsRef.current.get(candidateId) || {};
+    candidateConflictsRef.current.set(candidateId, {
+      candidateId,
+      action: eventMeta.action || existing.action || "update",
+      localDraft: draftSnapshot || existing.localDraft || null,
+      serverSnapshot: server ? { ...server } : existing.serverSnapshot || null,
+      timestamp: Date.now()
+    });
+    publishCandidateConflicts();
+  },
+  [publishCandidateConflicts]
+);
 
   const persistCandidateChanges = async (id) => {
     if (!projectId) return;
@@ -782,23 +928,57 @@ function OrganizerApp() {
       await updateScheduleCandidate(projectId, id, latest);
       candidateSyncedRef.current.set(id, { ...latest });
       clearCandidateErrors(id);
+      clearCandidateConflict(id);
     } catch (error) {
       const msg = error && error.message ? String(error.message) : "日程の更新に失敗しました";
       const isValidation = error && (error.code === 422 || /validation/i.test(String(error.message || "")));
+      const isConflict = error && error.status === 409;
       if (isValidation) {
         console.debug("updateCandidate validation", msg);
-      } else {
+      } else if (!isConflict) {
         console.error("updateCandidate error", error);
       }
-      popToast(msg);
-      markCandidateFieldErrors(id, msg);
+      if (!isConflict) {
+        popToast(msg);
+        markCandidateFieldErrors(id, msg);
+      }
     }
   };
 
   const removeCandidate = async (id) => {
     if (!projectId) return;
     await removeScheduleCandidate(projectId, id);
+    clearCandidateConflict(id);
   };
+
+  const applyServerCandidateState = useCallback(
+    (candidateId) => {
+      const server = candidateSyncedRef.current.get(candidateId);
+      if (!server) {
+        clearCandidateConflict(candidateId);
+        return;
+      }
+      const snapshot = { ...server };
+      candidateDraftRef.current.set(candidateId, snapshot);
+      setCandidates((prev) => prev.map((item) => (item.id === candidateId ? snapshot : item)));
+      clearCandidateErrors(candidateId);
+      clearCandidateConflict(candidateId);
+    },
+    [clearCandidateConflict, clearCandidateErrors]
+  );
+
+  const retryCandidateConflict = useCallback(
+    (candidateId) => {
+      const entry = candidateConflictsRef.current.get(candidateId);
+      if (entry && entry.localDraft) {
+        const snapshot = { ...entry.localDraft };
+        candidateDraftRef.current.set(candidateId, snapshot);
+        setCandidates((prev) => prev.map((item) => (item.id === candidateId ? snapshot : item)));
+      }
+      persistCandidateChanges(candidateId);
+    },
+    [persistCandidateChanges]
+  );
 
   const addCandidate = async () => {
     if (!projectId) return;
@@ -807,7 +987,9 @@ function OrganizerApp() {
       popToast("日程を追加しました");
     } catch (error) {
       console.error("Candidate add failed", error);
-      popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+      if (!(error && error.status === 409)) {
+        popToast("日程の追加に失敗しました。時間を置いて再度お試しください。");
+      }
     }
   };
 
@@ -873,7 +1055,9 @@ function OrganizerApp() {
       closeCandidateDeleteDialog();
     } catch (error) {
       console.error("Candidate removal failed", error);
-      popToast("日程の削除に失敗しました。時間を置いて再度お試しください。");
+      if (!(error && error.status === 409)) {
+        popToast("日程の削除に失敗しました。時間を置いて再度お試しください。");
+      }
     } finally {
       setCandidateDeleteInProgress(false);
     }
@@ -1023,14 +1207,35 @@ function OrganizerApp() {
     setImportPreview(null);
   };
 
-  const confirmImportPreview = () => {
+  const confirmImportPreview = async () => {
     if (!importPreview) return;
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    let previousSnapshot = null;
+    try {
+      previousSnapshot = projectService.exportState(projectId);
+    } catch (error) {
+      console.error("[Scheduly][admin] Failed to capture project snapshot before ICS import", error);
+      popToast("現在のプロジェクト状態を取得できませんでした。時間をおいて再度お試しください。");
+      return;
+    }
+    const previousCandidates = previousSnapshot?.state?.candidates || [];
+    const previousIcsText = previousSnapshot?.state?.icsText || "";
+    console.info("[Scheduly][admin] confirmImportPreview start", { projectId, items: importPreview.items.length });
     let addedCount = 0;
     let updatedCount = 0;
     let skippedCount = (importPreview.skippedNoUid || 0) + (importPreview.skippedNoDtstamp || 0);
     const selectedItems = importPreview.items.slice();
     const next = candidates.slice();
     selectedItems.forEach((item) => {
+      console.info("[Scheduly][admin] import preview item", {
+        uid: item.uid,
+        selected: item.selected,
+        status: item.status,
+        existingIndex: item.existingIndex
+      });
       if (!item.selected) {
         skippedCount += 1;
         return;
@@ -1046,7 +1251,37 @@ function OrganizerApp() {
         addedCount += 1;
       }
     });
+
+    console.info("[Scheduly][admin] replaceCandidatesFromImport", {
+      nextCount: next.length,
+      candidatesBefore: candidates.length
+    });
     replaceCandidatesFromImport(projectId, next);
+
+    try {
+      const snapshotForUpload = projectService.exportState(projectId);
+      const missingTzidCount = snapshotForUpload?.state?.candidates?.filter(
+        (item) => !item.tzid || !item.tzid.trim()
+      ).length;
+      console.info("[Scheduly][admin] uploading snapshot", {
+        candidateCount: snapshotForUpload?.state?.candidates?.length || 0,
+        missingTzidCount,
+        tzidSample: snapshotForUpload?.state?.candidates?.slice(0, 5).map((item) => item.tzid),
+        candidatePreview: snapshotForUpload?.state?.candidates?.[0]
+      });
+      const serverSnapshot = await projectService.importState(projectId, snapshotForUpload);
+      console.info("[Scheduly][admin] server snapshot", {
+        candidateCount: serverSnapshot?.candidates?.length || 0
+      });
+      applySyncedMeta(serverSnapshot.project?.name || "", serverSnapshot.project?.description || "");
+      applySyncedCandidates(serverSnapshot.candidates || next);
+    } catch (error) {
+      console.error("[Scheduly][admin] Failed to import candidates from ICS", error);
+      replaceCandidatesFromImport(projectId, previousCandidates, previousIcsText);
+      popToast("ICSの取り込みをサーバーに保存できませんでした。通信状態を確認して再度お試しください。");
+      return;
+    }
+
     const parts = [];
     if (addedCount) parts.push("追加 " + addedCount + "件");
     if (updatedCount) parts.push("更新 " + updatedCount + "件");
@@ -1096,10 +1331,9 @@ function OrganizerApp() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      const driver = runtimeConfig.isProjectDriverApi() ? "api" : "local";
-      console.info("[Scheduly][admin] project driver", driver);
+      console.info("[Scheduly][admin] project driver", isApiDriver ? "api" : "local");
     }
-  }, []);
+  }, [isApiDriver]);
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -1132,21 +1366,50 @@ function OrganizerApp() {
             phase: prev.phase === "sending" ? prev.phase : "refreshing",
             message: prev.message
           }));
+          if (isApiDriver) {
+            setSnapshotStatus((prev) => {
+              if (prev.phase === "ready") return prev;
+              return {
+                phase: "loading",
+                message: "サーバーの最新情報を取得しています…"
+              };
+            });
+          }
         } else if (phase === "success") {
           setMetaSyncStatus({ phase: "idle", message: "" });
-          if (meta && meta.reason === "conflict") {
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "ready", message: "" });
+          }
+          if (meta?.reason === "conflict") {
             popToast("サーバーの最新状態を反映しました。");
+          } else if (meta?.firstReady) {
+            popToast("サーバーの最新情報を読み込みました");
           }
         } else if (phase === "error") {
           const message = "サーバーの最新状態を取得できませんでした。";
           setMetaSyncStatus({ phase: "error", message });
+          if (isApiDriver) {
+            setSnapshotStatus({ phase: "error", message });
+          }
           popToast(message);
+        }
+      } else if (scope === "mutation") {
+        if (event.entity === "candidate" && phase === "conflict") {
+          const targetId = event.meta?.candidateId || event.meta?.targetId;
+          recordCandidateConflict(targetId, event);
+          const candidateName = targetId ? candidateDraftRef.current.get(targetId)?.summary || "日程" : "日程";
+          popToast(`${candidateName} の編集が他の操作と競合しました。カード内の差分を確認してください。`);
+        } else if (phase === "conflict" || phase === "error") {
+          const message = describeMutationToast(event);
+          if (message) {
+            popToast(message);
+          }
         }
       }
     });
 
     return unsubscribe;
-  }, [projectId, popToast]);
+  }, [isApiDriver, projectId, popToast, recordCandidateConflict]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -1174,26 +1437,6 @@ function OrganizerApp() {
     }
   };
 
-  const updateLocationToAdminUrl = (entry) => {
-    if (!entry || !isNonEmptyString(entry.url)) return;
-    if (typeof window === "undefined") return;
-    try {
-      const target = new URL(entry.url);
-      const current = new URL(window.location.href);
-      if (target.origin === current.origin) {
-        window.history.replaceState(null, "", target.pathname + target.search + target.hash);
-        const resolved = projectService.resolveProjectFromLocation();
-        setProjectId(resolved.projectId);
-        setRouteContext(resolved.routeContext);
-      } else {
-        window.location.assign(entry.url);
-      }
-    } catch (error) {
-      console.warn("[Scheduly][admin] Failed to update location to admin URL", error);
-      window.location.assign(entry.url);
-    }
-  };
-
   const executeShareLinkAction = async () => {
     if (!projectId) {
       popToast("プロジェクトの読み込み中です。少し待ってください。");
@@ -1218,7 +1461,9 @@ function OrganizerApp() {
       popToast(message);
     } catch (error) {
       console.error("Share link generation error", error);
-      popToast("共有URLの生成に失敗しました");
+      if (!(error && error.status === 409)) {
+        popToast("共有URLの生成に失敗しました");
+      }
     } finally {
       setShareActionInProgress(false);
       setShareReissueDialogOpen(false);
@@ -1275,47 +1520,7 @@ function OrganizerApp() {
     if (process.env.NODE_ENV !== "production") {
       console.info("[Scheduly][admin] project driver", driver);
     }
-    if (!projectId) return;
-    if (autoIssueHandledRef.current) return;
-
-    let cancelled = false;
-
-    const run = async () => {
-      const adminEntry = shareTokens?.admin || null;
-      const hasValidAdminToken =
-        adminEntry && !shareService.isPlaceholderToken(adminEntry.token) && isNonEmptyString(adminEntry.token);
-
-      if (initialRouteContext && initialRouteContext.kind === "share" && initialRouteContext.shareType === "admin") {
-        autoIssueHandledRef.current = true;
-        return;
-      }
-
-      if (hasValidAdminToken) {
-        updateLocationToAdminUrl(adminEntry);
-        autoIssueHandledRef.current = true;
-        return;
-      }
-
-      try {
-        const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
-        if (cancelled) return;
-        const tokens = refreshShareTokensState({ resetWhenMissing: true });
-        const nextAdmin = tokens.admin || result.admin;
-        updateLocationToAdminUrl(nextAdmin);
-        popToast("共有URLを発行しました。コピーしてください");
-      } catch (error) {
-        console.error("Auto issue share URLs failed", error);
-      } finally {
-        autoIssueHandledRef.current = true;
-      }
-    };
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, baseUrlEffective, shareTokens, initialRouteContext, refreshShareTokensState, popToast]);
+  }, [projectId]);
 
   const handleExportProjectInfo = () => {
     if (!projectId) {
@@ -1370,8 +1575,7 @@ function OrganizerApp() {
             (parseError instanceof Error ? parseError.message : String(parseError))
         );
       }
-      projectService.importState(projectId, parsed);
-      const snapshot = projectService.getState(projectId);
+      const snapshot = await projectService.importState(projectId, parsed);
       applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
       applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
@@ -1415,8 +1619,7 @@ function OrganizerApp() {
       const res = await fetch("/proj/scheduly-project-sampledata-001.json", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const parsed = await res.json();
-      projectService.importState(projectId, parsed);
-      const snapshot = projectService.getState(projectId);
+      const snapshot = await projectService.importState(projectId, parsed);
       applySyncedMeta(snapshot.project?.name || "", snapshot.project?.description || "");
       applySyncedCandidates(snapshot.candidates || []);
       baseUrlTouchedRef.current = false;
@@ -1436,13 +1639,46 @@ function OrganizerApp() {
     }
   };
 
+  const handleOpenParticipantView = useCallback(async () => {
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    const entry = shareTokens?.participant;
+    const ready =
+      entry && !shareService.isPlaceholderToken(entry.token) && isNonEmptyString(entry.url);
+    if (!ready) {
+      try {
+        await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
+        refreshShareTokensState({ resetWhenMissing: true });
+        setRouteContext(projectService.getRouteContext());
+        popToast("参加者URLを発行しました。もう一度ボタンを押すと参加者画面へ移動します。");
+      } catch (error) {
+        console.error("Participant URL auto-issue failed", error);
+        popToast("参加者URLの発行に失敗しました。もう一度お試しください。");
+      }
+      return;
+    }
+    try {
+      const target = new URL(entry.url, window.location.origin);
+      if (target.origin === window.location.origin) {
+        window.location.assign(target.pathname + target.search + target.hash);
+      } else {
+        window.open(entry.url, "_blank");
+      }
+    } catch (error) {
+      void error;
+      window.open(entry.url, "_blank");
+    }
+  }, [projectId, shareTokens, baseUrlEffective, refreshShareTokensState, popToast, setRouteContext]);
+
 
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
   const hasIssuedShareTokens =
     (adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token)) ||
     (participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token));
-  const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを生成";
+  const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを発行";
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
   const issuedAtDisplay = formatShareIssuedAtDisplay(adminShareEntry || participantShareEntry);
@@ -1457,6 +1693,19 @@ function OrganizerApp() {
   const isMetaSyncSaving = metaSyncStatus.phase === "pending" || metaSyncStatus.phase === "sending";
   const isMetaSyncRefreshing = metaSyncStatus.phase === "refreshing";
   const metaSyncErrorMessage = metaSyncStatus.phase === "error" ? metaSyncStatus.message : "";
+  const snapshotBannerVisible = isApiDriver && snapshotStatus.phase !== "ready" && snapshotStatus.message;
+  const snapshotBannerClasses =
+    snapshotStatus.phase === "error"
+      ? "mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600"
+      : "mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600";
+  const participantShareReady =
+    participantShareEntry &&
+    !shareService.isPlaceholderToken(participantShareEntry.token) &&
+    isNonEmptyString(participantShareEntry.url);
+  const participantButtonLabel = participantShareReady ? "参加者画面を開く" : "共有URL発行待ち";
+  const participantButtonClass = participantShareReady
+    ? "inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+    : "inline-flex items-center gap-2 cursor-not-allowed rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-400";
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-5 px-4 py-6 text-zinc-900 sm:px-6">
@@ -1467,6 +1716,9 @@ function OrganizerApp() {
             <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-bold text-zinc-900">
               <span aria-hidden="true">🗂️</span>
               <span className="break-words">Scheduly 管理</span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold tracking-wide text-amber-700">
+                BETA
+              </span>
             </h1>
             <p className="mt-2 break-words text-sm text-zinc-600">
               日程を調整し参加者へ共有するための管理画面です。必要に応じて日程を編集し、ICS として取り込み・書き出しができます。
@@ -1493,42 +1745,27 @@ function OrganizerApp() {
                 {metaSyncErrorMessage}
               </div>
             )}
+            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
+            <button
               type="button"
-              onClick={async () => {
-                const entry = shareTokens?.participant;
-                if (entry && entry.url && !shareService.isPlaceholderToken(entry.token)) {
-                  try {
-                    const u = new URL(entry.url, window.location.origin);
-                    if (u.origin === window.location.origin) {
-                      window.location.assign(u.pathname + u.search + u.hash);
-                    } else {
-                      window.open(entry.url, "_blank");
-                    }
-                  } catch (error) {
-                    void error;
-                    window.open(entry.url, "_blank");
-                  }
-                } else {
-                  const result = await shareService.generate(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: false });
-                  const tokens = refreshShareTokensState({ resetWhenMissing: true });
-                  const next = tokens.participant || result.participant;
-                  if (next && next.url) {
-                    window.location.assign(new URL(next.url, window.location.origin).pathname);
-                    popToast("参加者URLを発行して開きました");
-                  } else {
-                    popToast("参加者URLを開けませんでした");
-                  }
-                }
-              }}
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-600 hover:border-emerald-300 hover:text-emerald-700"
+              onClick={handleOpenParticipantView}
+              disabled={!participantShareReady}
+              className={participantButtonClass}
             >
-              参加者画面を開く
+              <span aria-hidden="true" className="mr-2">
+                📋
+              </span>
+              <span>{participantButtonLabel}</span>
             </button>
           </div>
         </div>
+        {!participantShareReady && (
+          <p className="mt-1 text-[11px] text-zinc-500">
+            参加者URLが未発行です。「共有URLを発行」ボタンで共有URLを作成すると、このボタンから参加者画面を開けるようになります。
+          </p>
+        )}
       </header>
 
       <div className="grid flex-1 gap-5">
@@ -1545,11 +1782,12 @@ function OrganizerApp() {
             action={
               <button
                 type="button"
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:border-emerald-300 disabled:opacity-60"
                 onClick={handleShareLinkAction}
                 disabled={shareActionInProgress}
               >
-                {shareActionLabel}
+                <span aria-hidden="true">📝</span>
+                <span>{shareActionLabel}</span>
               </button>
             }
           >
@@ -1718,21 +1956,33 @@ function OrganizerApp() {
                 日程がまだありません。右上のボタンから追加してください。
               </div>
             ) : (
-              candidates.map((candidate, index) => (
-                <CandidateCard
-                  index={index}
-                  key={candidate.id}
-                  value={candidate}
-                  onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
-                  onCommit={() => persistCandidateChanges(candidate.id)}
-                  onRemove={() => openCandidateDeleteDialog(candidate)}
-                  onExport={() => handleExportCandidate(candidate.id)}
-                  disableRemove={candidates.length === 1}
-                  isOpen={openCandidateId === candidate.id}
-                  onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
-                  errors={candidateErrors[candidate.id] || {}}
-                />
-              ))
+              candidates.map((candidate, index) => {
+                const conflictEntry = candidateConflicts[candidate.id] || null;
+                const conflictPayload = conflictEntry
+                  ? {
+                      ...conflictEntry,
+                      diffFields: diffCandidateFields(conflictEntry.localDraft, conflictEntry.serverSnapshot)
+                    }
+                  : null;
+                return (
+                  <CandidateCard
+                    index={index}
+                    key={candidate.id}
+                    value={candidate}
+                    onChange={(next) => handleCandidateDraftChange(candidate.id, next)}
+                    onCommit={() => persistCandidateChanges(candidate.id)}
+                    onRemove={() => openCandidateDeleteDialog(candidate)}
+                    onExport={() => handleExportCandidate(candidate.id)}
+                    disableRemove={candidates.length === 1}
+                    isOpen={openCandidateId === candidate.id}
+                    onToggleOpen={() => setOpenCandidateId((prev) => (prev === candidate.id ? null : candidate.id))}
+                    errors={candidateErrors[candidate.id] || {}}
+                    conflict={conflictPayload}
+                    onResolveConflict={() => applyServerCandidateState(candidate.id)}
+                    onRetryConflict={() => retryCandidateConflict(candidate.id)}
+                  />
+                );
+              })
             )}
           </SectionCard>
         </main>
@@ -1821,8 +2071,10 @@ function OrganizerApp() {
                     </tr>
                   </thead>
                   <tbody>
-                    {importPreview.items.map((item) => (
-                      <tr key={item.uid} className="hover:bg-emerald-50/40">
+                    {importPreview.items.map((item) => {
+                      const handleToggle = () => toggleImportPreviewItem(item.uid);
+                      return (
+                        <tr key={item.uid} className="hover:bg-emerald-50/40">
                         <td className="border border-zinc-200 px-2 py-2 text-center">
                           <input
                             type="checkbox"
@@ -1832,9 +2084,15 @@ function OrganizerApp() {
                           />
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 align-top">
-                          <div className="font-semibold text-zinc-800">{item.summary}</div>
-                          <div className="text-xs text-zinc-500">{item.start} 〜 {item.end}</div>
-                          <div className="mt-1 font-mono text-[11px] text-zinc-400 break-all">{item.uid}</div>
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="block w-full text-left"
+                          >
+                            <div className="font-semibold text-zinc-800">{item.summary}</div>
+                            <div className="text-xs text-zinc-500">{item.start} 〜 {item.end}</div>
+                            <div className="mt-1 font-mono text-[11px] text-zinc-400 break-all">{item.uid}</div>
+                          </button>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs text-zinc-700">
                           <span
@@ -1851,13 +2109,26 @@ function OrganizerApp() {
                           </span>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs font-mono text-zinc-500 break-all">
-                          {item.existingDtstamp || "—"}
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="w-full text-left"
+                          >
+                            {item.existingDtstamp || "—"}
+                          </button>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs font-mono text-zinc-500 break-all">
-                          {item.importedDtstamp}
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="w-full text-left"
+                          >
+                            {item.importedDtstamp}
+                          </button>
                         </td>
-                      </tr>
-                    ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
