@@ -2071,8 +2071,10 @@ const recordCandidateConflict = useCallback(
                     </tr>
                   </thead>
                   <tbody>
-                    {importPreview.items.map((item) => (
-                      <tr key={item.uid} className="hover:bg-emerald-50/40">
+                    {importPreview.items.map((item) => {
+                      const handleToggle = () => toggleImportPreviewItem(item.uid);
+                      return (
+                        <tr key={item.uid} className="hover:bg-emerald-50/40">
                         <td className="border border-zinc-200 px-2 py-2 text-center">
                           <input
                             type="checkbox"
@@ -2082,9 +2084,15 @@ const recordCandidateConflict = useCallback(
                           />
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 align-top">
-                          <div className="font-semibold text-zinc-800">{item.summary}</div>
-                          <div className="text-xs text-zinc-500">{item.start} 〜 {item.end}</div>
-                          <div className="mt-1 font-mono text-[11px] text-zinc-400 break-all">{item.uid}</div>
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="block w-full text-left"
+                          >
+                            <div className="font-semibold text-zinc-800">{item.summary}</div>
+                            <div className="text-xs text-zinc-500">{item.start} 〜 {item.end}</div>
+                            <div className="mt-1 font-mono text-[11px] text-zinc-400 break-all">{item.uid}</div>
+                          </button>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs text-zinc-700">
                           <span
@@ -2101,13 +2109,26 @@ const recordCandidateConflict = useCallback(
                           </span>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs font-mono text-zinc-500 break-all">
-                          {item.existingDtstamp || "—"}
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="w-full text-left"
+                          >
+                            {item.existingDtstamp || "—"}
+                          </button>
                         </td>
                         <td className="border border-zinc-200 px-3 py-2 text-xs font-mono text-zinc-500 break-all">
-                          {item.importedDtstamp}
+                          <button
+                            type="button"
+                            onClick={handleToggle}
+                            className="w-full text-left"
+                          >
+                            {item.importedDtstamp}
+                          </button>
                         </td>
-                      </tr>
-                    ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
