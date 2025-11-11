@@ -38,7 +38,7 @@
 | 参加者トークン (`participantToken`) | 参加者へ共有する秘密トークン。URL は `https://scheduly.app/p/{participantToken}` または `baseUrl/p/{participantToken}`。旧称「閲覧トークン」。 |
 | Share Link | 管理者・参加者それぞれの URL 全体。 |
 | `ShareTokenEntry` | `token` / `url` / `issuedAt`（ISO8601）と、必要に応じて `lastGeneratedBy` / `revokedAt` を保持するレコード。 |
-| プレースホルダートークン | `demo-` または `scheduly-` で始まるダミー値。`demo-` は完全な未発行扱い、`scheduly-*` はデモデータ用で URL 欄には反映されても正式トークンではない。UI では「–– 未発行 ––」表示。 |
+| プレースホルダートークン | `demo-` で始まるダミー値。API ドライバがサーバーからプレースホルダーを受け取った場合のみ発生し、UI では「–– 未発行 ––」表示として扱う。ローカルドライバやデモインポート後は通常プロジェクトとして扱う。 |
 | `shareService` | トークン取得・生成・再発行・URL 組み立て・自動遷移を担うサービス層。 |
 
 ## 4. User Stories
@@ -53,7 +53,7 @@
 
 ### 5.1 初期状態
 - `project.project.shareTokens` に `ShareTokenEntry` が存在しない、またはプレースホルダーのみの場合は「未発行」表示とし、コピー操作を無効化する。
-- `projectStore` の初期化時はダミー `demo-admin` を保持するが、UI では `shareService.isPlaceholderToken()` を利用して未発行扱いとする。
+- API ドライバ初期化時はサーバー側のダミー `demo-*` トークンが返る場合があるため、UI は `shareService.isPlaceholderToken()` で未発行扱いにする（ローカルドライバは常に空のトークンセットで開始する）。
 - セッション内で発行済みのトークンは sessionStorage から復元されるが、新しいシークレットウィンドウ／ルートアクセスでは新しい `projectId` が払い出され、以前のトークンは表示されない（`/a/{token}` でアクセスした場合のみサーバーから該当プロジェクトが読み込まれる）。
 
 ### 5.2 トークン生成（`shareService.generate`）

@@ -8,9 +8,6 @@
       "name": "(TEST) 素敵弦楽四重奏団がミューザ旗揚公演",
       "description": "(TEST) 素敵弦楽四重奏団がミューザ旗揚公演。本番および練習日の確認用。\n※このカレンダーはフィクションです。テストデータとしてのみ存在します。",
       "defaultTzid": "Asia/Tokyo",
-      "shareTokens": {
-        "admin": "demo-admin"
-      },
       "createdAt": "2025-10-27T15:38:43.763Z",
       "updatedAt": "2025-10-27T23:06:34.472Z",
       "demoSeedOptOut": true

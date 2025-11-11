@@ -4,6 +4,7 @@ const createProjectsRouter = require("./routes/projects");
 const { APIError, NotFoundError } = require("./errors");
 const { log } = require("./logger");
 const telemetry = require("./telemetry");
+const createDevLogRouter = require("./routes/dev-log");
 
 const BODY_LIMIT = process.env.SCHEDULY_API_BODY_LIMIT || "256kb";
 
@@ -120,6 +121,9 @@ const createApp = ({ store }) => {
   });
 
   app.use("/api/projects", createProjectsRouter(store));
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/api/dev/log", createDevLogRouter());
+  }
 
   app.use((req, res, next) => {
     next(new NotFoundError("Endpoint not found"));
