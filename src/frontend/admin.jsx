@@ -1260,14 +1260,14 @@ const recordCandidateConflict = useCallback(
 
     try {
       const snapshotForUpload = projectService.exportState(projectId);
-      if (snapshotForUpload?.state?.candidates) {
-        snapshotForUpload.state.candidates = snapshotForUpload.state.candidates.map((candidate) => ({
-          ...candidate,
-          tzid: typeof candidate.tzid === "string" && candidate.tzid.trim() ? candidate.tzid : DEFAULT_TZID
-        }));
-      }
+      const missingTzidCount = snapshotForUpload?.state?.candidates?.filter(
+        (item) => !item.tzid || !item.tzid.trim()
+      ).length;
       console.info("[Scheduly][admin] uploading snapshot", {
-        candidateCount: snapshotForUpload?.state?.candidates?.length || 0
+        candidateCount: snapshotForUpload?.state?.candidates?.length || 0,
+        missingTzidCount,
+        tzidSample: snapshotForUpload?.state?.candidates?.slice(0, 5).map((item) => item.tzid),
+        candidatePreview: snapshotForUpload?.state?.candidates?.[0]
       });
       const serverSnapshot = await projectService.importState(projectId, snapshotForUpload);
       console.info("[Scheduly][admin] server snapshot", {

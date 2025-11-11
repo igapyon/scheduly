@@ -15,6 +15,9 @@ const {
   ensureICAL
 } = sharedIcalUtils;
 
+const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
+const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
+
 const logDebug = sharedIcalUtils.createLogger("schedule-service");
 const syncProjectSnapshot = (projectId, reason) =>
   projectService && typeof projectService.syncProjectSnapshot === "function"
@@ -372,8 +375,22 @@ const exportCandidateToIcs = (projectId, candidateId) => {
   };
 };
 
+const normalizeCandidateForPersist = (candidate) => {
+  if (!candidate || typeof candidate !== "object") return candidate;
+  const rawTzid = typeof candidate.tzid === "string" ? candidate.tzid.trim() : "";
+  const tzidValue =
+    rawTzid && (TZID_PATTERN.test(rawTzid) || CUSTOM_TZID_PATTERN.test(rawTzid)) ? rawTzid : DEFAULT_TZID;
+  return {
+    ...candidate,
+    tzid: tzidValue
+  };
+};
+
 const replaceCandidatesFromImport = (projectId, importedCandidates, sourceIcsText = null) => {
-  persistCandidates(projectId, importedCandidates, sourceIcsText);
+  const normalized = Array.isArray(importedCandidates)
+    ? importedCandidates.map((candidate) => normalizeCandidateForPersist(candidate))
+    : importedCandidates;
+  persistCandidates(projectId, normalized, sourceIcsText);
 };
 
 const apiAddCandidate = async (projectId) => {
