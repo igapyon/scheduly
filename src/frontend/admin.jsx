@@ -7,6 +7,7 @@ import sharedIcalUtils from "./shared/ical-utils";
 import projectService from "./services/project-service";
 import scheduleService from "./services/schedule-service";
 import shareService from "./services/share-service";
+import devLogService from "./services/dev-log-service";
 import runtimeConfig from "./shared/runtime-config";
 import EventMeta from "./shared/EventMeta.jsx";
 import InfoBadge from "./shared/InfoBadge.jsx";
@@ -581,6 +582,7 @@ const formatShareIssuedAtDisplay = (entry) => {
 function OrganizerApp() {
   const [projectId, setProjectId] = useState(null);
   const [routeContext, setRouteContext] = useState(null);
+  const [projectState, setProjectState] = useState(null);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [candidates, setCandidates] = useState([]);
@@ -650,6 +652,7 @@ function OrganizerApp() {
         setProjectId(resolved.projectId);
         setRouteContext(resolved.routeContext);
         const state = resolved.state || {};
+        setProjectState(state);
         applySyncedMeta(state.project?.name || "", state.project?.description || "");
         applySyncedCandidates(state.candidates || []);
 
@@ -665,6 +668,7 @@ function OrganizerApp() {
 
         unsubscribe = projectService.subscribe(resolved.projectId, (nextState) => {
           if (cancelled || !nextState) return;
+          setProjectState(nextState);
           applySyncedMeta(nextState.project?.name || "", nextState.project?.description || "");
           applySyncedCandidates(nextState.candidates || []);
           // 開いているIDは維持。自動で開かない（すべて閉じた状態を許可）。
@@ -716,6 +720,24 @@ const clearCandidateConflict = useCallback(
   },
   [publishCandidateConflicts]
 );
+
+  const syncMetaIfNeeded = useCallback(() => {
+    if (!projectId) return;
+    const normalizedName = summary || projectState?.project?.name || "";
+    const normalizedDescription = description || projectState?.project?.description || "";
+    if (
+      syncedMetaRef.current.name !== normalizedName ||
+      syncedMetaRef.current.description !== normalizedDescription
+    ) {
+      console.log("[Scheduly][admin][debug] syncMetaIfNeeded updating meta", {
+        normalizedName,
+        normalizedDescription,
+        synced: syncedMetaRef.current
+      });
+      projectService.updateMeta(projectId, { name: normalizedName, description: normalizedDescription });
+      syncedMetaRef.current = { name: normalizedName, description: normalizedDescription };
+    }
+  }, [projectId, summary, description, projectState?.project?.name, projectState?.project?.description]);
 
   const applySyncedMeta = useCallback((nameValue = "", descriptionValue = "") => {
     const normalizedName = nameValue || "";
@@ -1213,6 +1235,7 @@ const recordCandidateConflict = useCallback(
       popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
       return;
     }
+    syncMetaIfNeeded();
     let previousSnapshot = null;
     try {
       previousSnapshot = projectService.exportState(projectId);
@@ -1259,7 +1282,12 @@ const recordCandidateConflict = useCallback(
     replaceCandidatesFromImport(projectId, next);
 
     try {
+      const devToken = resolveDevLogToken();
+      syncMetaIfNeeded();
       const snapshotForUpload = projectService.exportState(projectId);
+      if (snapshotForUpload?.state?.project) {
+        delete snapshotForUpload.state.project.shareTokens;
+      }
       const missingTzidCount = snapshotForUpload?.state?.candidates?.filter(
         (item) => !item.tzid || !item.tzid.trim()
       ).length;
@@ -1269,16 +1297,45 @@ const recordCandidateConflict = useCallback(
         tzidSample: snapshotForUpload?.state?.candidates?.slice(0, 5).map((item) => item.tzid),
         candidatePreview: snapshotForUpload?.state?.candidates?.[0]
       });
+      devLogService.logDebugEvent(devToken, {
+        scope: "import",
+        level: "info",
+        message: "upload_snapshot",
+        payload: {
+          candidateCount: snapshotForUpload?.state?.candidates?.length || 0,
+          missingTzidCount
+        }
+      });
       const serverSnapshot = await projectService.importState(projectId, snapshotForUpload);
       console.info("[Scheduly][admin] server snapshot", {
         candidateCount: serverSnapshot?.candidates?.length || 0
       });
       applySyncedMeta(serverSnapshot.project?.name || "", serverSnapshot.project?.description || "");
       applySyncedCandidates(serverSnapshot.candidates || next);
+      devLogService.logDebugEvent(devToken, {
+        scope: "import",
+        level: "info",
+        message: "import_success",
+        payload: {
+          candidateCount: serverSnapshot?.candidates?.length || 0
+        }
+      });
     } catch (error) {
       console.error("[Scheduly][admin] Failed to import candidates from ICS", error);
+      devLogService.logDebugEvent(resolveDevLogToken(), {
+        scope: "import",
+        level: "error",
+        message: "import_error",
+        payload: {
+          message: error?.message || "error",
+          stack: error?.stack
+        }
+      });
       replaceCandidatesFromImport(projectId, previousCandidates, previousIcsText);
       popToast("ICSの取り込みをサーバーに保存できませんでした。通信状態を確認して再度お試しください。");
+      console.warn("[Scheduly][admin][debug] restored candidate state after failure", {
+        previousCandidatesCount: previousCandidates.length
+      });
       return;
     }
 
@@ -1437,38 +1494,130 @@ const recordCandidateConflict = useCallback(
     }
   };
 
-  const executeShareLinkAction = async () => {
-    if (!projectId) {
-      popToast("プロジェクトの読み込み中です。少し待ってください。");
+  const resolveEffectiveSummary = () => {
+    console.log("[Scheduly][admin][debug] resolveEffectiveSummary", {
+      summary,
+      projectName: projectState?.project?.name,
+      synced: syncedMetaRef.current
+    });
+    if (typeof summary === "string" && summary.trim().length > 0) {
+      return summary.trim();
+    }
+    if (typeof projectState?.project?.name === "string" && projectState.project.name.trim().length > 0) {
+      return projectState.project.name.trim();
+    }
+    try {
+      const snapshot = projectService.exportState(projectId);
+      const nameFromSnapshot = snapshot?.state?.project?.name;
+      if (typeof nameFromSnapshot === "string" && nameFromSnapshot.trim().length > 0) {
+        return nameFromSnapshot.trim();
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  };
+
+const executeShareLinkAction = async () => {
+  if (!projectId) {
+    popToast("プロジェクトの読み込み中です。少し待ってください。");
+    return;
+  }
+  setShareActionInProgress(true);
+  try {
+    const devToken = resolveDevLogToken();
+    console.log("[Scheduly][admin][debug] share action start", {
+      summary,
+      description,
+      syncedMeta: syncedMetaRef.current,
+      projectStateName: projectState?.project?.name,
+      projectId
+    });
+    devLogService.logDebugEvent(devToken, {
+      scope: "share",
+      level: "info",
+      message: "start",
+      payload: {
+        projectId,
+        summary,
+        description,
+        hasIssuedShareTokens
+      }
+    });
+    syncMetaIfNeeded();
+    console.log("[Scheduly][admin][debug] share action after sync", {
+      summary,
+      description,
+      syncedMeta: syncedMetaRef.current
+    });
+    const effectiveSummary = resolveEffectiveSummary();
+    const trimmedName = effectiveSummary.trim();
+    if (!trimmedName) {
+      popToast("プロジェクト名を入力してください");
+      console.warn("[Scheduly][admin][debug] missing name detected", {
+        effectiveSummary,
+        summary,
+        projectStateName: projectState?.project?.name,
+        synced: syncedMetaRef.current
+      });
       return;
     }
-    setShareActionInProgress(true);
-    try {
-      const hasIssued = hasIssuedShareTokens;
-      const action = hasIssued ? shareService.rotate : shareService.generate;
-      const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: true });
-      refreshShareTokensState({ resetWhenMissing: true });
-      setRouteContext(projectService.getRouteContext());
-      const notices = [];
-      if (hasIssued) {
-        notices.push("以前のリンクは無効です");
+    console.log("[Scheduly][admin][debug] share action resolved summary", {
+      effectiveSummary,
+      projectStateName: projectState?.project?.name
+    });
+    const hasIssued = hasIssuedShareTokens;
+    const action = hasIssued ? shareService.rotate : shareService.generate;
+    console.log("[Scheduly][admin][debug] share action request payload", {
+      hasIssued,
+      baseUrlEffective,
+      shareTokensBefore: shareTokens
+    });
+    const result = await action(projectId, { baseUrl: baseUrlEffective, navigateToAdminUrl: true });
+    console.log("[Scheduly][admin][debug] share action result", {
+      hasIssued,
+      result,
+      shareTokensAfter: shareService.get(projectId)
+    });
+    devLogService.logDebugEvent(devToken, {
+      scope: "share",
+      level: "info",
+      message: hasIssued ? "rotate_success" : "generate_success",
+      payload: {
+        result
       }
-      if (result.navigation?.attempted && result.navigation.blocked) {
-        notices.push("管理者URLへの自動遷移はブロックされました");
-      }
-      const baseMessage = hasIssued ? "共有URLを再発行しました" : "共有URLを発行しました";
-      const message = notices.length ? `${baseMessage}（${notices.join("／")}）` : baseMessage;
-      popToast(message);
-    } catch (error) {
-      console.error("Share link generation error", error);
-      if (!(error && error.status === 409)) {
-        popToast("共有URLの生成に失敗しました");
-      }
-    } finally {
-      setShareActionInProgress(false);
-      setShareReissueDialogOpen(false);
+    });
+    refreshShareTokensState({ resetWhenMissing: true });
+    setRouteContext(projectService.getRouteContext());
+    const notices = [];
+    if (hasIssued) {
+      notices.push("以前のリンクは無効です");
     }
-  };
+    if (result.navigation?.attempted && result.navigation.blocked) {
+      notices.push("管理者URLへの自動遷移はブロックされました");
+    }
+    const baseMessage = hasIssued ? "共有URLを再発行しました" : "共有URLを発行しました";
+    const message = notices.length ? `${baseMessage}（${notices.join("／")}）` : baseMessage;
+    popToast(message);
+  } catch (error) {
+    console.error("Share link generation error", error);
+    devLogService.logDebugEvent(resolveDevLogToken(), {
+      scope: "share",
+      level: "error",
+      message: "share_action_error",
+      payload: {
+        message: error?.message || "error",
+        stack: error?.stack
+      }
+    });
+    if (!(error && error.status === 409)) {
+      popToast("共有URLの生成に失敗しました");
+    }
+  } finally {
+    setShareActionInProgress(false);
+    setShareReissueDialogOpen(false);
+  }
+};
 
   const handleShareLinkAction = () => {
     if (!projectId) {
@@ -1676,8 +1825,24 @@ const recordCandidateConflict = useCallback(
   const adminShareEntry = shareTokens?.admin || null;
   const participantShareEntry = shareTokens?.participant || null;
   const hasIssuedShareTokens =
-    (adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token)) ||
-    (participantShareEntry && !shareService.isPlaceholderToken(participantShareEntry.token));
+    (adminShareEntry &&
+      !shareService.isPlaceholderToken(adminShareEntry.token) &&
+      isNonEmptyString(adminShareEntry.url)) ||
+    (participantShareEntry &&
+      !shareService.isPlaceholderToken(participantShareEntry.token) &&
+      isNonEmptyString(participantShareEntry.url));
+  const resolveDevLogToken = () => {
+    if (adminShareEntry && !shareService.isPlaceholderToken(adminShareEntry.token)) {
+      return adminShareEntry.token;
+    }
+    if (routeContext?.shareType === "admin" && routeContext?.token) {
+      return routeContext.token;
+    }
+    if (projectId) {
+      return `project:${projectId}`;
+    }
+    return null;
+  };
   const shareActionLabel = hasIssuedShareTokens ? "共有URLを再発行" : "共有URLを発行";
   const adminUrlDisplay = formatShareUrlDisplay(adminShareEntry);
   const participantUrlDisplay = formatShareUrlDisplay(participantShareEntry);
