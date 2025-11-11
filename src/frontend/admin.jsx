@@ -1207,14 +1207,35 @@ const recordCandidateConflict = useCallback(
     setImportPreview(null);
   };
 
-  const confirmImportPreview = () => {
+  const confirmImportPreview = async () => {
     if (!importPreview) return;
+    if (!projectId) {
+      popToast("プロジェクトの読み込み中です。少し待ってから再度お試しください。");
+      return;
+    }
+    let previousSnapshot = null;
+    try {
+      previousSnapshot = projectService.exportState(projectId);
+    } catch (error) {
+      console.error("[Scheduly][admin] Failed to capture project snapshot before ICS import", error);
+      popToast("現在のプロジェクト状態を取得できませんでした。時間をおいて再度お試しください。");
+      return;
+    }
+    const previousCandidates = previousSnapshot?.state?.candidates || [];
+    const previousIcsText = previousSnapshot?.state?.icsText || "";
+    console.info("[Scheduly][admin] confirmImportPreview start", { projectId, items: importPreview.items.length });
     let addedCount = 0;
     let updatedCount = 0;
     let skippedCount = (importPreview.skippedNoUid || 0) + (importPreview.skippedNoDtstamp || 0);
     const selectedItems = importPreview.items.slice();
     const next = candidates.slice();
     selectedItems.forEach((item) => {
+      console.info("[Scheduly][admin] import preview item", {
+        uid: item.uid,
+        selected: item.selected,
+        status: item.status,
+        existingIndex: item.existingIndex
+      });
       if (!item.selected) {
         skippedCount += 1;
         return;
@@ -1230,7 +1251,37 @@ const recordCandidateConflict = useCallback(
         addedCount += 1;
       }
     });
+
+    console.info("[Scheduly][admin] replaceCandidatesFromImport", {
+      nextCount: next.length,
+      candidatesBefore: candidates.length
+    });
     replaceCandidatesFromImport(projectId, next);
+
+    try {
+      const snapshotForUpload = projectService.exportState(projectId);
+      if (snapshotForUpload?.state?.candidates) {
+        snapshotForUpload.state.candidates = snapshotForUpload.state.candidates.map((candidate) => ({
+          ...candidate,
+          tzid: typeof candidate.tzid === "string" && candidate.tzid.trim() ? candidate.tzid : DEFAULT_TZID
+        }));
+      }
+      console.info("[Scheduly][admin] uploading snapshot", {
+        candidateCount: snapshotForUpload?.state?.candidates?.length || 0
+      });
+      const serverSnapshot = await projectService.importState(projectId, snapshotForUpload);
+      console.info("[Scheduly][admin] server snapshot", {
+        candidateCount: serverSnapshot?.candidates?.length || 0
+      });
+      applySyncedMeta(serverSnapshot.project?.name || "", serverSnapshot.project?.description || "");
+      applySyncedCandidates(serverSnapshot.candidates || next);
+    } catch (error) {
+      console.error("[Scheduly][admin] Failed to import candidates from ICS", error);
+      replaceCandidatesFromImport(projectId, previousCandidates, previousIcsText);
+      popToast("ICSの取り込みをサーバーに保存できませんでした。通信状態を確認して再度お試しください。");
+      return;
+    }
+
     const parts = [];
     if (addedCount) parts.push("追加 " + addedCount + "件");
     if (updatedCount) parts.push("更新 " + updatedCount + "件");
