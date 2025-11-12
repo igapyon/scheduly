@@ -1,4 +1,4 @@
-# Development Process (WIP)
+# Development Process
 
 この文書は、Scheduly の開発プロセス定義を示す内部向けガイドです。現在の開発を通じて継続的に更新する WIP 文書です。歴史的経緯の要素も含みますが、原則として「今の進め方」を第一に記載します。
 
