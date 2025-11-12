@@ -116,6 +116,9 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
 - projectStore を実質1プロジェクト専用に再設計し、内部 Map / インデックスを排除して `currentState` のみで管理する（共有トークン逆引きもサーバー依存に移行）。
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
+- `projectStore` を単一プロジェクト前提に再実装し、Map/逆引きインデックスを廃止して `currentState` ベースのシンプルな構造へ刷新する。
+- `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
+- ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
