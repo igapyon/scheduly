@@ -109,10 +109,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- 不具合: 参加者URLをもちいて別のブラウザから開くと参加者用の共有URLが無効です が表示される。おかしい。
+- 入力内容をリロードするためのボタンが欲しい。
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
-- ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
-- projectStore を実質1プロジェクト専用に再設計し、内部 Map / インデックスを排除して `currentState` のみで管理する（共有トークン逆引きもサーバー依存に移行）。
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - `projectStore` を単一プロジェクト前提に再実装し、Map/逆引きインデックスを廃止して `currentState` ベースのシンプルな構造へ刷新する。
 - `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
@@ -160,6 +158,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - sessionStorage でのみ状態を保持するよう `projectStore` / `projectService` を整理し、Web Storage ヘルパーと localStorage 依存を撤廃
 - ローカルモード/サービスドライバを廃止し、フロントエンドを API 専用構成へ統一（`service-driver.js` 削除、各サービスの API 実装へ一本化）
 - 参加者画面のダミー締切表示と「参加者サマリー活用メモ」を削除し、legacy モックも同様に整理
+- `projectStore` を単一 state (`currentProjectId`/`projectState`) で管理し、Map やトークン逆引きインデックスを廃止
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理

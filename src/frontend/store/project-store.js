@@ -129,15 +129,11 @@ const sanitizeVersions = (raw) => {
   return defaults;
 };
 
-const projectStore = new Map();
-const listeners = new Map();
-const participantTokenIndex = new Map();
-const participantTokenProjectMap = new Map();
-const shareTokenIndex = {
-  admin: new Map(),
-  participant: new Map()
+const projectStore = {
+  projectId: DEFAULT_PROJECT_ID,
+  state: null
 };
-const shareTokenProjectMap = new Map();
+const listeners = new Map();
 
 const getSessionStorage = () => {
   if (typeof window === "undefined" || !window.sessionStorage) {
@@ -176,10 +172,10 @@ const persistToStorage = () => {
   const storage = getSessionStorage();
   if (!storage) return;
   try {
-    const payload = {};
-    projectStore.forEach((state, projectId) => {
-      payload[projectId] = state;
-    });
+    const payload = {
+      projectId: projectStore.projectId,
+      state: projectStore.state
+    };
     storage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (error) {
     console.warn("[Scheduly] Failed to persist project store", error);
@@ -188,20 +184,32 @@ const persistToStorage = () => {
 
 const loadFromStorage = () => {
   const storage = getSessionStorage();
-  if (!storage) return;
+  if (!storage) {
+    projectStore.projectId = DEFAULT_PROJECT_ID;
+    projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
+    return;
+  }
   try {
     const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      projectStore.projectId = DEFAULT_PROJECT_ID;
+      projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
+      return;
+    }
     const payload = JSON.parse(raw);
-    Object.entries(payload).forEach(([projectId, state]) => {
-      if (!state || typeof state !== "object") return;
-      const sanitized = ensureProjectStateShape(projectId, state);
-      projectStore.set(projectId, sanitized);
-      rebuildParticipantTokenIndex(projectId);
-      rebuildShareTokenIndex(projectId);
-    });
+    if (payload && typeof payload === "object") {
+      const storedId = isNonEmptyString(payload.projectId) ? payload.projectId : DEFAULT_PROJECT_ID;
+      const sanitized = ensureProjectStateShape(storedId, payload.state);
+      projectStore.projectId = storedId;
+      projectStore.state = sanitized;
+    } else {
+      projectStore.projectId = DEFAULT_PROJECT_ID;
+      projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
+    }
   } catch (error) {
     console.warn("[Scheduly] Failed to load project store from storage", error);
+    projectStore.projectId = DEFAULT_PROJECT_ID;
+    projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
   }
 };
 
@@ -274,110 +282,53 @@ const cloneParticipants = (participants) => participants.map((item) => ({ ...ite
  */
 const cloneResponses = (responses) => responses.map((item) => ({ ...item }));
 
-function rebuildParticipantTokenIndex(projectId) {
-  const tokens = participantTokenProjectMap.get(projectId);
-  if (tokens) {
-    tokens.forEach((token) => {
-      const current = participantTokenIndex.get(token);
-      if (current && current.projectId === projectId) {
-        participantTokenIndex.delete(token);
-      }
-    });
-  }
-
-  const state = projectStore.get(projectId);
-  if (!state) {
-    participantTokenProjectMap.delete(projectId);
-    return;
-  }
-
-  const trackedTokens = new Set();
-  const participants = Array.isArray(state.participants) ? state.participants : [];
-  participants.forEach((participant) => {
-    if (!participant || !participant.token) return;
-    const key = String(participant.token);
-    trackedTokens.add(key);
-    participantTokenIndex.set(key, { projectId, participantId: participant.id });
-  });
-
-  if (trackedTokens.size > 0) {
-    participantTokenProjectMap.set(projectId, trackedTokens);
-  } else {
-    participantTokenProjectMap.delete(projectId);
-  }
-}
-
-function rebuildShareTokenIndex(projectId) {
-  const previous = shareTokenProjectMap.get(projectId);
-  if (previous && typeof previous === "object") {
-    SHARE_TOKEN_TYPES.forEach((type) => {
-      const token = previous[type];
-      if (!token) return;
-      const indexMap = shareTokenIndex[type];
-      const current = indexMap.get(token);
-      if (current && current.projectId === projectId) {
-        indexMap.delete(token);
-      }
-    });
-  }
-
-  const state = projectStore.get(projectId);
-  if (!state) {
-    shareTokenProjectMap.delete(projectId);
-    return;
-  }
-
-  const nextTracked = {};
-  const tokens = state.project?.shareTokens;
-  SHARE_TOKEN_TYPES.forEach((type) => {
-    const entry = tokens?.[type];
-    if (!entry || !isNonEmptyString(entry.token) || isPlaceholderShareToken(entry.token)) return;
-    const tokenKey = String(entry.token);
-    const indexMap = shareTokenIndex[type];
-    indexMap.set(tokenKey, { projectId });
-    nextTracked[type] = tokenKey;
-  });
-
-  if (Object.keys(nextTracked).length > 0) {
-    shareTokenProjectMap.set(projectId, nextTracked);
-  } else {
-    shareTokenProjectMap.delete(projectId);
-  }
-}
-
 loadFromStorage();
 
-const ensureProjectEntry = (projectId = DEFAULT_PROJECT_ID) => {
-  if (!projectStore.has(projectId)) {
-    projectStore.set(projectId, createInitialProjectState(projectId));
-    rebuildParticipantTokenIndex(projectId);
-    rebuildShareTokenIndex(projectId);
+const ensureProjectEntry = () => {
+  if (!projectStore.state) {
+    projectStore.projectId = DEFAULT_PROJECT_ID;
+    projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
     persistToStorage();
   }
-  return projectStore.get(projectId);
+  return projectStore.state;
 };
 
 const getProjectStateSnapshot = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
-  return cloneState(state);
+  const state = ensureProjectEntry();
+  if (!projectId || projectId === projectStore.projectId) {
+    return cloneState(state);
+  }
+  return cloneState(createInitialProjectState(projectId));
+};
+
+const isActiveProject = (projectId) => !projectId || projectId === projectStore.projectId;
+
+const getStateForMutation = (projectId) => {
+  if (isActiveProject(projectId)) {
+    return ensureProjectEntry();
+  }
+  return ensureProjectStateShape(projectId, createInitialProjectState(projectId));
 };
 
 const getCandidates = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return [];
+  }
+  const state = ensureProjectEntry();
   return cloneCandidates(state.candidates || []);
 };
 
 const setProjectState = (projectId, nextState) => {
-  const sanitized = ensureProjectStateShape(projectId, nextState);
-  projectStore.set(projectId, sanitized);
-  rebuildParticipantTokenIndex(projectId);
-  rebuildShareTokenIndex(projectId);
+  const targetId = projectId || DEFAULT_PROJECT_ID;
+  const sanitized = ensureProjectStateShape(targetId, nextState);
+  projectStore.projectId = targetId;
+  projectStore.state = sanitized;
   persistToStorage();
-  notify(projectId);
+  notify(targetId);
 };
 
 const replaceCandidates = (projectId, nextCandidates, nextIcsText = null) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const candidatesArray = Array.isArray(nextCandidates) ? cloneCandidates(nextCandidates) : [];
   const nextState = {
     ...state,
@@ -386,49 +337,53 @@ const replaceCandidates = (projectId, nextCandidates, nextIcsText = null) => {
   if (typeof nextIcsText === "string") {
     nextState.icsText = nextIcsText;
   }
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const getIcsText = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return "";
+  }
+  const state = ensureProjectEntry();
   return state.icsText || "";
 };
 
 const getParticipants = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return [];
+  }
+  const state = ensureProjectEntry();
   return cloneParticipants(state.participants || []);
 };
 
 const getShareTokens = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return {};
+  }
+  const state = ensureProjectEntry();
   return cloneShareTokens(state.project?.shareTokens);
 };
 
 const findProjectByShareToken = (type, token) => {
   if (!isNonEmptyString(token)) return null;
   if (!SHARE_TOKEN_TYPES.includes(type)) return null;
-  const indexMap = shareTokenIndex[type];
-  const key = String(token);
-  const entry = indexMap.get(key);
-  if (!entry) return null;
-  const projectId = entry.projectId;
-  if (!projectId) return null;
-  const state = ensureProjectEntry(projectId);
-  const tokens = state.project?.shareTokens;
-  const matched = tokens?.[type];
-  if (!matched || !isNonEmptyString(matched.token) || matched.token !== key) {
+  const state = ensureProjectEntry();
+  const entry = state.project?.shareTokens?.[type];
+  if (!entry || !isNonEmptyString(entry.token)) return null;
+  if (entry.token !== token || isPlaceholderShareToken(entry.token)) {
     return null;
   }
   return {
-    projectId,
-    token: key,
-    entry: { ...matched }
+    projectId: projectStore.projectId,
+    token: entry.token,
+    entry: { ...entry }
   };
 };
 
 const updateShareTokens = (projectId, updater) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const currentTokens = cloneShareTokens(state.project?.shareTokens);
   const nextInput =
     typeof updater === "function" ? updater(currentTokens) ?? currentTokens : updater ?? {};
@@ -442,24 +397,26 @@ const updateShareTokens = (projectId, updater) => {
     ...state,
     project: nextProject
   };
-  setProjectState(projectId, nextState);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
   return cloneShareTokens(nextTokens);
 };
 
 const replaceParticipants = (projectId, nextParticipants) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const participantsArray = Array.isArray(nextParticipants) ? cloneParticipants(nextParticipants) : [];
   const nextState = {
     ...state,
     participants: participantsArray
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const upsertParticipant = (projectId, participant) => {
   if (!participant || !participant.id) throw new Error("participant must have id");
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const participants = Array.isArray(state.participants) ? state.participants.slice() : [];
   const nextParticipant = { ...participant };
   const index = participants.findIndex((item) => item && item.id === participant.id);
@@ -472,12 +429,13 @@ const upsertParticipant = (projectId, participant) => {
     ...state,
     participants
   };
-  setProjectState(projectId, nextState);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
   return { ...nextParticipant };
 };
 
 const removeParticipant = (projectId, participantId) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const nextParticipants = (state.participants || []).filter((item) => item && item.id !== participantId);
   const nextResponses = (state.responses || []).filter((item) => item && item.participantId !== participantId);
   const nextState = {
@@ -485,45 +443,51 @@ const removeParticipant = (projectId, participantId) => {
     participants: nextParticipants,
     responses: nextResponses
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const findParticipantByToken = (token) => {
   if (!token) return null;
-  const entry = participantTokenIndex.get(String(token));
-  if (!entry) return null;
-  const state = ensureProjectEntry(entry.projectId);
-  const participant = (state.participants || []).find((item) => item && item.id === entry.participantId);
+  const state = ensureProjectEntry();
+  const participant = (state.participants || []).find((item) => item && item.token === token);
   if (!participant) return null;
-  return { projectId: entry.projectId, participant: { ...participant } };
+  return { projectId: projectStore.projectId, participant: { ...participant } };
 };
 
 const getResponses = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return [];
+  }
+  const state = ensureProjectEntry();
   return cloneResponses(state.responses || []);
 };
 
 const getTallies = (projectId = DEFAULT_PROJECT_ID) => {
-  const state = ensureProjectEntry(projectId);
+  if (!isActiveProject(projectId)) {
+    return cloneTallies(createInitialDerivedState().tallies);
+  }
+  const state = ensureProjectEntry();
   const tallies = state.derived?.tallies ?? createInitialDerivedState().tallies;
   return cloneTallies(tallies);
 };
 
 const replaceResponses = (projectId, nextResponses) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const responsesArray = Array.isArray(nextResponses) ? cloneResponses(nextResponses) : [];
   const nextState = {
     ...state,
     responses: responsesArray
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const upsertResponse = (projectId, response) => {
   if (!response || !response.id) throw new Error("response must have id");
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const responses = Array.isArray(state.responses) ? state.responses.slice() : [];
   const nextResponse = { ...response };
   const index = responses.findIndex((item) => item && item.id === response.id);
@@ -536,12 +500,13 @@ const upsertResponse = (projectId, response) => {
     ...state,
     responses
   };
-  setProjectState(projectId, nextState);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
   return { ...nextResponse };
 };
 
 const replaceTallies = (projectId, nextTallies) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const tallies = cloneTallies(nextTallies);
   const nextState = {
     ...state,
@@ -550,23 +515,25 @@ const replaceTallies = (projectId, nextTallies) => {
       tallies
     }
   };
-  setProjectState(projectId, nextState);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
   return cloneTallies(tallies);
 };
 
 const removeResponsesByCandidate = (projectId, candidateId) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const nextResponses = (state.responses || []).filter((item) => item && item.candidateId !== candidateId);
   const nextState = {
     ...state,
     responses: nextResponses
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const updateProjectMeta = (projectId, changes) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const nextProject = { ...state.project };
   let dirty = false;
 
@@ -594,12 +561,13 @@ const updateProjectMeta = (projectId, changes) => {
     ...state,
     project: nextProject
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const updateProjectVersions = (projectId, changes) => {
-  const state = ensureProjectEntry(projectId);
+  const state = getStateForMutation(projectId);
   const nextVersions = sanitizeVersions({
     ...state.versions,
     ...(changes && typeof changes === "object" ? changes : {})
@@ -613,8 +581,9 @@ const updateProjectVersions = (projectId, changes) => {
     ...state,
     versions: nextVersions
   };
-  setProjectState(projectId, nextState);
-  return getProjectStateSnapshot(projectId);
+  const targetId = projectId || projectStore.projectId;
+  setProjectState(targetId, nextState);
+  return getProjectStateSnapshot(targetId);
 };
 
 const subscribeProjectState = (projectId, callback) => {
