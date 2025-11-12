@@ -28,7 +28,6 @@ void TypeConfirmationDialog;
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   description: "秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。",
-  deadline: "2025/05/01 23:59",
   lastUpdated: "2025/04/12 17:45"
 };
 
@@ -1487,7 +1486,6 @@ useEffect(() => {
             </h1>
             <p className="mt-2 text-sm text-zinc-600">プロジェクト「{projectName}」の日程と回答状況です。</p>
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
-            <p className="mt-1 text-xs text-zinc-500">締切目安: {DASHBOARD_META.deadline}</p>
             <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
             {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
           </div>
@@ -1603,12 +1601,6 @@ useEffect(() => {
             )}
           </div>
 
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
-            <p className="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>未回答者を抽出して個別フォローしましょう。</li>
-            </ul>
-          </div>
         </section>
       )}
 

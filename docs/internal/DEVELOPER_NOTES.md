@@ -109,8 +109,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- Scheduly 参加者の締切目安: 2025/05/01 23:59 は不要。除去して。
-- Scheduly 参加者 => 参加者ごと の参加者サマリー活用メモ未回答者を抽出して個別フォローしましょう。 は不要。除去して。
 - 不具合: 参加者URLをもちいて別のブラウザから開くと参加者用の共有URLが無効です が表示される。おかしい。
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
 - ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
@@ -161,6 +159,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
 - sessionStorage でのみ状態を保持するよう `projectStore` / `projectService` を整理し、Web Storage ヘルパーと localStorage 依存を撤廃
 - ローカルモード/サービスドライバを廃止し、フロントエンドを API 専用構成へ統一（`service-driver.js` 削除、各サービスの API 実装へ一本化）
+- 参加者画面のダミー締切表示と「参加者サマリー活用メモ」を削除し、legacy モックも同様に整理
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理
