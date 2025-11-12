@@ -70,24 +70,28 @@ const scheduleViewFromState = (state, tallies) => {
 
   const summaries = (state.candidates || []).map((candidate) => {
     const rangeLabel = formatDateTimeRangeLabel(candidate.dtstart, candidate.dtend, candidate.tzid || DEFAULT_TZID);
-    const counts = {
-      o: 0,
-      d: 0,
-      x: 0,
-      pending: participants.length
-    };
+    const counts = { o: 0, d: 0, x: 0, pending: 0 };
+    const detailed = [];
+    const respondedIds = new Set();
+    const participantResponseMap = responsesByCandidate.get(candidate.id) || new Map();
+    let respondedCount = 0;
     const tallyEntry = tallies.candidates?.[candidate.id];
-    if (tallyEntry) {
+    if (tallyEntry && typeof tallyEntry === "object") {
       counts.o = tallyEntry.o ?? counts.o;
       counts.d = tallyEntry.d ?? counts.d;
       counts.x = tallyEntry.x ?? counts.x;
       counts.pending = tallyEntry.pending ?? counts.pending;
     }
-    const detailed = [];
-    const respondedIds = new Set();
-    const participantResponseMap = responsesByCandidate.get(candidate.id) || new Map();
     participantResponseMap.forEach((response) => {
+      respondedCount += 1;
       const mark = normalizeMark(response.mark);
+      if (!tallyEntry || typeof tallyEntry !== "object") {
+        if (mark === "o" || mark === "d" || mark === "x") {
+          counts[mark] += 1;
+        } else {
+          counts.pending += 1;
+        }
+      }
       const participantEntry = participantLookup.get(response.participantId);
       const participant = participantEntry?.participant;
       const rawComment = typeof response.comment === "string" ? response.comment : "";
@@ -106,6 +110,13 @@ const scheduleViewFromState = (state, tallies) => {
       });
       respondedIds.add(response.participantId);
     });
+
+    if (!tallyEntry || typeof tallyEntry !== "object") {
+      const unmatchedCount = Math.max(0, participants.length - respondedCount);
+      if (unmatchedCount > 0) {
+        counts.pending += unmatchedCount;
+      }
+    }
 
     participants.forEach((participant, index) => {
       if (!participant || respondedIds.has(participant.id)) return;
