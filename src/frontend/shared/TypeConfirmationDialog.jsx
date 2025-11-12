@@ -15,6 +15,7 @@ function TypeConfirmationDialog({
   onConfirm
 }) {
   const [inputValue, setInputValue] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -72,7 +73,19 @@ function TypeConfirmationDialog({
             <input
               type="text"
               value={inputValue}
-              onChange={(event) => setInputValue(event.target.value.toUpperCase())}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(event) => {
+                setIsComposing(false);
+                setInputValue(event.target.value.toUpperCase());
+              }}
+              onChange={(event) => {
+                const { value } = event.target;
+                if (isComposing) {
+                  setInputValue(value);
+                } else {
+                  setInputValue(value.toUpperCase());
+                }
+              }}
               placeholder={confirmWord}
               className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
               autoFocus
