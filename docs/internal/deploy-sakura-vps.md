@@ -98,6 +98,11 @@ server {
     root /home/scheduly/scheduly/dist;
     index index.html;
 
+    location ~ ^/(p|r)(?:/.*)?$ {
+        try_files $uri $uri/ /user.html;
+    }
+
+    # 管理者リンク（/a/...）とトップ
     location / {
         try_files $uri $uri/ /index.html;
     }
