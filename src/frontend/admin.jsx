@@ -1376,6 +1376,30 @@ const recordCandidateConflict = useCallback(
     return tokens;
   }, [projectId, shareTokens]);
 
+  const handleManualRefresh = useCallback(async () => {
+    if (!projectId) {
+      window.location.reload();
+      return;
+    }
+    if (!isApiDriver) {
+      window.location.reload();
+      return;
+    }
+    setSnapshotStatus({ phase: "refreshing", message: "サーバーから最新状態を取得しています…" });
+    try {
+      await projectService.syncProjectSnapshot(projectId, { force: true, reason: "manual_refresh" });
+      setSnapshotStatus({ phase: "ready", message: "" });
+      popToast("最新状態に更新しました。");
+    } catch (error) {
+      console.error("[Scheduly][admin] manual refresh failed", error);
+      setSnapshotStatus({
+        phase: "error",
+        message: "最新状態の取得に失敗しました。時間を置いて再度お試しください。"
+      });
+      popToast("最新状態の取得に失敗しました。");
+    }
+  }, [projectId, isApiDriver, popToast]);
+
   const handleBaseUrlBlur = () => {
     setBaseUrlDraft((prev) => {
       const normalized = normalizeBaseUrlInput(prev);
@@ -1911,10 +1935,19 @@ const executeShareLinkAction = async () => {
                 {metaSyncErrorMessage}
               </div>
             )}
-            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button
+        {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={!projectId || snapshotStatus.phase === "refreshing" || snapshotStatus.phase === "loading"}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-base text-zinc-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="最新状態に更新"
+        >
+          <span aria-hidden="true">🔄</span>
+        </button>
+        <button
               type="button"
               onClick={handleOpenParticipantView}
               disabled={!participantShareReady}

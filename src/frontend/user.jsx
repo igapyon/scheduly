@@ -1121,6 +1121,30 @@ useEffect(() => {
     setInlineEditorTarget(null);
   }, [activeTab]);
 
+  const handleManualRefresh = useCallback(async () => {
+    if (!projectId) {
+      window.location.reload();
+      return;
+    }
+    if (!isApiDriver) {
+      window.location.reload();
+      return;
+    }
+    setSnapshotStatus({ phase: "refreshing", message: "サーバーから最新状態を取得しています…" });
+    try {
+      await projectService.syncProjectSnapshot(projectId, { force: true, reason: "manual_refresh" });
+      setSnapshotStatus({ phase: "ready", message: "" });
+      popToast("最新状態に更新しました。");
+    } catch (error) {
+      console.error("[Scheduly][user] manual refresh failed", error);
+      setSnapshotStatus({
+        phase: "error",
+        message: "最新状態の取得に失敗しました。時間を置いて再度お試しください。"
+      });
+      popToast("最新状態の取得に失敗しました。");
+    }
+  }, [projectId, isApiDriver, popToast]);
+
   const handleDownloadAllIcs = () => {
     if (!projectId) {
       return;
@@ -1493,9 +1517,18 @@ useEffect(() => {
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
             <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
             {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <button
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={!projectId || snapshotStatus.phase === "refreshing" || snapshotStatus.phase === "loading"}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-base text-zinc-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="最新状態に更新"
+        >
+          <span aria-hidden="true">🔄</span>
+        </button>
+        <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               onClick={() => {

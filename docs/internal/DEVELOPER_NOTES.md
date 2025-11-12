@@ -109,7 +109,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- 入力内容をリロードするためのボタンが欲しい。
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - `projectStore` を単一プロジェクト前提に再実装し、Map/逆引きインデックスを廃止して `currentState` ベースのシンプルな構造へ刷新する。
