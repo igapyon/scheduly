@@ -50,7 +50,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 ## Documentation Index
 
 - ドキュメントの読み方と読者別索引: `docs/README.md`
-- **外部向け** `docs/external/README.md`: 読み始める順番と目的別リンク
+- **外部向け** [docs/external/README.md](docs/external/README.md): 読み始める順番と目的別リンク
 - **外部向け** [docs/external/index-screens.md](docs/external/index-screens.md): 画面役割と回答管理 UI の詳細
 - **外部向け** [docs/external/guide-ical-workflow.md](docs/external/guide-ical-workflow.md): ICS 連携の運用メモ
 - **外部向け** [docs/external/concept-assumptions.md](docs/external/concept-assumptions.md): 外部仕様の前提・制約（通常と異なる方式）
@@ -67,6 +67,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - **内部向け** [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
 - **内部向け** [docs/internal/guide-development-process.md](docs/internal/guide-development-process.md): 現行の開発プロセス定義（WIP）と経緯の要点
 - **内部向け** [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理
+- **内部向け** [docs/internal/deploy-sakura-vps.md](docs/internal/deploy-sakura-vps.md): Ubuntu 24.04 LTS 上のさくらの VPS でベータ公開する最小手順
 
 | 種別 | 主な用途 | 配置 | 起動方法 / 挙動 |
 | ---- | -------- | ---- | -------- |

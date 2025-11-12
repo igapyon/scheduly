@@ -28,3 +28,4 @@
   - バリデーション方針: `docs/internal/spec-validation-policy.md`
   - ICS 内部仕様: `docs/internal/spec-ical-internals.md`
   - 共有 URL 仕様: `docs/internal/spec-share-url-generation.md`
+  - さくら VPS デプロイ手順: `docs/internal/deploy-sakura-vps.md`
