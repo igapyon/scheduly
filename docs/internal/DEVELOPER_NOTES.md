@@ -134,6 +134,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
  - `summary-service` の派生データを活用し、「○最多の日程」「未回答者一覧」などハイライト統計を UI に表示する。集計基盤を可視化して意思決定を支援する。
  - レガシーモック（`public/legacy/scheduly-user-edit-mock.html` ほか）を最新のインライン編集 UI／データに合わせて更新し、現行実装との乖離を解消する。（これは人間が手動で操作する）
  - 生成LLM 用の MCP（Model Context Protocol）対応を検討し、可能であれば導入方針・接続ポイント・最小PoCを作成する（優先度: 中）。
+ - E2E テスト: Cypress などで管理者→参加者→回答→エクスポート一連のシナリオを自動化。
 
 ### 優先度: 低
 - ICS 生成時に `VTIMEZONE` を自動挿入するなど、タイムゾーン情報の扱いを強化する（現状は `X-SCHEDULY-TZID` のみ）。

@@ -10,7 +10,7 @@ Scheduly の内部仕様・運用ドキュメントを読むための入口で�
 
 ## フロー別の参照先
 - 画面の技術詳細: `docs/internal/ref-screen-tech-overview.md`
-- サーバー連携計画 (WIP): `docs/internal/spec-server-integration.md`
+- サーバー連携計画: `docs/internal/spec-server-integration.md`
 - 共有 URL 仕様: `docs/internal/spec-share-url-generation.md`
 - バリデーション方針: `docs/internal/spec-validation-policy.md`
 - ICS 内部仕様: `docs/internal/spec-ical-internals.md`

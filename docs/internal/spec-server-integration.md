@@ -1,154 +1,114 @@
-# Server Integration Plan (Draft)
+# Server Integration Overview
 
-このドキュメントは、Scheduly がクライアントサイド完結の実装からサーバー連携へ移行する際に検討すべきポイントを整理するためのたたき台です。現時点では詳細が未確定のため、TBD 項目を含むラフな構成になっています。
+このドキュメントは、Scheduly のフロントエンド（管理/参加者 UI）とバックエンド API の結合方式、現在の運用構成、継続課題をまとめた開発者向けの参照資料です。2025 年初頭時点で、アプリは **クライアントサーバー型** に移行済みであり、さくらの VPS 上でベータ公開を行っています。
 
-## 目的と前提
+## 1. 現行アーキテクチャ
 
-- 現行: `projectStore` がブラウザの `sessionStorage` を利用し、すべてのロジックがクライアント内で完結
-- 初期サーバ実装: **単一プロセス / オンメモリ** の Node.js アプリとして立ち上げ、永続ストレージを持たない揮発運用を起点とする（プロセス再起動時に状態は消える前提）
-- スケールアウトやマルチプロセス対応は後続フェーズで検討し、初期段階では単一ノード内でのトークン配布・ICS 生成・回答集計を完結させる
-- 目標: Node.js ベースのサーバーを導入しても既存の JavaScript スタックを活かしつつ、永続化と複数クライアントの整合性を確保する
-- 範囲: API 設計、ストレージ選定、データ移行手順、テスト/CI への影響
+```
+┌────────────┐    https           ┌────────────────────┐
+│ Admin UI   │ ────────────────▶ │                    │
+│ (React,    │                    │  Nginx (static +   │
+│ webpack)   │ ◀───────────────┐ │  reverse proxy)    │
+└────────────┘    https        │ └──────┬─────────────┘
+                                │        │
+┌────────────┐    https        │        │ (proxy_pass /api/*)
+│ Participant│ ────────────────┘        ▼
+│ UI         │                     ┌───────────────┐
+└────────────┘                     │ Node.js API   │
+                                   │ (Express +    │
+                                   │ InMemoryStore)│
+                                   └───────────────┘
+```
 
-## 段階的移行プラン（ドラフト）
+- フロントエンドは `npm run dev`（開発時） / `npm run build`（本番ビルド）で生成され、Nginx から `dist/` を配信。
+- API は `src/server/index.js` で起動する Express アプリ。`InMemoryProjectStore` が `Map<projectId, ProjectState>` を保持し、再起動するとデータは消える。
+- `.env` で `SCHEDULY_API_BASE_URL` / `SCHEDULY_SHARE_BASE_URL` を指定し、Webpack 定義済みの `runtime-config` から API URL を解決。
+- 参加者・管理者 URL は API が発行するトークン（`/a/{token}`, `/p/{token}`）を通じてルーティングされる。フロントは `projectService.resolveProjectFromLocation()` を使い、共有トークン→プロジェクト ID を解決する。
 
-1. **API スケルトン作成（TBD）**  
-   - Express などで `/projects`, `/candidates`, `/participants`, `/responses` の CRUD を定義する  
-   - 認証/トークンの扱いは別ドキュメントで検討
-2. **データストア選定（TBD）**  
-   - 選択肢: SQLite, PostgreSQL, Document Store など  
-   - モックとの親和性を考慮して JSON 互換スキーマから検討
-3. **クライアントの段階移行**  
-   - `sessionStorage` への書き込み箇所をラップし、API 経由の fetch へ差し替え可能な構造を用意（現状は API 専用に統一済み）
-4. **ICS ワークフローへの組み込み（TBD）**  
-   - ファイルアップロード/ダウンロードのハンドリング  
-   - ICS の差分更新をサーバー側でどう管理するか
+## 2. プロセス構成と主要モジュール
 
-## 揮発性バックエンド（初期実装）方針
+| パス | 役割 |
+| ---- | ---- |
+| `src/server/app.js` | Express アプリの初期化、CORS、JSON パース、ヘルスチェック、メトリクス。 |
+| `src/server/store.js` | InMemoryProjectStore。本体の CRUD、バージョン管理、共有トークン生成、回答集計など。 |
+| `src/server/routes/projects.js` | `/api/projects/*` の REST ルーティング。 |
+| `src/frontend/services/*-service.js` | フロント側から API を呼び出すラッパー。`projectService` がルート解決・購読を担う。 |
+| `src/frontend/services/summary-service.js` / `tally-service.js` | サーバーの派生データをフロント向けに整形。 |
 
-最初のサーバ導入は、あくまでフロントの `sessionStorage` 実装を置き換える最小機能に限定し、可観測性・競合検知の基礎を整えることを目的とする。永続ストレージや分散構成は後続フェーズで検討する。
+### InMemoryProjectStore の特徴
+- `project`, `candidates`, `participants`, `responses`, `shareTokens`, `versions`, `derived.tallies` を１つのオブジェクトで保持。
+- `shareTokens` は admin / participant の 2 種類を管理。API で `/share/rotate` を呼ぶと `token`, `url`, `issuedAt` を更新。
+- バージョン管理: `metaVersion`, `candidatesVersion`, `candidatesListVersion`, `participantsVersion`, `responsesVersion`, `shareTokensVersion`。書き込み API は version を検証し、競合時は 409 を返す。
+- `derived.tallies` は `tallyService.recalculate()` で生成し、候補別・参加者別の ○△× 集計をキャッシュ。
 
-### ランタイム構成
+## 3. API サマリー
 
-- Node.js + Express（または同等の軽量 HTTP フレームワーク）を単一プロセスで起動する。
-- プロセス内に `Map<projectId, ProjectState>` を保持する in-memory ストアを実装し、API ハンドラからのみアクセスさせる。`ProjectState` はフロントの `projectStore` と同等の構造（`project`, `candidates`, `participants`, `responses`, `icsText`, `shareTokens`, `versions`）を持つ。
-- プロセス再起動＝全データ消失となる点を運用文書に明示し、ステートレスなサンプル用途（PoC/デモ）として扱う。
+| メソッド/パス | 説明 |
+| ------------- | ---- |
+| `POST /api/projects` | 新規プロジェクト作成。管理 URL / 参加者 URL を付与し、空の state を返す。 |
+| `GET /api/projects/share/:type/:token` | 共有トークン（admin/participant）から snapshot を取得。 |
+| `GET /api/projects/:projectId/snapshot` | プロジェクト全体を一括取得。 |
+| `GET/PUT /api/projects/:projectId/meta` | プロジェクト名・説明・タイムゾーンの取得/更新。 |
+| `POST /api/projects/:projectId/candidates` | 候補の作成。 |
+| `PUT /api/projects/:projectId/candidates/:candidateId` | 候補更新。 |
+| `DELETE /api/projects/:projectId/candidates/:candidateId` | 候補削除。 |
+| `POST /api/projects/:projectId/candidates/order` | 並び順更新（`candidatesListVersion` を検証）。 |
+| `POST /api/projects/:projectId/participants` | 参加者作成。 |
+| `PUT /api/projects/:projectId/participants/:participantId` | 参加者更新。 |
+| `DELETE /api/projects/:projectId/participants/:participantId` | 参加者削除。 |
+| `GET /api/projects/:projectId/participants/:participantId/responses` | 参加者単位の回答一覧。 |
+| `POST /api/projects/:projectId/responses` | 回答 Upsert。`{ participantId, candidateId }` ごとに version を持つ。 |
+| `DELETE /api/projects/:projectId/responses/:participantId/:candidateId` | 回答削除。 |
+| `POST /api/projects/:projectId/share/rotate` | 管理者/参加者 URL を再発行。 |
+| `POST /api/projects/:projectId/import` | ICS/JSON のインポート。 |
+| `GET /api/projects/:projectId/export` | JSON エクスポート。 |
+| `GET /api/projects/:projectId/ics` | ICS エクスポート。 |
+| `GET /api/healthz`, `GET /api/readyz`, `GET /api/metrics` | ヘルスチェックと簡易メトリクス。 |
 
-### API スコープ
+レスポンス型は `src/shared/types.ts` で定義。Zod ベースのバリデーションをフロント/サーバで共有することで、入力サニタイズと型整合性を担保している。
 
-- ルート: `/api/projects/:projectId`
-- サブリソース:
-  - `GET/PUT` `/meta` – プロジェクト名・説明・タイムゾーンなどのメタ情報
-  - `GET/POST/PUT/DELETE` `/candidates` – 候補 CRUD、一覧更新（順序変更）には `If-Match` or `candidatesListVersion`
-  - `GET/POST/PUT/DELETE` `/participants`
-  - `GET/POST/PUT/DELETE` `/responses`
-  - `POST` `/share/rotate` – 管理者/参加者トークンの再発行
-  - `GET` `/snapshot` – 一括取得。`projectStore` へ流し込める JSON 全体を返す
-- レスポンスはフロントと共通の型 (`src/shared/types.ts` を共用予定) を採用し、`version` を必須フィールドとして返す。
+## 4. ルーティングと URL
 
-### データ分離とバージョン管理
+- 管理画面: `/index.html` から開始し、共有 URL 発行後は `/a/{token}` へ遷移。
+- 参加者画面: `/user.html`（開発時）/ `/p/{token}`（本番運用）。`/r/{token}` は後方互換で `/p/{token}` へリダイレクト。
+- Nginx のサンプル設定は `docs/internal/deploy-sakura-vps.md#5` を参照。`location ~ ^/(p|r)` を `user.html` に張り替えることで、参加者画面が正しく読み込まれる。
 
-- `ProjectState` 内で以下のバージョン番号を保持する。
-  - `metaVersion`
-  - `candidatesVersion` と `candidatesListVersion`
-  - `participantsVersion`
-  - `responsesVersion`（行単位は `Response.version` として保持）
-  - `shareTokensVersion`
-- 書き込み系 API は `If-Match` ヘッダまたはリクエスト Body の `version` を要求し、不一致の場合は 409 を返却。レスポンスに最新値を含め、クライアントがロールバック後に再送できるようにする。
-- 行単位での衝突検知が必要な `Response` は、`{ participantId, candidateId }` キーでバージョンを持たせる。候補一覧や参加者一覧はリスト全体も別バージョンを持つ。
+## 5. デプロイ（さくら VPS β環境）
 
-### マルチプロジェクト対応方針（新規）
+詳細は `docs/internal/deploy-sakura-vps.md` に記載。要点のみ抜粋。
 
-- これまでは「単一の `demo-project` をブラウザの Web Storage で共有する」前提だったが、今後は **プロジェクト ID ごとに完全に独立した shareTokens/state** を管理する。本番ホスティングを想定した際に、別セッションで以前の管理 URL が表示される挙動は NG。
-- API サーバーは `projectId` をキーに `Map<projectId, ProjectState>` を保持し、共有トークン・候補・参加者などすべてをプロジェクト単位で切り分ける。ブラウザが `/`（トークンなし）へアクセスした場合は **新規プロジェクトを生成** し、プレースホルダー shareTokens と空の state を返す。
-- 管理 URL (`/a/{token}`) でアクセスされた場合のみ既存プロジェクトをロードする。ルート直叩きや新しいセッションでは、以前に発行したトークンを暗黙に引き継がない。
-- 共有 URL を発行したあとにブラウザを閉じても、サーバーに保存された `shareTokens` はそのプロジェクトにのみ紐づく。他セッションで同じ state が見えてしまうのは仕様として許容せず、必ずトークン（もしくは projectId 明示指定）でアクセスした場合だけ既存データが取れるようにする。
-- この方針を念頭に、ルーティング／プロジェクト初期化 API／`projectService.resolveProjectFromLocation()` の仕様を段階的に更新する。最終形では「URL を知らない限り他人のプロジェクトを覗けない」ことをサーバー側でも保証する。
+1. **環境**: Ubuntu 24.04 LTS。Node.js 20 (NodeSource) + npm。
+2. **ユーザー**: `/home/scheduly/` に Git clone し、`npm ci && npm run build`。
+3. **API 起動**: systemd サービス `scheduly-api.service` で `/usr/bin/node src/server/index.js` を常駐。`.env` は以下を想定。
+   ```
+   PORT=4000
+   BASE_URL=https://example.com
+   SCHEDULY_SHARE_BASE_URL=https://example.com
+   ```
+4. **Nginx**: `root dist/`、`/api/` を 127.0.0.1:4000 へ proxy。`/p`/`/r` 向けに `user.html` を返す rewrite を追加。
+5. **HTTPS**: `snap install --classic certbot` → `sudo certbot --nginx -d example.com`。
+6. **観測**: `journalctl -u scheduly-api` で API ログ、`/var/log/nginx/` でアクセスログを確認。
 
-### 起動時と終了時の扱い
+## 6. ロギング / テレメトリ / ヘルスチェック
 
-- プロセス初期化時は空のストアから開始し、リクエストを受けて初めて `ProjectState` を生成する。デモ用途で初期データが必要な場合は、外部 CLI や管理 API から `snapshot` をロードする方針とする。
-- シャットダウン時は特別な永続化は行わないが、将来の永続化を見据えて `serializeState()` ヘルパーを用意しておく。
-- 監視目的で `/api/healthz` `/api/readyz` の結果に `uptime`, `projectCount` などのメタ情報を追加できるようにする。
+- **ログ形式**: `src/server/logger.js` を介して JSON 1 行の構造化ログを出力（`request.start`, `request.complete`, `request.error`）。`X-Request-ID` をレスポンスヘッダに付与。
+- **メトリクス**: `GET /api/metrics` がリクエスト数・平均応答時間・最新エラーなどのスナップショットを返す。
+- **ヘルスエンドポイント**:
+  - `/api/healthz`: 常に 200（HTTP ハンドラが生きているか）。
+  - `/api/readyz`: 起動直後は 503、準備完了後は 200。Nginx / LB の readiness probe 用。
 
-### ファイル入出力
+## 7. セキュリティと制限事項
 
-- ICS / JSON エクスポートは同期処理で返す。`GET /api/projects/:projectId/export/ics` は `text/calendar`、`GET /api/projects/:projectId/export/json` は `application/json` + `Content-Disposition: attachment`。生成は都度行い、ジョブキューは使わない。
-- インポート（JSON/ICS）は `multipart/form-data` または JSON payload とし、サーバ側で `ProjectState` へマージする。現行のフロント `importState` と同じ整合チェック（UID/DTSTAMP 比較）を行う。
-- ファイルサイズ上限（例: 1 MB）とリクエストタイムアウトを明文化しておき、413 や 422 の返却ポリシーを合わせて `spec-api-flow.md` へ記載する。
-- トークン権限チェック: 管理者トークンのみエクスポート/インポート可。参加者トークンはアクセス拒否（403）。揮発版ではレスポンス生成後に監査ログ（リクエスト ID, tokenType, ファイル種別）を残す。
+- 現行の認証は **共有トークンベース**。URL を知っているだけで管理者/参加者画面へアクセスできるため、リンクの秘匿が大前提。
+- API には認証レイヤを設けていない。外部公開時は IP 制限または VPN 配下で利用する想定。
+- データは in-memory のため、VPS 再起動・プロセス再起動で消える。UI にもテスト公開中の注意パネルを表示し、利用者に明示している。
 
-### 権限・セキュリティ
+## 9. 参考ドキュメント
 
-- 当面は共有トークンをベアラートークンとして利用し、`Authorization: Bearer <token>` ヘッダで認証する。管理者トークンと参加者トークンを区別し、エンドポイントごとに許可範囲をチェックする。
-- 管理者トークンでのアクセス時は全 API を許可、参加者トークンでのアクセス時は `GET /snapshot`（回答者向けビュー）と自分の `POST/PUT /responses` のみに限定する。
-- ログにはトークン値を直接出さず、ハッシュ化（SHA-256 の先頭数文字など）して記録する。
+- `docs/internal/deploy-sakura-vps.md`: さくら VPS でのセットアップ手順。
+- `docs/internal/spec-api-flow.md`: API の詳細シーケンス、楽観更新、エラー処理。
+- `docs/internal/spec-data-model.md`: ProjectState の構造とフィールド意味。
+- `docs/internal/spec-share-url-generation.md`: 共有トークンの規約と発行手順。
+- `docs/internal/DEVELOPER_NOTES.md`: 最新の TODO / 完了項目、運用メモ。
 
-### 運用上の留意
-
-- プロセスが落ちた場合は復元手段がないため、PoC として扱う。安定運用や SLA が必要になった段階で永続ストレージ（SQLite/PostgreSQL 等）への移行を計画する。
-- 定期的に `/snapshot` で取得した JSON を外部へバックアップする CLI を用意すると検証時の再現が容易になる。
-- 将来の永続化に備えて、API レイヤはリポジトリインターフェース（`ProjectRepository`）を間に挟み、実装を `MemoryRepository` から `SqlRepository` へ差し替えられるようにする。
-
-### ログ／モニタリング基盤（初期構成）
-
-- **構造化ログ**
-  - 書式は JSON 行（1 行 1 レコード）。`{ timestamp, level, message, context }` を基本とし、`context` に `projectId`（ハッシュ化）、`operation`, `tokenType`, `durationMs`, `statusCode`, `requestId` を含める。
-  - レベル定義: `info`（通常リクエスト）、`warn`（4xx）、`error`（5xx・未捕捉例外）、`debug`（開発用）。409 は `info`＋`conflict.reason` を記録。
-  - 揮発版は stdout へ出力し、ローカル開発では `LOG_LEVEL=debug` で詳細表示。本番想定ではファイルローリングもしくは stdout → Collect Agent を前提とする。
-
-- **保存とマスキング**
-  - トークン値・コメント等の個人情報はログに残さない。必要に応じて `hashToken(token)`（SHA-256 の先頭 8 文字）や `sanitizePII(text)` でマスクする。
-  - プロジェクト ID は `hashProjectId(projectId)` で匿名化し、アクセス集計時のみ利用。
-  - 保存期間は初期段階で 30 日。古いログは自動削除（外部保存先を利用する場合も同水準を目指す）。
-
-- **アクセス監視**
-  - API ミドルウェアで Access Log を記録（リクエスト開始時に `requestId` を発行）。レスポンス完了時に `durationMs` を算出し、閾値（例: 1.5s）を超えた場合は `warn` を出力。
-  - 重要操作（共有URL発行、ICS/JSON エクスポート、インポート、デモプロジェクトインポート、プロジェクト削除）は `operation` を `critical` とし、別ストリーム（監査ログ）にも複製。
-
-- **メトリクス**
-- まずは Application Logs から計算できるサマリ（リクエスト数、4xx/5xx レート、平均レスポンス）を想定。将来的に Prometheus 等を導入する場合は `/api/metrics` エンドポイントで `http_request_duration_seconds` Histogram などを公開する。
-- 実装済み: `/api/metrics` でリクエスト数・エラーレート・ルート別ステータス分布・最近のエラーを JSON で取得できる。Prometheus 等に移行する際はこのルートから移し替える。
-  - フロントエンドでも `performance.now()` を用いて主要操作の所要時間を計測し、`debug` レベルで出力（将来の RUM 基盤を見据える）。
-
-- **アラート**
-  - 初期段階ではダッシュボード上での目視確認を前提。永続環境へ移行する際には以下の閾値でアラートを設定: 5xx レート > 2%（5 分間平均）、平均レスポンス > 2s、連続失敗（共有 URL 発行/エクスポート）3 回以上。
-
-- **ダッシュボード**
-  - ログ集約基盤（Datadog, Loki+Grafana 等）を想定し、標準ダッシュボードに「総リクエスト数」「ステータス別件数」「重要操作ログ一覧」「平均レスポンス時間」「エラーメッセージ Top5」を配置する。
-  - 監査向けには `operation=critical` のログを日付降順で確認できるビューを用意する。
-
-- **落とし穴と対策**
-  - ログ量肥大を避けるため、`debug` ログは開発時のみ。リリース時には `LOG_LEVEL=info`。
-  - エラー情報にスタックトレースを含める場合も、個人情報やトークンが混じらないよう `sanitizeError()` を通す。
-  - 将来的に永続ストレージへ移行したら、DB 側でも Slow Query ログやエラーログを取る計画を別途策定する。
-
-## サーバー健全性エンドポイント
-
-最小構成の Node.js サーバーでも、稼働監視のためのヘルスチェックを提供する。
-
-- `GET /api/healthz`
-  - 目的: プロセスが起動し、HTTP ハンドラが応答できるかを確認するライブネスチェック。
-  - 実装: 常に 200/`{"status":"ok"}` を返す（将来的に依存モジュール診断を足しても良い）。外部依存のチェックは含めない。
-  - 運用: コンテナの `livenessProbe` や外形監視から定期ポーリング。
-
-- `GET /api/readyz`
-  - 目的: 初期化が完了し、リクエストを受け付けられる状態かを判定するレディネスチェック。
-  - 実装: 起動時の初期ロード（設定読み込み、キャッシュウォーム、バックグラウンドジョブ初期化など）が完了していれば 200/`{"status":"ready"}`、未完了の場合は 503/`{"status":"starting"}` を返す。
-  - 運用: ロードバランサや Kubernetes `readinessProbe` から利用し、503 を受け取った場合はトラフィックを振らない。
-
-レスポンスボディは JSON 固定とし、追加メタデータ（ビルド番号やチェック項目）は `meta` フィールドで拡張する。API 認証は不要だが、外部公開する環境では IP 制限やヘッダ検証を前段で行う。
-
-## テスト・CI への影響（メモ）
-
-- API 層追加後のユニットテスト/統合テスト戦略（未策定）
-- CI 上での lint / test 実行コマンドの拡張（TBD）
-- ブラウザ E2E テスト導入のタイミング検討
-
-## 未決事項 / ToDo
-
-- [ ] 認証・アクセス制御の方式を検討する
-- [ ] 本番ホスティング環境の候補を列挙する
-- [ ] データ移行のリハーサル手順を決める
-
-> このファイルは随時更新予定です。決定事項が固まり次第、各セクションを具体化していきます。
+本ドキュメントは現行実装を基準としつつ、将来の変更点を随時追記する。永続化や認証方式が決定した場合は、該当セクションを更新して整合性を保つこと。
