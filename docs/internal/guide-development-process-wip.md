@@ -29,8 +29,8 @@
 
 4. **クライアントサイド完結の実装フェーズ**  
    - 目的: 仕様に沿った実装を進めつつ、依然としてブラウザだけで成立する形を維持する。  
-   - 施策: `npm run dev` で webpack dev server を起動し、静的資産を配信。ブラウザのローカルストレージと in-memory ストアのみでデータを扱うことで、サーバー導入の誘惑を抑えつつ少しずつ複雑な挙動に近づけた。  
-   - 品質管理: このタイミングで ESLint を導入し、コードベースの整理と静的解析を開始。作業途中で中断しても再開しやすいよう、`docs/internal/DEVELOPER_NOTES.md` に TODO を書き出しテクニカルメモを集約。ブラウザ側では `projectStore` が `sessionStorage` を利用して状態を保持しており、Console ログを節目でチェックする習慣も維持した。
+  - 施策: `npm run dev` で webpack dev server を起動し、静的資産を配信。ブラウザの Web Storage（localStorage フォーカス、利用不可時は sessionStorage）と in-memory ストアのみでデータを扱うことで、サーバー導入の誘惑を抑えつつ少しずつ複雑な挙動に近づけた。  
+  - 品質管理: このタイミングで ESLint を導入し、コードベースの整理と静的解析を開始。作業途中で中断しても再開しやすいよう、`docs/internal/DEVELOPER_NOTES.md` に TODO を書き出しテクニカルメモを集約。ブラウザ側では `projectStore` が Web Storage（localStorage / sessionStorage）を利用して状態を保持しており、Console ログを節目でチェックする習慣も維持した。
    - 継続性の確保: ローカル HTML モックから Node.js ベースの開発へ移る際も、「すべて JavaScript で完結する」流れを崩さなかったため、当初候補に上がっていた Python サーバー案よりスムーズに段階移行できると判断した。
 
 ## 次のステップに向けて
@@ -40,5 +40,5 @@
 ### 次のステップに向けて (2)
 
 - 品質保証: React/webpack フェーズ用のテスト方針（ユニット/E2E）や CI での自動検証項目を洗い出す
-- 移行計画: ローカルストレージ (`sessionStorage`) を利用した現在の `projectStore` を、将来的に API / 永続ストアへ切り替える段階的プランを策定
+- 移行計画: ローカルストレージ（localStorage / sessionStorage）を利用した現在の `projectStore` を、将来的に API / 永続ストアへ切り替える段階的プランを策定
 - ツール候補: ESLint に続いて導入する型サポート（TypeScript 等）や自動ビルド/テストツールの候補を `docs/internal/DEVELOPER_NOTES.md` の TODO として記録する

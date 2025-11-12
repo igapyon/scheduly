@@ -36,7 +36,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 1.3 その他の運用メモ
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
-- 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
+- 現状はブラウザ `localStorage`（利用不可環境では `sessionStorage`）に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
 - `/api/metrics` で直近のアクセス統計（リクエスト数・平均応答時間・ルート別ステータス分布・最新エラー）を JSON で取得できる。簡易監視やローカル検証時に活用する。
@@ -114,6 +114,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Scheduly 参加者 => 参加者ごと の参加者サマリー活用メモ未回答者を抽出して個別フォローしましょう。 は不要。除去して。
 - 不具合: 参加者URLをもちいて別のブラウザから開くと参加者用の共有URLが無効です が表示される。おかしい。
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
+- Web Storage ヘルパー導入はやめて単純構成に戻す（localStorage/sessionStorage ハンドリングを直書きでよいか再検討）。
+- localStorage の利用をやめ、sessionStorage だけに戻す（別タブ同期は諦める前提で影響調査）。
+- ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
+- サービス層の driver/local/API 両対応を見直し、API 前提で `projectService` / `*_service` を簡素化（`createServiceDriver` や `runOptimisticUpdate` の抽象を整理）。
+- そもそも localモード不要かも。api モードだけでいいじゃん。
+- apiモードだけになったら不要になる処理やソースコードないかな？
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
@@ -140,7 +146,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 
 ### 優先度: 低
 - ICS 生成時に `VTIMEZONE` を自動挿入するなど、タイムゾーン情報の扱いを強化する（現状は `X-SCHEDULY-TZID` のみ）。
-- 現状は `sessionStorage` を利用したオンメモリ実装だが、本番を想定したサーバー側永続化（API 経由）へ移行する。
+- 現状は `localStorage`（フォールバックで `sessionStorage`）を利用したオンメモリ実装だが、本番を想定したサーバー側永続化（API 経由）へ移行する。
 - 履歴や監査ログを収集できる仕組みを導入する。
 - 主要画面のレスポンシブ対応を再検討し、モバイル表示を整備する。
  - 初回利用者向けのヘルプ／オンボーディング導線を整備する。

@@ -10,6 +10,7 @@
  */
 
 const { DEFAULT_TZID } = require("../shared/ical-utils");
+const { getPersistentStorage } = require("../shared/web-storage");
 
 const DEFAULT_PROJECT_ID = "demo-project";
 const DEFAULT_PROJECT_NAME = "";
@@ -166,22 +167,24 @@ const decodePathToken = (value) => {
 };
 
 const persistToStorage = () => {
-  if (typeof window === "undefined") return;
+  const storage = getPersistentStorage();
+  if (!storage) return;
   try {
     const payload = {};
     projectStore.forEach((state, projectId) => {
       payload[projectId] = state;
     });
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    storage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (error) {
     console.warn("[Scheduly] Failed to persist project store", error);
   }
 };
 
 const loadFromStorage = () => {
-  if (typeof window === "undefined") return;
+  const storage = getPersistentStorage();
+  if (!storage) return;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return;
     const payload = JSON.parse(raw);
     Object.entries(payload).forEach(([projectId, state]) => {

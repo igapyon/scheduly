@@ -17,7 +17,7 @@
 ## 2. データフローと主要サービス
 
 - 中心ストア: `projectStore`
-  - 役割: アプリ状態（プロジェクト、候補、参加者、回答）を保持（sessionStorage ベース）
+  - 役割: アプリ状態（プロジェクト、候補、参加者、回答）を保持（localStorage ベース。利用不可環境では sessionStorage へフォールバック）
   - 購読/通知: `projectStore.subscribe` による購読で派生データ再計算をトリガ
 
 - サービス層

@@ -6,6 +6,7 @@ const participantService = require("./participant-service");
 const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const { addSyncListener, emitSyncEvent } = require("./sync-events");
+const { getPersistentStorage } = require("../shared/web-storage");
 
 const randomProjectId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -34,9 +35,10 @@ const apiSyncState = {
 const SESSION_PROJECT_STORAGE_KEY = "scheduly:project-id";
 
 const getStoredSessionProjectId = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) return null;
+  const storage = getPersistentStorage();
+  if (!storage) return null;
   try {
-    return window.sessionStorage.getItem(SESSION_PROJECT_STORAGE_KEY);
+    return storage.getItem(SESSION_PROJECT_STORAGE_KEY);
   } catch (error) {
     console.warn("[Scheduly] Failed to read session project id", error);
     return null;
@@ -44,12 +46,13 @@ const getStoredSessionProjectId = () => {
 };
 
 const setStoredSessionProjectId = (projectId) => {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
+  const storage = getPersistentStorage();
+  if (!storage) return;
   try {
     if (projectId) {
-      window.sessionStorage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
+      storage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
     } else {
-      window.sessionStorage.removeItem(SESSION_PROJECT_STORAGE_KEY);
+      storage.removeItem(SESSION_PROJECT_STORAGE_KEY);
     }
   } catch (error) {
     console.warn("[Scheduly] Failed to write session project id", error);

@@ -1,6 +1,6 @@
 # Flow & API Sketch
 
-React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。ブラウザ側では `projectStore` がセッション単位のキャッシュ（sessionStorage）を持つが、**正規データは API サーバーが管理する**。トップページ (`/` や `/index.html`) にアクセスすると毎回新しい `projectId` が払い出され、発行済みトークンを知らない限り別セッションから同じプロジェクトを参照することはできない。
+React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。ブラウザ側では `projectStore` が Web Storage（localStorage / sessionStorage）にキャッシュを持つが、**正規データは API サーバーが管理する**。トップページ (`/` や `/index.html`) にアクセスすると毎回新しい `projectId` が払い出され、発行済みトークンを知らない限り別セッションから同じプロジェクトを参照することはできない。
 
 ## 1. 全体像
 
@@ -14,7 +14,7 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
   ├─ tallyService / summaryService で派生データ   │
   └─ projectStore.subscribeProjectState()         │
                                                   ▼
-                                        projectStore（オンメモリ + sessionStorage 永続化）
+                                        projectStore（オンメモリ + Web Storage 永続化）
                                                   │
                                                   └─ shared routeContext / derived tallies / icsText
 ```
@@ -27,7 +27,7 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
 
 ### 2.1 プロジェクト初期化と候補整備（管理者）
 
-1. `projectService.resolveProjectFromLocation()` でプロジェクト ID と `routeContext` を決定（ルートアクセス時は API 経由で新規プロジェクトを作成し、その ID を sessionStorage へ保存する。`/a/{token}` や `/p/{token}` にアクセスした場合はサーバーの shareTokens インデックスから該当プロジェクトを引き当てる）。
+1. `projectService.resolveProjectFromLocation()` でプロジェクト ID と `routeContext` を決定（ルートアクセス時は API 経由で新規プロジェクトを作成し、その ID を Web Storage へ保存する。`/a/{token}` や `/p/{token}` にアクセスした場合はサーバーの shareTokens インデックスから該当プロジェクトを引き当てる）。
 2. 新規作成時は `projectService.create()` → `projectStore.resetProject()` で初期状態を生成。`icsText` は空の VCALENDAR を前提に再計算される。
 3. 候補追加・更新は `scheduleService.addCandidate` / `updateCandidate` / `removeCandidate` が担い、処理後に `projectStore.replaceCandidates` と `tallyService.recalculate` を実行。ICS テキストは `scheduleService.persistCandidates()` 内で常に再生成され `projectStore` に保存される。
 4. 外部 ICS の取り込みは `scheduleService.replaceCandidatesFromImport()` を経由し、`UID` / `DTSTAMP` の差分を保ったまま候補一覧と `icsText` を更新。
@@ -132,7 +132,7 @@ projectService.subscribe(projectId, (state) => {
 
 ### 同期方式と競合処理
 
-- フロントは当面、ポーリングまたは画面リロードによる定期同期とする（※API 導入後の構成を想定した計画であり、現行 sessionStorage 実装では未対応）。初期フェーズでは WebSocket 等の常時接続は導入せず、UI 側は 30〜60 秒間隔で `GET /api/projects/:id` を呼び出して最新状態に追随する。参加者画面も回答送信後に `projectStore.rehydrateFromServer()`（仮称・未実装）でサーバー値へ寄せる。
+- フロントは当面、ポーリングまたは画面リロードによる定期同期とする（※API 導入後の構成を想定した計画であり、現行 Web Storage 実装では未対応）。初期フェーズでは WebSocket 等の常時接続は導入せず、UI 側は 30〜60 秒間隔で `GET /api/projects/:id` を呼び出して最新状態に追随する。参加者画面も回答送信後に `projectStore.rehydrateFromServer()`（仮称・未実装）でサーバー値へ寄せる。
 - API 層は各リソース（Participants/Candidates/Responses/ShareTokens/ProjectMeta）に `version` を持たせ、更新時にクライアントの `version` と比較する。差異がある場合は 409 を返却し、レスポンスに最新レコードを含める。
 - フロントは 409 を受けたらローカルの楽観更新をロールバックし（`projectStore.rollbackPending()` など）、直後に全体再取得を実行。UI 上では最新値を表示しつつ「最新データに更新しました。再入力してください。」等のトーストで利用者へ案内する。
 - 楽観更新ヘルパーはサービス層で共通化し、通信失敗時も同じロールバック→再取得→再入力促しのパターンを適用する。
