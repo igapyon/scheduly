@@ -1553,6 +1553,15 @@ useEffect(() => {
         </div>
       </header>
 
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2">
+          <span aria-hidden="true" className="mt-0.5">⚠️</span>
+          <p className="leading-relaxed">
+            このアプリはテスト公開中です。断りなく再起動され、保存していない内容が失われる場合がありますのでご注意ください。
+          </p>
+        </div>
+      </div>
+
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === "schedule" && (

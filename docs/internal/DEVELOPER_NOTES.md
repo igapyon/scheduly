@@ -109,23 +109,21 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
 - ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
-  - API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
-  - UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
+- API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
+- UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
- - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
- - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+- サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
+- `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
 - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
 - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
-- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ### 優先度: 中
  - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
@@ -141,11 +139,12 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 現状は `sessionStorage` を利用したオンメモリ実装だが、本番を想定したサーバー側永続化（API 経由）へ移行する。
 - 履歴や監査ログを収集できる仕組みを導入する。
 - 主要画面のレスポンシブ対応を再検討し、モバイル表示を整備する。
- - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
+- 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
 - InfoBadge / SectionCard の利用ガイドを本ドキュメントに整備（左列: `basis-0 grow min-w-0`、右列: `shrink-0`、テキスト: `break-words` の原則）。
- - 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+- 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ---
 
