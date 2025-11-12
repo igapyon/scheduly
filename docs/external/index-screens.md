@@ -11,7 +11,7 @@ Scheduly の UI は次の 2 画面で構成されます。ここでは「何が�
 - ICS 個別／一括エクスポート、ICS インポートプレビュー
 - プロジェクト JSON のエクスポート／インポート
 - 共有 URL（管理者／参加者）生成と表示
-- API 連携（開発環境）: `window.__SCHEDULY_PROJECT_DRIVER__ = "api"; window.__SCHEDULY_API_BASE_URL__ = "http://localhost:4000";` をコンソールで設定すると、サーバーとの同期挙動を確認できる。
+- API 連携（開発環境）: `window.__SCHEDULY_API_BASE_URL__ = "http://localhost:4000";` をコンソールで設定すると、ローカルで起動した API サーバーとの同期挙動を確認できる。
   
 ![管理画面のスクリーンショット](../screenshot/scheduly-admin-screenshot.png)
   

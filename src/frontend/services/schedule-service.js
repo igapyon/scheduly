@@ -7,7 +7,6 @@ const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
 const { candidateInputSchema, collectZodIssueFields } = require("../../shared/schema");
-const { createServiceDriver } = require("./service-driver");
 const { emitMutationEvent } = require("./sync-events");
 
 const {
@@ -527,27 +526,10 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
   });
 };
 
-const scheduleDriver = createServiceDriver({
-  local: {
-    addCandidate: (projectId) => Promise.resolve(localAddCandidate(projectId)),
-    updateCandidate: (projectId, candidateId, nextCandidate) =>
-      Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate)),
-    removeCandidate: (projectId, candidateId) => Promise.resolve(localRemoveCandidate(projectId, candidateId))
-  },
-  api: {
-    addCandidate: apiAddCandidate,
-    updateCandidate: apiUpdateCandidate,
-    removeCandidate: apiRemoveCandidate
-  }
-});
-
-const addCandidate = (projectId) => scheduleDriver.run("addCandidate", projectId);
+const addCandidate = (projectId) => apiAddCandidate(projectId);
 const updateCandidate = (projectId, candidateId, nextCandidate) =>
-  scheduleDriver.run("updateCandidate", projectId, candidateId, nextCandidate);
-const removeCandidate = (projectId, candidateId) => scheduleDriver.run("removeCandidate", projectId, candidateId);
-
-const setScheduleServiceDriver = (driverName) => scheduleDriver.setDriverOverride(driverName);
-const clearScheduleServiceDriver = () => scheduleDriver.clearDriverOverride();
+  apiUpdateCandidate(projectId, candidateId, nextCandidate);
+const removeCandidate = (projectId, candidateId) => apiRemoveCandidate(projectId, candidateId);
 
 module.exports = {
   addCandidate,
@@ -557,9 +539,7 @@ module.exports = {
   exportCandidateToIcs,
   createBlankCandidate,
   createCandidateFromVevent,
-  replaceCandidatesFromImport,
-  setScheduleServiceDriver,
-  clearScheduleServiceDriver
+  replaceCandidatesFromImport
 };
 const notifyCandidateMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;

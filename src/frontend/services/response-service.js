@@ -6,7 +6,6 @@ const apiClient = require("./api-client");
 const projectService = require("./project-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { responseInputSchema, collectZodIssueFields } = require("../../shared/schema");
-const { createServiceDriver } = require("./service-driver");
 const { emitMutationEvent } = require("./sync-events");
 
 const VALID_MARKS = new Set(["o", "d", "x", "pending"]);
@@ -72,41 +71,6 @@ const getResponse = (projectId, participantId, candidateId) => {
   const responses = projectStore.getResponses(projectId);
   const id = buildResponseId(participantId, candidateId);
   return responses.find((item) => item && item.id === id) || null;
-};
-
-const localUpsertResponse = (projectId, payload) => {
-  if (!payload || !payload.participantId || !payload.candidateId) {
-    throw new Error("participantId and candidateId are required");
-  }
-  const parsed = parseResponseInput({
-    participantId: payload.participantId,
-    candidateId: payload.candidateId,
-    mark: payload.mark || "",
-    comment: payload.comment || ""
-  });
-  const candidateList = projectStore.getCandidates(projectId);
-  if (candidateList && !candidateList.some((item) => item.id === parsed.candidateId)) {
-    throw new Error("candidate not found");
-  }
-
-  const responses = projectStore.getResponses(projectId);
-  const id = buildResponseId(parsed.participantId, parsed.candidateId);
-  const existing = responses.find((item) => item && item.id === id);
-  const timestamp = new Date().toISOString();
-  const createdAt = payload?.createdAt || (existing && existing.createdAt) || timestamp;
-  const updatedAt = payload?.updatedAt || timestamp;
-  const response = {
-    id,
-    participantId: parsed.participantId,
-    candidateId: parsed.candidateId,
-    mark: normalizeMark(parsed.mark),
-    comment: parsed.comment || "",
-    createdAt,
-    updatedAt
-  };
-  projectStore.upsertResponse(projectId, response);
-  tallyService.recalculate(projectId, parsed.candidateId);
-  return response;
 };
 
 const apiUpsertResponse = async (projectId, payload) => {
@@ -188,19 +152,7 @@ const apiUpsertResponse = async (projectId, payload) => {
   return response;
 };
 
-const responseDriver = createServiceDriver({
-  local: {
-    upsertResponse: localUpsertResponse
-  },
-  api: {
-    upsertResponse: apiUpsertResponse
-  }
-});
-
-const upsertResponse = (projectId, payload) => responseDriver.run("upsertResponse", projectId, payload);
-
-const setResponseServiceDriver = (driverName) => responseDriver.setDriverOverride(driverName);
-const clearResponseServiceDriver = () => responseDriver.clearDriverOverride();
+const upsertResponse = (projectId, payload) => apiUpsertResponse(projectId, payload);
 
 const bulkImportResponses = (projectId, list) => {
   if (!Array.isArray(list) || list.length === 0) return [];
@@ -251,9 +203,7 @@ module.exports = {
   getResponse,
   upsertResponse,
   bulkImportResponses,
-  clearResponsesForParticipant,
-  setResponseServiceDriver,
-  clearResponseServiceDriver
+  clearResponsesForParticipant
 };
 const notifyResponseMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;

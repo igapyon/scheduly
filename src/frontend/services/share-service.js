@@ -4,12 +4,9 @@ const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
 const { emitMutationEvent } = require("./sync-events");
-const { createServiceDriver } = require("./service-driver");
 
 const { createLogger } = sharedIcalUtils;
 
-const TOKEN_LENGTH = 32;
-const BASE62_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const SHARE_TOKEN_TYPES = ["admin", "participant"];
 const URL_PREFIX = {
   admin: "a",
@@ -45,18 +42,6 @@ const isPlaceholderToken = (token) => typeof token === "string" && token.startsW
 
 const hasUsableEntry = (entry) => entry && typeof entry === "object" && isNonEmptyString(entry.token) && !isPlaceholderToken(entry.token);
 
-const shareEntriesEqual = (a, b) => {
-  if (!a && !b) return true;
-  if (!a || !b) return false;
-  return (
-    a.token === b.token &&
-    (a.url || "") === (b.url || "") &&
-    (a.issuedAt || "") === (b.issuedAt || "") &&
-    (a.revokedAt || "") === (b.revokedAt || "") &&
-    (a.lastGeneratedBy || "") === (b.lastGeneratedBy || "")
-  );
-};
-
 const getWindowOrigin = () => {
   if (typeof window === "undefined" || !window.location) return null;
   return window.location.origin;
@@ -81,44 +66,12 @@ const sanitizeBaseUrl = (rawBaseUrl) => {
   }
 };
 
-const generateBase62Token = (length = TOKEN_LENGTH) => {
-  const alphabetLength = BASE62_ALPHABET.length;
-  const result = [];
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const values = new Uint32Array(length);
-    crypto.getRandomValues(values);
-    for (let i = 0; i < length; i += 1) {
-      result.push(BASE62_ALPHABET[values[i] % alphabetLength]);
-    }
-  } else {
-    for (let i = 0; i < length; i += 1) {
-      const randomIndex = Math.floor(Math.random() * alphabetLength);
-      result.push(BASE62_ALPHABET[randomIndex]);
-    }
-  }
-  return result.join("");
-};
-
 const buildUrl = (type, token, baseUrl) => {
   if (!isNonEmptyString(token)) return "";
   const prefix = URL_PREFIX[type];
   if (!prefix) throw new Error(`Unknown share token type: ${type}`);
   const normalizedBase = trimTrailingSlash(baseUrl || DEFAULT_BASE_URL);
   return `${normalizedBase}/${prefix}/${token}`;
-};
-
-const createShareTokenEntry = (type, baseUrl, lastGeneratedBy) => {
-  const token = generateBase62Token();
-  const issuedAt = new Date().toISOString();
-  const entry = {
-    token,
-    url: buildUrl(type, token, baseUrl),
-    issuedAt
-  };
-  if (isNonEmptyString(lastGeneratedBy)) {
-    entry.lastGeneratedBy = lastGeneratedBy;
-  }
-  return entry;
 };
 
 const applyBaseUrlToEntry = (type, entry, baseUrl) => {
@@ -187,60 +140,6 @@ const applyApiTokens = (projectId, tokens, version, baseUrl) => {
 const get = (projectId) => {
   const tokens = projectStore.getShareTokens(projectId);
   return cloneTokens(tokens);
-};
-
-const localGenerate = (projectId, options = {}) => {
-  const baseUrl = sanitizeBaseUrl(options.baseUrl);
-  const currentTokens = projectStore.getShareTokens(projectId);
-  const nextAdmin = hasUsableEntry(currentTokens.admin)
-    ? applyBaseUrlToEntry("admin", currentTokens.admin, baseUrl)
-    : createShareTokenEntry("admin", baseUrl, options.lastGeneratedBy);
-  const nextParticipant = hasUsableEntry(currentTokens.participant)
-    ? applyBaseUrlToEntry("participant", currentTokens.participant, baseUrl)
-    : createShareTokenEntry("participant", baseUrl, options.lastGeneratedBy);
-
-  const tokensChanged =
-    !shareEntriesEqual(currentTokens.admin, nextAdmin) ||
-    !shareEntriesEqual(currentTokens.participant, nextParticipant);
-
-  const storedTokens = tokensChanged
-    ? projectStore.updateShareTokens(projectId, { admin: nextAdmin, participant: nextParticipant })
-    : currentTokens;
-
-  const navigation = handleNavigation(storedTokens.admin, options);
-
-  return {
-    admin: cloneEntry(storedTokens.admin),
-    participant: cloneEntry(storedTokens.participant),
-    navigation
-  };
-};
-
-const localRotate = (projectId, options = {}) => {
-  const baseUrl = sanitizeBaseUrl(options.baseUrl);
-  const adminEntry = createShareTokenEntry("admin", baseUrl, options.lastGeneratedBy);
-  const participantEntry = createShareTokenEntry("participant", baseUrl, options.lastGeneratedBy);
-  const storedTokens = projectStore.updateShareTokens(projectId, {
-    admin: adminEntry,
-    participant: participantEntry
-  });
-  const navigation = handleNavigation(storedTokens.admin, options);
-  return {
-    admin: cloneEntry(storedTokens.admin),
-    participant: cloneEntry(storedTokens.participant),
-    navigation
-  };
-};
-
-const localInvalidate = (projectId, type) => {
-  if (!SHARE_TOKEN_TYPES.includes(type)) {
-    throw new Error(`Invalid share token type: ${type}`);
-  }
-  projectStore.updateShareTokens(projectId, (current) => {
-    const next = { ...current };
-    delete next[type];
-    return next;
-  });
 };
 
 const apiRotate = async (projectId, options = {}) => {
@@ -343,25 +242,9 @@ const apiInvalidate = async (projectId, type) => {
   });
 };
 
-const shareDriver = createServiceDriver({
-  local: {
-    generate: localGenerate,
-    rotate: localRotate,
-    invalidate: localInvalidate
-  },
-  api: {
-    generate: apiGenerate,
-    rotate: apiRotate,
-    invalidate: apiInvalidate
-  }
-});
-
-const generate = (projectId, options = {}) => shareDriver.run("generate", projectId, options);
-const rotate = (projectId, options = {}) => shareDriver.run("rotate", projectId, options);
-const invalidate = (projectId, type) => shareDriver.run("invalidate", projectId, type);
-
-const setShareServiceDriver = (driverName) => shareDriver.setDriverOverride(driverName);
-const clearShareServiceDriver = () => shareDriver.clearDriverOverride();
+const generate = (projectId, options = {}) => apiGenerate(projectId, options);
+const rotate = (projectId, options = {}) => apiRotate(projectId, options);
+const invalidate = (projectId, type) => apiInvalidate(projectId, type);
 
 module.exports = {
   get,
@@ -369,9 +252,7 @@ module.exports = {
   rotate,
   invalidate,
   buildUrl,
-  isPlaceholderToken,
-  setShareServiceDriver,
-  clearShareServiceDriver
+  isPlaceholderToken
 };
 const notifyShareMutation = (projectId, action, phase, error) => {
   if (!projectId) return;

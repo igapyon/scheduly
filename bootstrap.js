@@ -23,9 +23,6 @@ if (fs.existsSync(envPath)) {
     });
 }
 
-if (!process.env.SCHEDULY_PROJECT_DRIVER) {
-  process.env.SCHEDULY_PROJECT_DRIVER = 'local';
-}
 if (!process.env.SCHEDULY_API_BASE_URL) {
   process.env.SCHEDULY_API_BASE_URL = '';
 }

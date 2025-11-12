@@ -19,8 +19,7 @@
    - 選択肢: SQLite, PostgreSQL, Document Store など  
    - モックとの親和性を考慮して JSON 互換スキーマから検討
 3. **クライアントの段階移行**  
-   - Web Storage（localStorage / sessionStorage）への書き込み箇所をラップし、API 経由の fetch へ差し替え可能な構造を用意  
-   - 移行期間中は API とローカルストアを選択的に切り替えられるよう Feature Flag を検討
+   - Web Storage（localStorage / sessionStorage）への書き込み箇所をラップし、API 経由の fetch へ差し替え可能な構造を用意（現状は API 専用に統一済み）
 4. **ICS ワークフローへの組み込み（TBD）**  
    - ファイルアップロード/ダウンロードのハンドリング  
    - ICS の差分更新をサーバー側でどう管理するか

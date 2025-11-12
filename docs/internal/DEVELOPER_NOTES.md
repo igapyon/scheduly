@@ -41,14 +41,13 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
 - `/api/metrics` で直近のアクセス統計（リクエスト数・平均応答時間・ルート別ステータス分布・最新エラー）を JSON で取得できる。簡易監視やローカル検証時に活用する。
 - API サーバは `/api/healthz`（常時 200）と `/api/readyz`（起動直後のみ 503、それ以外は 200）で監視でき、すべてのリクエストに `X-Request-ID` と構造化ログを付与している。ログは JSON 1 行形式で `ts/level/msg/...` を含む。`SCHEDULY_API_BODY_LIMIT` で `express.json` の受信上限（既定: `256kb`）を変更できる。共有URLの基準は `SCHEDULY_SHARE_BASE_URL`（または `BASE_URL`）で上書きでき、未指定の場合はフロントエンドから渡された `baseUrl` を優先する。
-- フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) も API ドライバ時はサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
+- フロントエンドは常に API ドライバで動作する前提となった。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` だけを指定する。管理画面のプロジェクト名/説明更新は約600ms のディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) もサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
 - 共通のデータ型は `src/shared/types.ts` に TypeScript で集約している。フロント／サーバ双方で `@typedef {import('../shared/types')...}` を用い、プロジェクトスナップショットや共有トークン、候補・参加者の構造を参照する。
 
-### 1.4 サービスドライバの切り替え
-- `src/frontend/services/service-driver.js` に共通の driver セレクタを追加。`runtimeConfig.getProjectDriver()` の結果または個別オーバーライドで `local` / `api` を選択できる。
-- 参加者・回答・候補・共有トークンの各サービスは `createServiceDriver` で実装を束ね、`set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` をエクスポートしている。E2E や Storybook 等でモックしたい場合はこれらのフックを使って強制的に local/api を切り替える。
-- local driver は従来どおり `projectStore` を直接操作し、API driver は `apiClient` 経由の fetch + 楽観更新を行う。UI から見た場合はいずれも同じ Promise ベースのインターフェースとなる。
-- `src/frontend/services/sync-events.js` でサーバー同期イベント（`scope: 'snapshot' | 'meta' | 'mutation'` など）を一元配信する。React 側は `projectService.addSyncListener`（内部で同イベントを再エクスポート）を購読しており、Admin/User 画面では初期スナップショット完了・競合によるロールバック・更新失敗をバナー／トーストで通知する。
+### 1.4 サービス層は API 専用
+- `src/frontend/services/service-driver.js` を廃止し、参加者・回答・候補・共有トークン等はすべて API 実装のみを提供する。E2E や Storybook でモックしたい場合は API サーバーをスタブ化するか、`projectStore` を直接差し替える。
+- これまで `set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` で切り替えていたフックは削除済み。ローカル専用ドライバは提供せず、`runOptimisticUpdate` によるローカル書き換え＋サーバー同期で一貫させる。
+- `src/frontend/services/sync-events.js` は継続して利用し、`projectService.addSyncListener` からスナップショット完了・競合・エラーを購読する。UI バナーやトーストの仕様はこれまでと同じ。
 
 ---
 
@@ -117,9 +116,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - Web Storage ヘルパー導入はやめて単純構成に戻す（localStorage/sessionStorage ハンドリングを直書きでよいか再検討）。
 - localStorage の利用をやめ、sessionStorage だけに戻す（別タブ同期は諦める前提で影響調査）。
 - ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
-- サービス層の driver/local/API 両対応を見直し、API 前提で `projectService` / `*_service` を簡素化（`createServiceDriver` や `runOptimisticUpdate` の抽象を整理）。
-- そもそも localモード不要かも。api モードだけでいいじゃん。
-- apiモードだけになったら不要になる処理やソースコードないかな？
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
@@ -160,6 +156,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6.x Done（完了）
 
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
+- ローカルモード/サービスドライバを廃止し、フロントエンドを API 専用構成へ統一（`service-driver.js` 削除、各サービスの API 実装へ一本化）
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理

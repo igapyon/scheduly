@@ -6,7 +6,7 @@
 
 - 対象画面: 管理画面 (`src/frontend/admin.jsx`) の「共有URL」カード。
 - 対象機能: 「共有URLを生成」/「再発行」を押下した際に、管理者向け URL と参加者向け URL を管理・表示する処理。
-- 実装コンテキスト: API ドライバが有効な場合、共有トークンの正規値はサーバーに保存される。フロントの `projectStore` は Web Storage（localStorage / sessionStorage）を介して **ブラウザ内キャッシュ** を保持し、`shareService` がトークン生成・更新・URL 組み立てを担う。複数タブ／ウィンドウ間は `projectStore` の購読で同期される。
+- 実装コンテキスト: 現在は常に API ドライバで動作し、共有トークンの正規値はサーバーに保存される。フロントの `projectStore` は Web Storage（localStorage / sessionStorage）を介して **ブラウザ内キャッシュ** を保持し、`shareService` がトークン生成・更新・URL 組み立てを担う。複数タブ／ウィンドウ間は `projectStore` の購読で同期される。
 
 ## 2. Goals / Non-Goals
 
@@ -14,7 +14,7 @@
 - プロジェクトごとに一意な管理者トークン・参加者トークンを保持し、常に最新 URL を提示する。
 - `shareService.generate()` は既存の有効トークンを再利用しつつ、`baseUrl` やリダイレクト URL を整形して返す。未発行（プレースホルダー）の場合のみ新規生成する。
 - `shareService.rotate()` は明示的に再発行し、旧トークンを即時無効化する。
-- `projectStore.updateShareTokens()` は Web Storage のキャッシュを更新すると同時に、API ドライバ時はサーバー側トークンを即座に書き換える。ブラウザを閉じた後に同じ管理 URL を開けるのは、トークンがサーバーに保存されている場合に限られる。
+- `projectStore.updateShareTokens()` は Web Storage のキャッシュを更新すると同時に、サーバー側トークンを即座に書き換える。ブラウザを閉じた後に同じ管理 URL を開けるのは、トークンがサーバーに保存されている場合に限られる。
 - トークン情報を `ShareTokenEntry` として管理し、`issuedAt` / `lastGeneratedBy` / `revokedAt` といったメタデータを拡張しやすくする。
 - `baseUrl` の sanitize とクロスオリジン遷移の防止を実装し、安全な自動遷移を保証する。
 - React コンポーネント側はサービスから返るステートを表示・コピーボタンに渡すだけにし、責務を軽量化する。
@@ -38,7 +38,7 @@
 | 参加者トークン (`participantToken`) | 参加者へ共有する秘密トークン。URL は `https://scheduly.app/p/{participantToken}` または `baseUrl/p/{participantToken}`。旧称「閲覧トークン」。 |
 | Share Link | 管理者・参加者それぞれの URL 全体。 |
 | `ShareTokenEntry` | `token` / `url` / `issuedAt`（ISO8601）と、必要に応じて `lastGeneratedBy` / `revokedAt` を保持するレコード。 |
-| プレースホルダートークン | `demo-` で始まるダミー値。API ドライバがサーバーからプレースホルダーを受け取った場合のみ発生し、UI では「–– 未発行 ––」表示として扱う。ローカルドライバやデモインポート後は通常プロジェクトとして扱う。 |
+| プレースホルダートークン | `demo-` で始まるダミー値。API からプレースホルダーを受け取った場合のみ発生し、UI では「–– 未発行 ––」表示として扱う。デモインポート後は通常プロジェクトとして扱う。 |
 | `shareService` | トークン取得・生成・再発行・URL 組み立て・自動遷移を担うサービス層。 |
 
 ## 4. User Stories
@@ -53,7 +53,7 @@
 
 ### 5.1 初期状態
 - `project.project.shareTokens` に `ShareTokenEntry` が存在しない、またはプレースホルダーのみの場合は「未発行」表示とし、コピー操作を無効化する。
-- API ドライバ初期化時はサーバー側のダミー `demo-*` トークンが返る場合があるため、UI は `shareService.isPlaceholderToken()` で未発行扱いにする（ローカルドライバは常に空のトークンセットで開始する）。
+- 初期化時はサーバー側のダミー `demo-*` トークンが返る場合があるため、UI は `shareService.isPlaceholderToken()` で未発行扱いにする。
 - ブラウザ内で発行済みのトークンは localStorage から復元されるが、ストレージをクリアしたりシークレットウィンドウ（localStorage 無効）でアクセスすると新しい `projectId` が払い出され、以前のトークンは表示されない（`/a/{token}` でアクセスした場合のみサーバーから該当プロジェクトが読み込まれる）。
 
 ### 5.2 トークン生成（`shareService.generate`）
@@ -101,7 +101,7 @@ project.project.shareTokens = {
 ```
 
 - `projectStore` は `normalizeShareTokens()` で入力を正規化し、プレースホルダーや空文字を除外する。
-- キャッシュは localStorage（利用不可時は sessionStorage：キー `scheduly:project-store` と、プロジェクト ID 追跡用の `scheduly:project-id`）に保存され、再読込時に `ensureProjectStateShape` を通じて復元・検証される。API ドライバ時はサーバーからの最新スナップショットで上書きされる。
+- キャッシュは localStorage（利用不可時は sessionStorage：キー `scheduly:project-store` と、プロジェクト ID 追跡用の `scheduly:project-id`）に保存され、再読込時に `ensureProjectStateShape` を通じて復元・検証される。サーバーからの最新スナップショットで随時上書きされる。
 - `shareTokenIndex` によりトークン → プロジェクトの逆引きを保持し、`/a/{token}` などからのルーティングに利用する。
 
 ## 7. Service API Surface
