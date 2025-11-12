@@ -1944,19 +1944,19 @@ const executeShareLinkAction = async () => {
                 {metaSyncErrorMessage}
               </div>
             )}
-        {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={handleManualRefresh}
-          disabled={!projectId || snapshotStatus.phase === "refreshing" || snapshotStatus.phase === "loading"}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-base text-zinc-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="最新状態に更新"
-        >
-          <span aria-hidden="true">🔄</span>
-        </button>
-        <button
+            {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={!projectId || snapshotStatus.phase === "refreshing" || snapshotStatus.phase === "loading"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-base text-zinc-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="最新状態に更新"
+            >
+              <span aria-hidden="true">🔄</span>
+            </button>
+            <button
               type="button"
               onClick={handleOpenParticipantView}
               disabled={!participantShareReady}
@@ -1976,6 +1976,15 @@ const executeShareLinkAction = async () => {
         )}
       </header>
 
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2">
+          <span aria-hidden="true" className="mt-0.5">⚠️</span>
+          <p className="leading-relaxed">
+            このアプリはテスト公開中です。断りなく再起動され、保存していない内容が失われる場合がありますのでご注意ください。
+          </p>
+        </div>
+      </div>
+      
       <div className="grid flex-1 gap-5">
 
         <main className="space-y-5" style={{ contain: "inline-size" }}>
