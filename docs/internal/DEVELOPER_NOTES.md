@@ -109,8 +109,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
-- 確認ダイアログで「CREATE」などと入力させる際に iPhone だと１文字打つたびに2文字入力される。日本語独自の問題の可能性。
-- Scheduly 参加者画面の日程ごとタブにおいて○△×の集計結果がおかしい場合がある。再現性は確定できていない。
+- 参加者ごと で 最終更新、がおかしい、というかハードコード？
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
 - ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
