@@ -14,7 +14,7 @@ Scheduly の内部仕様・運用ドキュメントを読むための入口で�
 - 共有 URL 仕様: `docs/internal/spec-share-url-generation.md`
 - バリデーション方針: `docs/internal/spec-validation-policy.md`
 - ICS 内部仕様: `docs/internal/spec-ical-internals.md`
-- 開発プロセス: `docs/internal/guide-development-process-wip.md`
+- 開発プロセス: `docs/internal/guide-development-process.md`
 - QA / 目視確認手順: `docs/internal/ref-verify-checklist.md`
 
 ## 文書間の関係（概要）
