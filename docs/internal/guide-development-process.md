@@ -1,4 +1,4 @@
-# Development Process (WIP)
+# Development Process
 
 この文書は、Scheduly の開発プロセス定義を示す内部向けガイドです。現在の開発を通じて継続的に更新する WIP 文書です。歴史的経緯の要素も含みますが、原則として「今の進め方」を第一に記載します。
 
@@ -29,16 +29,19 @@
 
 4. **クライアントサイド完結の実装フェーズ**  
    - 目的: 仕様に沿った実装を進めつつ、依然としてブラウザだけで成立する形を維持する。  
-  - 施策: `npm run dev` で webpack dev server を起動し、静的資産を配信。ブラウザの `sessionStorage` と in-memory ストアのみでデータを扱うことで、サーバー導入の誘惑を抑えつつ少しずつ複雑な挙動に近づけた。  
-  - 品質管理: このタイミングで ESLint を導入し、コードベースの整理と静的解析を開始。作業途中で中断しても再開しやすいよう、`docs/internal/DEVELOPER_NOTES.md` に TODO を書き出しテクニカルメモを集約。ブラウザ側では `projectStore` が `sessionStorage` を利用して状態を保持しており、Console ログを節目でチェックする習慣も維持した。
+   - 施策: `npm run dev` で webpack dev server を起動し、静的資産を配信。ブラウザの `sessionStorage` と in-memory ストアのみでデータを扱うことで、サーバー導入の誘惑を抑えつつ少しずつ複雑な挙動に近づけた。
+   - 品質管理: このタイミングで ESLint を導入し、コードベースの整理と静的解析を開始。作業途中で中断しても再開しやすいよう、`docs/internal/DEVELOPER_NOTES.md` に TODO を書き出しテクニカルメモを集約。ブラウザ側では `projectStore` が `sessionStorage` を利用して状態を保持しており、Console ログを節目でチェックする習慣も維持した。
    - 継続性の確保: ローカル HTML モックから Node.js ベースの開発へ移る際も、「すべて JavaScript で完結する」流れを崩さなかったため、当初候補に上がっていた Python サーバー案よりスムーズに段階移行できると判断した。
 
-## 次のステップに向けて
+5. **クライアントサーバー型への転換**  
+   - 目的: 共有URLの真正性や回答反映の整合性を高め、ブラウザのみの揮発的ストアから、API サーバーを正面に据えた構成へ移行する。  
+   - 施策: Express 製 in-memory API (`npm run api:dev`) を常時起動し、`SCHEDULY_API_BASE_URL` でフロントと接続。`projectService` から local driver を撤去し、作成/共有/参加者/回答をすべて API ルート経由に統一した。フォールバック用のデモ state や Web Storage ヘルパーも削ぎ落とし、`sessionStorage` には直近セッションのメタ情報のみを持たせるシンプルな構造に整理。  
+   - 品質管理: API 連携後も ESLint と Console ログ監視を続けつつ、`projectStore` の同期イベントと `tallyService.recalculate` をホットループ化。共有 URL の再発行、回答更新、ICS インポート後のサマリー反映を API 主導で確認できるようにし、`docs/internal/DEVELOPER_NOTES.md` に検証手順を追加。  
+   - 継続性の確保: すべて JavaScript（React + webpack + Express）で揃えているため、Sakura VPS へのデプロイや `npm run api:dev` / `npm run dev` の二重起動も統一的な手順で扱えるようになった。
 
-サーバー連携や永続化を導入する際は、上記フェーズで得た知見を土台に、API 設計・ストレージ選定・CI/CD 体制の整備へ進む想定。モックで培った UI/仕様の一貫性を崩さず、段階的にバックエンド機能を取り込む。
+### 今後に向けたメモ
 
-### 次のステップに向けて (2)
-
-- 品質保証: React/webpack フェーズ用のテスト方針（ユニット/E2E）や CI での自動検証項目を洗い出す
-- 移行計画: `sessionStorage` を利用した現在の `projectStore` を、将来的に API / 永続ストアへ切り替える段階的プランを策定
-- ツール候補: ESLint に続いて導入する型サポート（TypeScript 等）や自動ビルド/テストツールの候補を `docs/internal/DEVELOPER_NOTES.md` の TODO として記録する
+- **品質保証**: React/webpack フェーズ用のテスト方針（ユニット/E2E）と CI 上で回す自動検証を具体化する。  
+- **永続化ロードマップ**: `sessionStorage` に依存している `projectStore` を、API 経由での永続ストア（例: SQLite/PostgreSQL）へ段階的に移行するプランを策定。  
+- **自動化ツール**: ESLint・typecheck に続き、型安全性向上（TypeScript 化）やビルド/テストの自動化を進める。  
+- **運用監視**: `/api/metrics` や `journalctl` ログを活かした軽量なアラート設計、Certbot 更新監視など、VPS 運用で必要になるタスクを TODO に落とし込む。

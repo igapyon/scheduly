@@ -10,17 +10,17 @@ Scheduly の内部仕様・運用ドキュメントを読むための入口で�
 
 ## フロー別の参照先
 - 画面の技術詳細: `docs/internal/ref-screen-tech-overview.md`
-- サーバー連携計画 (WIP): `docs/internal/spec-server-integration-wip.md`
+- サーバー連携計画: `docs/internal/spec-server-integration.md`
 - 共有 URL 仕様: `docs/internal/spec-share-url-generation.md`
 - バリデーション方針: `docs/internal/spec-validation-policy.md`
 - ICS 内部仕様: `docs/internal/spec-ical-internals.md`
-- 開発プロセス: `docs/internal/guide-development-process-wip.md`
+- 開発プロセス: `docs/internal/guide-development-process.md`
 - QA / 目視確認手順: `docs/internal/ref-verify-checklist.md`
 
 ## 文書間の関係（概要）
 - `spec-data-model.md` を中心に `spec-api-flow.md` や `spec-share-url-generation.md` が依存。
 - `ref-screen-tech-overview.md` は UI 関連 spec の補足資料として参照。
-- `spec-server-integration-wip.md` は現行のオンメモリ構成からサーバー連携へ移行する際の前提をまとめており、`spec-data-model.md` の永続化方針とリンク。
+- `spec-server-integration.md` は現行のオンメモリ構成からサーバー連携へ移行する際の前提をまとめており、`spec-data-model.md` の永続化方針とリンク。
 
 ## 日々の参考資料
 - 作業状況や TODO: `docs/internal/DEVELOPER_NOTES.md`
