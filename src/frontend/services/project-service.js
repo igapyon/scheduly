@@ -2,27 +2,8 @@
 
 const { DEFAULT_TZID } = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
-const participantService = require("./participant-service");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const { addSyncListener, emitSyncEvent } = require("./sync-events");
-
-const randomProjectId = () => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `project-${crypto.randomUUID()}`;
-  }
-  const seed = Math.random().toString(36).slice(2, 10);
-  return `project-${Date.now().toString(36)}-${seed}`;
-};
-
-const ensureProjectId = (projectId) => {
-  if (typeof projectId === "string" && projectId.trim()) {
-    return projectId.trim();
-  }
-  return projectStore.getDefaultProjectId();
-};
-
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
 const apiSyncState = {
   readyProjects: new Set(),
@@ -33,10 +14,18 @@ const apiSyncState = {
 
 const SESSION_PROJECT_STORAGE_KEY = "scheduly:project-id";
 
+const getSessionStorage = () => {
+  if (typeof window === "undefined" || !window.sessionStorage) {
+    return null;
+  }
+  return window.sessionStorage;
+};
+
 const getStoredSessionProjectId = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) return null;
+  const storage = getSessionStorage();
+  if (!storage) return null;
   try {
-    return window.sessionStorage.getItem(SESSION_PROJECT_STORAGE_KEY);
+    return storage.getItem(SESSION_PROJECT_STORAGE_KEY);
   } catch (error) {
     console.warn("[Scheduly] Failed to read session project id", error);
     return null;
@@ -44,12 +33,13 @@ const getStoredSessionProjectId = () => {
 };
 
 const setStoredSessionProjectId = (projectId) => {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
+  const storage = getSessionStorage();
+  if (!storage) return;
   try {
     if (projectId) {
-      window.sessionStorage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
+      storage.setItem(SESSION_PROJECT_STORAGE_KEY, projectId);
     } else {
-      window.sessionStorage.removeItem(SESSION_PROJECT_STORAGE_KEY);
+      storage.removeItem(SESSION_PROJECT_STORAGE_KEY);
     }
   } catch (error) {
     console.warn("[Scheduly] Failed to write session project id", error);
@@ -193,71 +183,6 @@ const handleMetaValidationFailure = (projectId, issues) => {
 
 // --- Local driver helpers --------------------------------------------------
 
-const localCreate = (payload = {}) => {
-  const projectId = payload.projectId || randomProjectId();
-  const base = projectStore.resetProject(projectId);
-  const nextMeta = {
-    name: typeof payload.name === "string" ? payload.name : base.project.name,
-    description: typeof payload.description === "string" ? payload.description : base.project.description,
-    defaultTzid: typeof payload.defaultTzid === "string" ? payload.defaultTzid : base.project.defaultTzid
-  };
-  projectStore.updateProjectMeta(projectId, nextMeta);
-  return {
-    projectId,
-    state: projectStore.getProjectStateSnapshot(projectId)
-  };
-};
-
-const localLoad = (identifier = null) => {
-  if (!identifier) {
-    const projectId = projectStore.getDefaultProjectId();
-    return {
-      projectId,
-      state: projectStore.getProjectStateSnapshot(projectId)
-    };
-  }
-  const lookupKey = String(identifier).trim();
-  const shareTypes = ["admin", "participant"];
-  for (let i = 0; i < shareTypes.length; i += 1) {
-    const match = projectStore.findProjectByShareToken(shareTypes[i], lookupKey);
-    if (match) {
-      return {
-        projectId: match.projectId,
-        state: projectStore.getProjectStateSnapshot(match.projectId)
-      };
-    }
-  }
-  try {
-    const parsed = participantService.resolveByToken(lookupKey);
-    if (parsed && parsed.projectId) {
-      return {
-        projectId: parsed.projectId,
-        state: projectStore.getProjectStateSnapshot(parsed.projectId),
-        participantId: parsed.participantId
-      };
-    }
-  } catch (error) {
-    void error;
-  }
-  const projectId = ensureProjectId(lookupKey);
-  return {
-    projectId,
-    state: projectStore.getProjectStateSnapshot(projectId)
-  };
-};
-
-const localLoadByParticipantToken = (token) => {
-  if (!token) return null;
-  const match = participantService.resolveByToken(token);
-  if (!match) return null;
-  return {
-    projectId: match.projectId,
-    participantId: match.participantId,
-    participant: match.participant,
-    state: projectStore.getProjectStateSnapshot(match.projectId)
-  };
-};
-
 const localUpdateMeta = (projectId, changes) => {
   if (!projectId) throw new Error("projectId is required");
   return projectStore.updateProjectMeta(projectId, changes || {});
@@ -282,11 +207,6 @@ const getLocalMetaVersion = (projectId) => {
   const snapshot = projectStore.getProjectStateSnapshot(projectId);
   const version = snapshot?.versions?.metaVersion;
   return Number.isInteger(version) && version > 0 ? version : 1;
-};
-
-const localImportState = (projectId, payload) => {
-  if (!projectId) throw new Error("projectId is required");
-  return projectStore.importProjectState(projectId, payload);
 };
 
 const apiImportState = async (projectId, payload, { version } = {}) => {
@@ -314,11 +234,6 @@ const apiImportState = async (projectId, payload, { version } = {}) => {
   return projectStore.getProjectStateSnapshot(projectId);
 };
 
-const localReset = (projectId) => {
-  if (!projectId) throw new Error("projectId is required");
-  return projectStore.resetProject(projectId);
-};
-
 const apiReset = async (projectId) => {
   if (!projectId) throw new Error("projectId is required");
   const expectedVersion = getLocalMetaVersion(projectId);
@@ -332,23 +247,12 @@ const localSubscribe = (projectId, callback) => {
   return projectStore.subscribeProjectState(projectId, callback);
 };
 
-const localResolveProjectFromLocation = () => {
-  const projectId = projectStore.resolveProjectIdFromLocation();
-  return {
-    projectId,
-    state: projectStore.getProjectStateSnapshot(projectId),
-    routeContext: projectStore.getCurrentRouteContext()
-  };
-};
-
-const localGetRouteContext = () => projectStore.getCurrentRouteContext();
-
 const localGetState = (projectId) => projectStore.getProjectStateSnapshot(projectId);
 
 // --- API helpers -----------------------------------------------------------
 
 const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
-  if (!isApiEnabled() || !projectId) {
+  if (!projectId) {
     return Promise.resolve(null);
   }
   if (!force && apiSyncState.snapshotPromises.has(projectId)) {
@@ -390,7 +294,7 @@ const syncProjectSnapshot = (projectId, { force, reason } = {}) => {
 };
 
 const scheduleMetaSync = (projectId) => {
-  if (!isApiEnabled() || !projectId) return;
+  if (!projectId) return;
 
   if (!apiSyncState.readyProjects.has(projectId)) {
     syncProjectSnapshot(projectId, { reason: "meta-prereq" }).then(() => {
@@ -498,26 +402,11 @@ const apiCreate = async (payload = {}) => {
         state: projectStore.getProjectStateSnapshot(response.projectId)
       };
     }
+    throw new Error("Failed to create project via API");
   } catch (error) {
-    console.warn("[Scheduly] Failed to create project via API. Falling back to local driver.", error);
+    console.warn("[Scheduly] Failed to create project via API.", error);
+    throw error;
   }
-  return localCreate(payload);
-};
-
-const apiLoad = (identifier = null) => {
-  const result = localLoad(identifier);
-  if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
-  }
-  return result;
-};
-
-const apiLoadByParticipantToken = (token) => {
-  const result = localLoadByParticipantToken(token);
-  if (result && result.projectId) {
-    syncProjectSnapshot(result.projectId, { reason: "initial-load" });
-  }
-  return result;
 };
 
 const apiUpdateMeta = (projectId, changes) => {
@@ -595,15 +484,19 @@ const loadSessionProjectSnapshot = async (projectId) => {
 };
 
 const createFreshSessionProject = async () => {
-  const created = await apiCreate();
-  if (created && created.projectId) {
-    setStoredSessionProjectId(created.projectId);
-    projectStore.setRouteContext({ projectId: created.projectId, kind: "default" });
-    return {
-      projectId: created.projectId,
-      state: created.state || projectStore.getProjectStateSnapshot(created.projectId),
-      routeContext: projectStore.getCurrentRouteContext()
-    };
+  try {
+    const created = await apiCreate();
+    if (created && created.projectId) {
+      setStoredSessionProjectId(created.projectId);
+      projectStore.setRouteContext({ projectId: created.projectId, kind: "default" });
+      return {
+        projectId: created.projectId,
+        state: created.state || projectStore.getProjectStateSnapshot(created.projectId),
+        routeContext: projectStore.getCurrentRouteContext()
+      };
+    }
+  } catch (error) {
+    console.warn("[Scheduly] Falling back to default project after create failure", error);
   }
   const fallbackId = projectStore.getDefaultProjectId();
   projectStore.setRouteContext({ projectId: fallbackId, kind: "default" });
@@ -643,39 +536,23 @@ const apiSubscribe = (projectId, callback) => {
 
 // --- Public API ------------------------------------------------------------
 
-const create = (payload) => (isApiEnabled() ? apiCreate(payload) : localCreate(payload));
-
-const load = (identifier) => (isApiEnabled() ? apiLoad(identifier) : localLoad(identifier));
-
-const loadByParticipantToken = (token) =>
-  (isApiEnabled() ? apiLoadByParticipantToken(token) : localLoadByParticipantToken(token));
-
-const updateMeta = (projectId, changes) =>
-  (isApiEnabled() ? apiUpdateMeta(projectId, changes) : localUpdateMeta(projectId, changes));
+const updateMeta = (projectId, changes) => apiUpdateMeta(projectId, changes);
 
 const exportState = (projectId, options) => localExportState(projectId, options);
 
-const importState = (projectId, payload) =>
-  (isApiEnabled() ? apiImportState(projectId, payload) : localImportState(projectId, payload));
+const importState = (projectId, payload) => apiImportState(projectId, payload);
 
-const reset = (projectId) => (isApiEnabled() ? apiReset(projectId) : localReset(projectId));
+const reset = (projectId) => apiReset(projectId);
 
-const subscribe = (projectId, callback) =>
-  (isApiEnabled() ? apiSubscribe(projectId, callback) : localSubscribe(projectId, callback));
+const subscribe = (projectId, callback) => apiSubscribe(projectId, callback);
 
-const resolveProjectFromLocation = () =>
-  (isApiEnabled()
-    ? apiResolveProjectFromLocation()
-    : Promise.resolve(localResolveProjectFromLocation()));
+const resolveProjectFromLocation = () => apiResolveProjectFromLocation();
 
-const getRouteContext = () => localGetRouteContext();
+const getRouteContext = () => projectStore.getCurrentRouteContext();
 
 const isProjectReady = (projectId) => apiSyncState.readyProjects.has(projectId);
 
 module.exports = {
-  create,
-  load,
-  loadByParticipantToken,
   updateMeta,
   exportState,
   importState,
