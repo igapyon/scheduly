@@ -40,8 +40,6 @@ const cloneTokens = (tokens) => {
 
 const isPlaceholderToken = (token) => typeof token === "string" && token.startsWith("demo-");
 
-const hasUsableEntry = (entry) => entry && typeof entry === "object" && isNonEmptyString(entry.token) && !isPlaceholderToken(entry.token);
-
 const getWindowOrigin = () => {
   if (typeof window === "undefined" || !window.location) return null;
   return window.location.origin;
@@ -185,23 +183,7 @@ const apiRotate = async (projectId, options = {}) => {
   });
 };
 
-const apiGenerate = async (projectId, options = {}) => {
-  const baseUrl = sanitizeBaseUrl(options.baseUrl);
-  const currentTokens = projectStore.getShareTokens(projectId);
-  const hasAdmin = hasUsableEntry(currentTokens.admin);
-  const hasParticipant = hasUsableEntry(currentTokens.participant);
-  if (!hasAdmin || !hasParticipant) {
-    return apiRotate(projectId, { ...options, baseUrl });
-  }
-  const mapped = applyBaseUrlToTokens(currentTokens, baseUrl);
-  const storedTokens = projectStore.updateShareTokens(projectId, mapped);
-  const navigation = handleNavigation(storedTokens.admin, options);
-  return {
-    admin: cloneEntry(storedTokens.admin),
-    participant: cloneEntry(storedTokens.participant),
-    navigation
-  };
-};
+const apiGenerate = async (projectId, options = {}) => apiRotate(projectId, options);
 
 const apiInvalidate = async (projectId, type) => {
   if (!SHARE_TOKEN_TYPES.includes(type)) {
