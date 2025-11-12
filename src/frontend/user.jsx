@@ -28,7 +28,6 @@ void TypeConfirmationDialog;
 const DASHBOARD_META = {
   projectName: "秋の合宿 調整会議",
   description: "秋の合宿に向けた候補日を集約し、参加者と共有するためのプロジェクトです。",
-  deadline: "2025/05/01 23:59",
   lastUpdated: "2025/04/12 17:45"
 };
 
@@ -58,6 +57,29 @@ const MARK_SYMBOL = {
 function markBadgeClass(mark) {
   return MARK_BADGE[mark] ?? "inline-flex items-center justify-center rounded-full bg-zinc-200 text-zinc-600";
 }
+
+const EmptyParticipantCallout = ({ className = "", onAddParticipant } = {}) => (
+  <div className={`rounded-2xl border border-dashed border-emerald-200 bg-white/80 p-5 text-center ${className}`}>
+    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl">
+      👥
+    </div>
+    <p className="text-sm font-semibold text-zinc-800">まだ参加者がいません</p>
+    <p className="mt-2 text-xs text-zinc-500">まずは参加者を登録し、回答用リンクを共有しましょう。</p>
+    <div className="mt-4 flex flex-wrap justify-center">
+      <button
+        type="button"
+        disabled={!onAddParticipant}
+        className={`inline-flex items-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow transition ${
+          onAddParticipant ? "bg-emerald-600 hover:bg-emerald-700" : "bg-zinc-300 cursor-not-allowed"
+        }`}
+        onClick={onAddParticipant}
+      >
+        <span className="text-sm">＋</span> 参加者を新規登録
+      </button>
+    </div>
+  </div>
+);
+void EmptyParticipantCallout;
 
 function formatStatusBadge(status) {
   const info = STATUS_LABELS[status] || { label: status, badgeClass: "bg-zinc-100 text-zinc-600" };
@@ -1014,24 +1036,6 @@ useEffect(() => {
       return { participantId, scheduleId };
     });
   };
-  const EmptyParticipantCallout = ({ className = "" } = {}) => (
-    <div className={`rounded-2xl border border-dashed border-emerald-200 bg-white/80 p-5 text-center ${className}`}>
-      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl">
-        👥
-      </div>
-      <p className="text-sm font-semibold text-zinc-800">まだ参加者がいません</p>
-      <p className="mt-2 text-xs text-zinc-500">まずは参加者を登録し、回答用リンクを共有しましょう。</p>
-      <div className="mt-4 flex flex-wrap justify-center">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-emerald-700"
-          onClick={() => setParticipantDialogOpen(true)}
-        >
-          <span className="text-sm">＋</span> 参加者を新規登録
-        </button>
-      </div>
-    </div>
-  );
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -1116,6 +1120,30 @@ useEffect(() => {
   useEffect(() => {
     setInlineEditorTarget(null);
   }, [activeTab]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (!projectId) {
+      window.location.reload();
+      return;
+    }
+    if (!isApiDriver) {
+      window.location.reload();
+      return;
+    }
+    setSnapshotStatus({ phase: "refreshing", message: "サーバーから最新状態を取得しています…" });
+    try {
+      await projectService.syncProjectSnapshot(projectId, { force: true, reason: "manual_refresh" });
+      setSnapshotStatus({ phase: "ready", message: "" });
+      popToast("最新状態に更新しました。");
+    } catch (error) {
+      console.error("[Scheduly][user] manual refresh failed", error);
+      setSnapshotStatus({
+        phase: "error",
+        message: "最新状態の取得に失敗しました。時間を置いて再度お試しください。"
+      });
+      popToast("最新状態の取得に失敗しました。");
+    }
+  }, [projectId, isApiDriver, popToast]);
 
   const handleDownloadAllIcs = () => {
     if (!projectId) {
@@ -1487,12 +1515,20 @@ useEffect(() => {
             </h1>
             <p className="mt-2 text-sm text-zinc-600">プロジェクト「{projectName}」の日程と回答状況です。</p>
             {projectDescription && <p className="mt-1 text-xs text-zinc-500">{projectDescription}</p>}
-            <p className="mt-1 text-xs text-zinc-500">締切目安: {DASHBOARD_META.deadline}</p>
             <p className="mt-1 text-xs text-zinc-500">参加者数: {participantCount}</p>
             {snapshotBannerVisible && <div className={snapshotBannerClasses}>{snapshotStatus.message}</div>}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <button
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={!projectId || snapshotStatus.phase === "refreshing" || snapshotStatus.phase === "loading"}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-base text-zinc-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="最新状態に更新"
+        >
+          <span aria-hidden="true">🔄</span>
+        </button>
+        <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               onClick={() => {
@@ -1517,11 +1553,22 @@ useEffect(() => {
         </div>
       </header>
 
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2">
+          <span aria-hidden="true" className="mt-0.5">⚠️</span>
+          <p className="leading-relaxed">
+            このアプリはテスト公開中です。断りなく再起動され、保存していない内容が失われる場合がありますのでご注意ください。
+          </p>
+        </div>
+      </div>
+
       <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === "schedule" && (
         <section className="space-y-3">
-          {participants.length === 0 && <EmptyParticipantCallout className="mb-3" />}
+          {participants.length === 0 && (
+            <EmptyParticipantCallout className="mb-3" onAddParticipant={() => setParticipantDialogOpen(true)} />
+          )}
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-600">
             <span>日程ごとの回答サマリー</span>
             <InfoBadge
@@ -1546,13 +1593,15 @@ useEffect(() => {
             ))
           ) : (
             <>
-              <EmptyParticipantCallout />
+              <EmptyParticipantCallout onAddParticipant={() => setParticipantDialogOpen(true)} />
               {loadError && (
                 <span className="mt-3 block text-center text-[11px] text-rose-500">読み込みエラー: {loadError}</span>
               )}
             </>
           )}
-          {participants.length === 0 && schedules.length > 0 && <EmptyParticipantCallout className="mt-3" />}
+          {participants.length === 0 && schedules.length > 0 && (
+            <EmptyParticipantCallout className="mt-3" onAddParticipant={() => setParticipantDialogOpen(true)} />
+          )}
         </section>
       )}
 
@@ -1599,16 +1648,10 @@ useEffect(() => {
                 );
               })
             ) : (
-              <EmptyParticipantCallout />
+              <EmptyParticipantCallout onAddParticipant={() => setParticipantDialogOpen(true)} />
             )}
           </div>
 
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/70 p-4 text-xs text-zinc-500">
-            <p className="font-semibold text-zinc-600">参加者サマリー活用メモ</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>未回答者を抽出して個別フォローしましょう。</li>
-            </ul>
-          </div>
         </section>
       )}
 

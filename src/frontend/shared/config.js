@@ -4,7 +4,7 @@ const read = (key, fallback = "") => {
   try {
     const v = process.env[key];
     if (typeof v === "string" && v.length > 0) return v;
-  } catch (e) {
+  } catch {
     // ignore
   }
   return fallback;

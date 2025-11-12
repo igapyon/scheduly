@@ -41,14 +41,13 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
 - `/api/metrics` で直近のアクセス統計（リクエスト数・平均応答時間・ルート別ステータス分布・最新エラー）を JSON で取得できる。簡易監視やローカル検証時に活用する。
 - API サーバは `/api/healthz`（常時 200）と `/api/readyz`（起動直後のみ 503、それ以外は 200）で監視でき、すべてのリクエストに `X-Request-ID` と構造化ログを付与している。ログは JSON 1 行形式で `ts/level/msg/...` を含む。`SCHEDULY_API_BODY_LIMIT` で `express.json` の受信上限（既定: `256kb`）を変更できる。共有URLの基準は `SCHEDULY_SHARE_BASE_URL`（または `BASE_URL`）で上書きでき、未指定の場合はフロントエンドから渡された `baseUrl` を優先する。
-- フロントエンド側は `window.__SCHEDULY_PROJECT_DRIVER__ = "api"`（または `process.env.SCHEDULY_PROJECT_DRIVER=api`）で API ドライバを有効化できる。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` を指定する。API ドライバ有効時は管理画面のプロジェクト名/説明更新が約600msのディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) も API ドライバ時はサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
+- フロントエンドは常に API ドライバで動作する前提となった。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` だけを指定する。管理画面のプロジェクト名/説明更新は約600ms のディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) もサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
 - 共通のデータ型は `src/shared/types.ts` に TypeScript で集約している。フロント／サーバ双方で `@typedef {import('../shared/types')...}` を用い、プロジェクトスナップショットや共有トークン、候補・参加者の構造を参照する。
 
-### 1.4 サービスドライバの切り替え
-- `src/frontend/services/service-driver.js` に共通の driver セレクタを追加。`runtimeConfig.getProjectDriver()` の結果または個別オーバーライドで `local` / `api` を選択できる。
-- 参加者・回答・候補・共有トークンの各サービスは `createServiceDriver` で実装を束ね、`set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` をエクスポートしている。E2E や Storybook 等でモックしたい場合はこれらのフックを使って強制的に local/api を切り替える。
-- local driver は従来どおり `projectStore` を直接操作し、API driver は `apiClient` 経由の fetch + 楽観更新を行う。UI から見た場合はいずれも同じ Promise ベースのインターフェースとなる。
-- `src/frontend/services/sync-events.js` でサーバー同期イベント（`scope: 'snapshot' | 'meta' | 'mutation'` など）を一元配信する。React 側は `projectService.addSyncListener`（内部で同イベントを再エクスポート）を購読しており、Admin/User 画面では初期スナップショット完了・競合によるロールバック・更新失敗をバナー／トーストで通知する。
+### 1.4 サービス層は API 専用
+- `src/frontend/services/service-driver.js` を廃止し、参加者・回答・候補・共有トークン等はすべて API 実装のみを提供する。E2E や Storybook でモックしたい場合は API サーバーをスタブ化するか、`projectStore` を直接差し替える。
+- これまで `set*ServiceDriver('api'|'local')` / `clear*ServiceDriver()` で切り替えていたフックは削除済み。ローカル専用ドライバは提供せず、`runOptimisticUpdate` によるローカル書き換え＋サーバー同期で一貫させる。
+- `src/frontend/services/sync-events.js` は継続して利用し、`projectService.addSyncListener` からスナップショット完了・競合・エラーを購読する。UI バナーやトーストの仕様はこれまでと同じ。
 
 ---
 
@@ -110,20 +109,21 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
+- `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
+- `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
+- ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
-  - API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
-  - UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
+- API入出力および内部ストアは UTC 固定かつ ISO8601（例: `2025-11-05T10:00:00Z`）で統一し、受信時に UTC へ正規化して保存、送信時も UTC を返す。必要に応じてレスポンスに `defaultTzid` を含める。
+- UI 表示や入力フォームはプロジェクトの `defaultTzid`（例: `Asia/Tokyo`）またはユーザー選択 TZ でフォーマットし、表示と入力体験をローカルタイムで揃える。
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
-- About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
- - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
- - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
+- サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
+- `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
 - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
 - README に `.env.example` の利用方法（設定例と読み込み経路）を短く追記。
-- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ### 優先度: 中
  - 重要操作ログのラッパー導入（共有URL発行/回転、ICS入出力、回答upsert を構造化出力）
@@ -139,17 +139,22 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 現状は `sessionStorage` を利用したオンメモリ実装だが、本番を想定したサーバー側永続化（API 経由）へ移行する。
 - 履歴や監査ログを収集できる仕組みを導入する。
 - 主要画面のレスポンシブ対応を再検討し、モバイル表示を整備する。
- - 初回利用者向けのヘルプ／オンボーディング導線を整備する。
+- 初回利用者向けのヘルプ／オンボーディング導線を整備する。
 - `user.html` への直接アクセスを防ぎ、共有 URL（`/p/{token}`）経由のみ許可する仕組みを用意する。
 - ICS インポートプレビューで選択した候補だけを適用できるようにし、未選択候補は理由をログ／トースト表示する。
 - InfoBadge / SectionCard の利用ガイドを本ドキュメントに整備（左列: `basis-0 grow min-w-0`、右列: `shrink-0`、テキスト: `break-words` の原則）。
- - 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+- 参加者/管理の「サマリーをコピー」機能の仕様を詰める（目的、コピー形式、出力先、アクセス権）。決定までUIからは非表示。実装時は `src/frontend/user.jsx` の該当ボタンを復活し、共通ユーティリティへ切り出す。
+- ルートアクセス時に新しい `projectId` を発行し、shareTokens/ProjectState をプロジェクト単位で完全に隔離する。`/a/{token}` や `projectId` 明示指定でアクセスした場合にのみ既存 state を復元するようサーバ/API/ルーティングを改修する。
 
 ---
 
 ## 6.x Done（完了）
 
 - Tailwind を本番ビルドへ移行（PostCSS/CLI, 生成CSS適用, CDN警告解消）
+- sessionStorage でのみ状態を保持するよう `projectStore` / `projectService` を整理し、Web Storage ヘルパーと localStorage 依存を撤廃
+- ローカルモード/サービスドライバを廃止し、フロントエンドを API 専用構成へ統一（`service-driver.js` 削除、各サービスの API 実装へ一本化）
+- 参加者画面のダミー締切表示と「参加者サマリー活用メモ」を削除し、legacy モックも同様に整理
+- `projectStore` を単一 state (`currentProjectId`/`projectState`) で管理し、Map やトークン逆引きインデックスを廃止
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
 - サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
 - 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理

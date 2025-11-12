@@ -5,7 +5,6 @@ const apiClient = require("./api-client");
 const tallyService = require("./tally-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
-const { createServiceDriver } = require("./service-driver");
 const { emitMutationEvent } = require("./sync-events");
 
 const randomUUID = () => {
@@ -143,38 +142,6 @@ const updateParticipantsVersion = (projectId, version) => {
   if (Number.isInteger(version) && version >= 0) {
     projectStore.updateProjectVersions(projectId, { participantsVersion: version });
   }
-};
-
-const localAddParticipant = (projectId, payload) => {
-  const timestamp = new Date().toISOString();
-  const preferredId = payload?.id;
-  const id = preferredId && !doesParticipantExist(projectId, preferredId) ? preferredId : randomUUID();
-  const parsed = parseParticipantInput({
-    displayName: payload?.displayName || "",
-    email: payload?.email || "",
-    comment: payload?.comment || ""
-  });
-  const displayName = parsed.displayName;
-  if (isDuplicateDisplayName(projectId, displayName)) {
-    throw new Error("同じ表示名の参加者が既に存在します。別の名前を入力してください。");
-  }
-  const token = ensureUniqueToken(payload?.token, projectId, id);
-  const createdAt = payload?.createdAt || timestamp;
-  const updatedAt = payload?.updatedAt || timestamp;
-  const participant = {
-    id,
-    token,
-    displayName,
-    email: parsed.email || "",
-    comment: parsed.comment || "",
-    createdAt,
-    updatedAt,
-    version: 1,
-    status: payload?.status || "active"
-  };
-  projectStore.upsertParticipant(projectId, participant);
-  tallyService.recalculate(projectId);
-  return participant;
 };
 
 const apiAddParticipant = async (projectId, payload) => {
@@ -344,29 +311,12 @@ const apiRemoveParticipant = async (projectId, participantId) => {
   });
 };
 
-const participantDriver = createServiceDriver({
-  local: {
-    addParticipant: localAddParticipant,
-    updateParticipant: localUpdateParticipant,
-    removeParticipant: localRemoveParticipant
-  },
-  api: {
-    addParticipant: apiAddParticipant,
-    updateParticipant: apiUpdateParticipant,
-    removeParticipant: apiRemoveParticipant
-  }
-});
-
-const addParticipant = (projectId, payload) => participantDriver.run("addParticipant", projectId, payload);
+const addParticipant = (projectId, payload) => apiAddParticipant(projectId, payload);
 
 const updateParticipant = (projectId, participantId, changes) =>
-  participantDriver.run("updateParticipant", projectId, participantId, changes);
+  apiUpdateParticipant(projectId, participantId, changes);
 
-const removeParticipant = (projectId, participantId) =>
-  participantDriver.run("removeParticipant", projectId, participantId);
-
-const setParticipantServiceDriver = (driverName) => participantDriver.setDriverOverride(driverName);
-const clearParticipantServiceDriver = () => participantDriver.clearDriverOverride();
+const removeParticipant = (projectId, participantId) => apiRemoveParticipant(projectId, participantId);
 
 const bulkUpsertParticipants = (projectId, list) => {
   if (!Array.isArray(list) || list.length === 0) return [];
@@ -437,9 +387,7 @@ module.exports = {
   removeParticipant,
   bulkUpsertParticipants,
   resolveByToken,
-  getToken,
-  setParticipantServiceDriver,
-  clearParticipantServiceDriver
+  getToken
 };
 const notifyParticipantMutation = (projectId, action, phase, error, meta = {}) => {
   if (!projectId) return;
