@@ -285,6 +285,7 @@ const cloneResponses = (responses) => responses.map((item) => ({ ...item }));
 loadFromStorage();
 
 const ensureProjectEntry = () => {
+
   if (!projectStore.state) {
     projectStore.projectId = DEFAULT_PROJECT_ID;
     projectStore.state = createInitialProjectState(DEFAULT_PROJECT_ID);
