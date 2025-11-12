@@ -1,6 +1,6 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
-import { useEffect, useState, useId, useRef, Fragment, useCallback } from "react";
+import { useEffect, useState, useRef, Fragment, useCallback } from "react";
 import ReactDOM from "react-dom/client";
 
 import sharedIcalUtils from "./shared/ical-utils";
@@ -224,7 +224,6 @@ function CandidateCard({
   onRetryConflict
 }) {
   const open = Boolean(isOpen);
-  const dialogTitleId = useId();
   const displayMeta = candidateToDisplayMeta(value);
   const ignoreNextClickRef = useRef(false);
   const SUMMARY_MAX = 120;
@@ -1653,7 +1652,9 @@ const executeShareLinkAction = async () => {
       setCopied((prev) => ({ ...prev, [type]: true }));
       try {
         if (copiedTimersRef.current[type]) clearTimeout(copiedTimersRef.current[type]);
-      } catch (_) {}
+      } catch {
+        // ignore
+      }
       copiedTimersRef.current[type] = setTimeout(() => {
         setCopied((prev) => ({ ...prev, [type]: false }));
         copiedTimersRef.current[type] = null;
