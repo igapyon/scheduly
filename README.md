@@ -19,10 +19,13 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 > 参加者URLが第三者に漏れると誰でも回答を更新できるため、URL を知っている人のみがアクセスできる前提で運用してください。
 
 ## はじめに（ローカル動作）
-1) `npm install`
-2) `npm run dev`（http://localhost:5173）
-   - 管理者: `/index.html`、参加者: 管理者画面の 参加者URL
-3) 本番ビルド: `npm run build` → 静的資産コピー: `npm run postbuild`
+1) 依存を導入: `npm install`
+2) `.env` を作成し、API の URL を指定します（例: `SCHEDULY_API_BASE_URL=http://localhost:4000`）。
+3) API サーバーを起動: 別ターミナルで `npm run api:dev`（既定ポート: http://localhost:4000）。
+4) フロントエンドを起動: `npm run dev`（Webpack Dev Server が http://localhost:5173 をリッスン）。
+   - 管理者画面: `http://localhost:5173/index.html`（共有URL発行後は `/a/{token}` へ自動遷移）
+   - 参加者画面: 管理者画面で発行した参加者URL（例: `/p/{token}`）
+5) 本番ビルド: `npm run build` → 静的資産コピー `npm run postbuild`（`dist/` に配置）
 
 ## 基本の流れ（外部仕様・概要）
 以下のように、日程調整をすばやく効果的に実現できます。
