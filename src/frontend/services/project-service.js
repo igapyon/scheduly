@@ -4,7 +4,6 @@ const { DEFAULT_TZID } = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
 const apiClient = require("./api-client");
 const { addSyncListener, emitSyncEvent } = require("./sync-events");
-const { getPersistentStorage } = require("../shared/web-storage");
 
 const apiSyncState = {
   readyProjects: new Set(),
@@ -15,8 +14,15 @@ const apiSyncState = {
 
 const SESSION_PROJECT_STORAGE_KEY = "scheduly:project-id";
 
+const getSessionStorage = () => {
+  if (typeof window === "undefined" || !window.sessionStorage) {
+    return null;
+  }
+  return window.sessionStorage;
+};
+
 const getStoredSessionProjectId = () => {
-  const storage = getPersistentStorage();
+  const storage = getSessionStorage();
   if (!storage) return null;
   try {
     return storage.getItem(SESSION_PROJECT_STORAGE_KEY);
@@ -27,7 +33,7 @@ const getStoredSessionProjectId = () => {
 };
 
 const setStoredSessionProjectId = (projectId) => {
-  const storage = getPersistentStorage();
+  const storage = getSessionStorage();
   if (!storage) return;
   try {
     if (projectId) {

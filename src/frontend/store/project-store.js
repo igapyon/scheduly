@@ -10,7 +10,6 @@
  */
 
 const { DEFAULT_TZID } = require("../shared/ical-utils");
-const { getPersistentStorage } = require("../shared/web-storage");
 
 const DEFAULT_PROJECT_ID = "demo-project";
 const DEFAULT_PROJECT_NAME = "";
@@ -140,6 +139,13 @@ const shareTokenIndex = {
 };
 const shareTokenProjectMap = new Map();
 
+const getSessionStorage = () => {
+  if (typeof window === "undefined" || !window.sessionStorage) {
+    return null;
+  }
+  return window.sessionStorage;
+};
+
 const STORAGE_KEY = "scheduly:project-store";
 const defaultRouteContext = Object.freeze({
   projectId: DEFAULT_PROJECT_ID,
@@ -167,7 +173,7 @@ const decodePathToken = (value) => {
 };
 
 const persistToStorage = () => {
-  const storage = getPersistentStorage();
+  const storage = getSessionStorage();
   if (!storage) return;
   try {
     const payload = {};
@@ -181,7 +187,7 @@ const persistToStorage = () => {
 };
 
 const loadFromStorage = () => {
-  const storage = getPersistentStorage();
+  const storage = getSessionStorage();
   if (!storage) return;
   try {
     const raw = storage.getItem(STORAGE_KEY);

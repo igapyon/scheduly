@@ -1,6 +1,6 @@
 # Flow & API Sketch
 
-React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。ブラウザ側では `projectStore` が Web Storage（localStorage / sessionStorage）にキャッシュを持つが、**正規データは API サーバーが管理する**。トップページ (`/` や `/index.html`) にアクセスすると毎回新しい `projectId` が払い出され、発行済みトークンを知らない限り別セッションから同じプロジェクトを参照することはできない。
+React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。ブラウザ側では `projectStore` が `sessionStorage` にキャッシュを持つが、**正規データは API サーバーが管理する**。トップページ (`/` や `/index.html`) にアクセスすると毎回新しい `projectId` が払い出され、発行済みトークンを知らない限り別セッションから同じプロジェクトを参照することはできない。
 
 ## 1. 全体像
 

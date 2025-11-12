@@ -5,7 +5,7 @@
 ## コンポーネントと責務
 
 - projectStore
-  - 候補・参加者・回答・派生データ（タリー/サマリー）・ICS テキストなどを集約管理（localStorage ベース。利用不可環境では sessionStorage へフォールバック）。
+  - 候補・参加者・回答・派生データ（タリー/サマリー）・ICS テキストなどを集約管理（sessionStorage ベース）。
   - `getIcsText()` で最新の ICS テキストを参照可能。
 
 - scheduleService

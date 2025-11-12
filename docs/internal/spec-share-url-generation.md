@@ -6,7 +6,7 @@
 
 - 対象画面: 管理画面 (`src/frontend/admin.jsx`) の「共有URL」カード。
 - 対象機能: 「共有URLを生成」/「再発行」を押下した際に、管理者向け URL と参加者向け URL を管理・表示する処理。
-- 実装コンテキスト: 現在は常に API ドライバで動作し、共有トークンの正規値はサーバーに保存される。フロントの `projectStore` は Web Storage（localStorage / sessionStorage）を介して **ブラウザ内キャッシュ** を保持し、`shareService` がトークン生成・更新・URL 組み立てを担う。複数タブ／ウィンドウ間は `projectStore` の購読で同期される。
+- 実装コンテキスト: 現在は常に API ドライバで動作し、共有トークンの正規値はサーバーに保存される。フロントの `projectStore` は `sessionStorage` を介して **ブラウザ内キャッシュ** を保持し、`shareService` がトークン生成・更新・URL 組み立てを担う。複数タブ／ウィンドウ間での同期は行わず、各タブは独立したキャッシュを持つ。
 
 ## 2. Goals / Non-Goals
 
@@ -54,7 +54,7 @@
 ### 5.1 初期状態
 - `project.project.shareTokens` に `ShareTokenEntry` が存在しない、またはプレースホルダーのみの場合は「未発行」表示とし、コピー操作を無効化する。
 - 初期化時はサーバー側のダミー `demo-*` トークンが返る場合があるため、UI は `shareService.isPlaceholderToken()` で未発行扱いにする。
-- ブラウザ内で発行済みのトークンは localStorage から復元されるが、ストレージをクリアしたりシークレットウィンドウ（localStorage 無効）でアクセスすると新しい `projectId` が払い出され、以前のトークンは表示されない（`/a/{token}` でアクセスした場合のみサーバーから該当プロジェクトが読み込まれる）。
+- ブラウザ内で発行済みのトークンは `sessionStorage` から復元されるが、ストレージをクリアしたり新しいタブ/ウィンドウでアクセスすると新しい `projectId` が払い出され、以前のトークンは表示されない（`/a/{token}` でアクセスした場合のみサーバーから該当プロジェクトが読み込まれる）。
 
 ### 5.2 トークン生成（`shareService.generate`）
 - `baseUrl` は `sanitizeBaseUrl` でプロトコル検証・パス/クエリの除去・末尾スラッシュ削除を行い、指定が無い場合は `window.location.origin` を使用する（ブラウザで取得不可のときは `https://scheduly.app` を使用）。
@@ -77,7 +77,7 @@
 
 ### 5.6 同期と通知
 - `projectStore.notify` により購読者へ変更が配信され、`admin.jsx` ではストア購読を通じて最新トークンを表示する。
-- localStorage のキャッシュは同一ブラウザ上で `StorageEvent` 経由で同期される。API 上の正規値は常にサーバーにあり、別セッションではトークン URL を知らない限り参照できない。
+- `sessionStorage` のキャッシュはタブ単位で保持され、他タブとは同期されない。API 上の正規値は常にサーバーにあり、トークン URL を知らない限り他セッションから参照できない。
 
 ## 6. Data Model & Persistence
 
@@ -101,7 +101,7 @@ project.project.shareTokens = {
 ```
 
 - `projectStore` は `normalizeShareTokens()` で入力を正規化し、プレースホルダーや空文字を除外する。
-- キャッシュは localStorage（利用不可時は sessionStorage：キー `scheduly:project-store` と、プロジェクト ID 追跡用の `scheduly:project-id`）に保存され、再読込時に `ensureProjectStateShape` を通じて復元・検証される。サーバーからの最新スナップショットで随時上書きされる。
+- キャッシュは `sessionStorage`（キー `scheduly:project-store` と、プロジェクト ID 追跡用の `scheduly:project-id`）に保存され、再読込時に `ensureProjectStateShape` を通じて復元・検証される。サーバーからの最新スナップショットで随時上書きされる。
 - `shareTokenIndex` によりトークン → プロジェクトの逆引きを保持し、`/a/{token}` などからのルーティングに利用する。
 
 ## 7. Service API Surface
@@ -138,7 +138,7 @@ project.project.shareTokens = {
 - HTTPS 前提で配布し、アプリ／サーバ双方でトークン値をログやアナリティクスへ書き出さない。監査が必要な場合はハッシュ化 or マスクした値のみを記録する。
 - `shareService.rotate()` を利用した再発行フローを推奨し、共有範囲変更・漏えい疑い時は即時再生成する。失効済みトークンはクライアント側で破棄し、バックエンド導入後は `revokedTokens` として保持する。
 - 失効・回転の履歴管理は今後の API 実装で担保するまで、運用ドキュメント側で再発行時の通知手順を定める。
-- localStorage に保存されたキャッシュはブラウザ内でのみ参照され、他アプリや別ブラウザセッションからはアクセスできない。正規データはサーバーの `ProjectState` にあり、トークンを知らない限り共有されない。
+- `sessionStorage` に保存されたキャッシュは開いているタブ内でのみ参照され、他アプリや別ブラウザセッションからはアクセスできない。正規データはサーバーの `ProjectState` にあり、トークンを知らない限り共有されない。
 - クロスオリジン遷移は `shareService` で検出し、自動遷移をブロックする。
 - 将来的にバックエンドを導入する際は、旧トークンを `revokedTokens` として保持しアクセス遮断する検証を行う。
 
@@ -161,7 +161,7 @@ DELETE /projects/:projectId/share-links/:type   // type = admin | participant
 | ケース | 対応方針 |
 | ------ | -------- |
 | トークン生成時に `projectId` が不明 | 例外を投げ、トーストで失敗通知。`resolveProjectIdFromLocation` を見直す。 |
-| `localStorage` / `sessionStorage` が利用できない環境 | 永続化不可。警告を表示し、現セッション内のみ有効とする。 |
+| `sessionStorage` が利用できない環境 | 永続化不可。警告を表示し、現セッション内のみ有効とする。 |
 | `baseUrl` が不正 URL | `sanitizeBaseUrl` で現在オリジンへフォールバックし、Console にデバッグログを出す。 |
 | 自動遷移でクロスオリジン URL が指定された | ブロックし、理由を `navigation.reason` に格納する。 |
 | `/a/{token}` などのパス形式を変更したい | `shareService.buildUrl` を差し替えるだけで済むよう、他レイヤーは `token` に依存する。 |
