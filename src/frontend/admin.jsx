@@ -1647,6 +1647,10 @@ const executeShareLinkAction = async () => {
       popToast("プロジェクトの読み込み中です。少し待ってください。");
       return;
     }
+    if (!candidates.length) {
+      popToast("日程が1件以上必要です。日程を作成してから共有URLを発行してください。");
+      return;
+    }
     if (hasIssuedShareTokens) {
       setShareReissueDialogOpen(true);
       return;
