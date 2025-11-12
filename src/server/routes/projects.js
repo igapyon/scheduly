@@ -7,6 +7,25 @@ const createProjectsRouter = (store) => {
   }
   const router = express.Router();
 
+  router.get("/share/:type/:token", (req, res, next) => {
+    try {
+      const type = req.params.type;
+      const token = req.params.token;
+      const result = store.resolveProjectByShareToken(type, token);
+      res.json({
+        projectId: result.projectId,
+        project: result.snapshot.project,
+        candidates: result.snapshot.candidates,
+        participants: result.snapshot.participants,
+        responses: result.snapshot.responses,
+        shareTokens: result.snapshot.shareTokens,
+        versions: result.snapshot.versions
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/", (req, res, next) => {
     try {
       const meta = req.body && typeof req.body === "object" ? req.body.meta || {} : {};

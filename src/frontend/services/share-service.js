@@ -1,9 +1,10 @@
 const projectStore = require("../store/project-store");
 const sharedIcalUtils = require("../shared/ical-utils");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
+const { emitMutationEvent } = require("./sync-events");
+const { createServiceDriver } = require("./service-driver");
 
 const { createLogger } = sharedIcalUtils;
 
@@ -17,8 +18,6 @@ const URL_PREFIX = {
 const DEFAULT_BASE_URL = "https://scheduly.app";
 
 const logDebug = createLogger("share-service");
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
-
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
 const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
@@ -267,6 +266,14 @@ const apiRotate = async (projectId, options = {}) => {
       };
     },
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyShareMutation(projectId, "rotate", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyShareMutation(projectId, "rotate", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Share tokens version mismatch";
@@ -316,6 +323,14 @@ const apiInvalidate = async (projectId, type) => {
       return true;
     },
     refetch: () => projectService.syncProjectSnapshot(projectId, { force: true, reason: "share_tokens_conflict" }),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyShareMutation(projectId, "invalidate", "conflict", error);
+      }
+    },
+    onError: (error) => {
+      notifyShareMutation(projectId, "invalidate", "error", error);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Share token invalidation conflict";
@@ -328,14 +343,25 @@ const apiInvalidate = async (projectId, type) => {
   });
 };
 
-const generate = (projectId, options = {}) =>
-  (isApiEnabled() ? apiGenerate(projectId, options) : localGenerate(projectId, options));
+const shareDriver = createServiceDriver({
+  local: {
+    generate: localGenerate,
+    rotate: localRotate,
+    invalidate: localInvalidate
+  },
+  api: {
+    generate: apiGenerate,
+    rotate: apiRotate,
+    invalidate: apiInvalidate
+  }
+});
 
-const rotate = (projectId, options = {}) =>
-  (isApiEnabled() ? apiRotate(projectId, options) : localRotate(projectId, options));
+const generate = (projectId, options = {}) => shareDriver.run("generate", projectId, options);
+const rotate = (projectId, options = {}) => shareDriver.run("rotate", projectId, options);
+const invalidate = (projectId, type) => shareDriver.run("invalidate", projectId, type);
 
-const invalidate = (projectId, type) =>
-  (isApiEnabled() ? apiInvalidate(projectId, type) : localInvalidate(projectId, type));
+const setShareServiceDriver = (driverName) => shareDriver.setDriverOverride(driverName);
+const clearShareServiceDriver = () => shareDriver.clearDriverOverride();
 
 module.exports = {
   get,
@@ -343,5 +369,17 @@ module.exports = {
   rotate,
   invalidate,
   buildUrl,
-  isPlaceholderToken
+  isPlaceholderToken,
+  setShareServiceDriver,
+  clearShareServiceDriver
+};
+const notifyShareMutation = (projectId, action, phase, error) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "share",
+    action,
+    phase,
+    error
+  });
 };

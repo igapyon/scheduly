@@ -3,6 +3,8 @@ const { randomUUID } = require("crypto");
 const createProjectsRouter = require("./routes/projects");
 const { APIError, NotFoundError } = require("./errors");
 const { log } = require("./logger");
+const telemetry = require("./telemetry");
+const createDevLogRouter = require("./routes/dev-log");
 
 const BODY_LIMIT = process.env.SCHEDULY_API_BODY_LIMIT || "256kb";
 
@@ -45,12 +47,19 @@ const createApp = ({ store }) => {
     });
     res.on("finish", () => {
       const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-      log("info", "request.complete", {
+      const payload = {
         requestId,
         method: req.method,
         path: req.originalUrl,
         status: res.statusCode,
         durationMs: Number(elapsed.toFixed(3))
+      };
+      log("info", "request.complete", payload);
+      telemetry.recordRequestComplete({
+        method: req.method,
+        path: req.path || req.originalUrl,
+        status: res.statusCode,
+        durationMs: payload.durationMs
       });
     });
     res.on("close", () => {
@@ -107,7 +116,14 @@ const createApp = ({ store }) => {
     });
   });
 
+  app.get("/api/metrics", (req, res) => {
+    res.json(telemetry.getMetricsSnapshot());
+  });
+
   app.use("/api/projects", createProjectsRouter(store));
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/api/dev/log", createDevLogRouter());
+  }
 
   app.use((req, res, next) => {
     next(new NotFoundError("Endpoint not found"));
@@ -117,11 +133,18 @@ const createApp = ({ store }) => {
     void next;
     const isKnownError = error instanceof APIError;
     if (!isKnownError) {
-      log("error", "request.error", {
+      const errorPayload = {
         requestId: req.requestId,
         method: req.method,
         path: req.originalUrl,
         error: error && error.stack ? error.stack : error?.message
+      };
+      log("error", "request.error", errorPayload);
+      telemetry.recordError({
+        method: req.method,
+        path: req.path || req.originalUrl,
+        status: error?.status || 500,
+        message: errorPayload.error
       });
     }
     const status = isKnownError ? error.status : 500;

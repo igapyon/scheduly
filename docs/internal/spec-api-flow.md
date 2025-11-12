@@ -1,6 +1,6 @@
 # Flow & API Sketch
 
-React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。オンメモリ構成（`projectStore` + sessionStorage）を前提に、管理者／参加者の画面遷移と主要サービスの責務を整理する。
+React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフローとサービス API の役割をまとめる。ブラウザ側では `projectStore` がセッション単位のキャッシュ（sessionStorage）を持つが、**正規データは API サーバーが管理する**。トップページ (`/` や `/index.html`) にアクセスすると毎回新しい `projectId` が払い出され、発行済みトークンを知らない限り別セッションから同じプロジェクトを参照することはできない。
 
 ## 1. 全体像
 
@@ -27,7 +27,7 @@ React / webpack 版 Scheduly の現在実装に沿ったフロントエンドフ
 
 ### 2.1 プロジェクト初期化と候補整備（管理者）
 
-1. `projectService.resolveProjectFromLocation()` でプロジェクト ID と `routeContext` を決定。
+1. `projectService.resolveProjectFromLocation()` でプロジェクト ID と `routeContext` を決定（ルートアクセス時は API 経由で新規プロジェクトを作成し、その ID を sessionStorage へ保存する。`/a/{token}` や `/p/{token}` にアクセスした場合はサーバーの shareTokens インデックスから該当プロジェクトを引き当てる）。
 2. 新規作成時は `projectService.create()` → `projectStore.resetProject()` で初期状態を生成。`icsText` は空の VCALENDAR を前提に再計算される。
 3. 候補追加・更新は `scheduleService.addCandidate` / `updateCandidate` / `removeCandidate` が担い、処理後に `projectStore.replaceCandidates` と `tallyService.recalculate` を実行。ICS テキストは `scheduleService.persistCandidates()` 内で常に再生成され `projectStore` に保存される。
 4. 外部 ICS の取り込みは `scheduleService.replaceCandidatesFromImport()` を経由し、`UID` / `DTSTAMP` の差分を保ったまま候補一覧と `icsText` を更新。
@@ -302,7 +302,7 @@ shareService.rotate(projectId, {
 
 - **フロント側適用**
   - `projectStore`, `responseService`, `share-service`, `summaryService` などで重複している構造体定義を削除し、JSDoc import に置換。
-  - `demo-data.js` は `/** @type {ProjectSnapshot} */` を付け、サンプルデータの整合性を保つ。
+  - `public/proj/scheduly-project-sampledata-001.json` などデモ用サンプルも `/** @type {ProjectSnapshot} */` の型を守る（インポート時にバリデーションする）。
   - `validation.js` やコンポーネントで `import type` もしくは JSDoc 参照を利用し、引数・戻り値の型を共有する。
 
 - **サーバ側適用**

@@ -38,10 +38,13 @@ const buildParticipantLookup = (participants) => {
 const groupResponsesByCandidate = (responses) => {
   const map = new Map();
   (responses || []).forEach((response) => {
-    if (!response || !response.candidateId) return;
-    const list = map.get(response.candidateId) || [];
-    list.push(response);
-    map.set(response.candidateId, list);
+    if (!response || !response.candidateId || !response.participantId) return;
+    let participantMap = map.get(response.candidateId);
+    if (!participantMap) {
+      participantMap = new Map();
+      map.set(response.candidateId, participantMap);
+    }
+    participantMap.set(response.participantId, response);
   });
   return map;
 };
@@ -82,8 +85,8 @@ const scheduleViewFromState = (state, tallies) => {
     }
     const detailed = [];
     const respondedIds = new Set();
-    const candidateResponses = responsesByCandidate.get(candidate.id) || [];
-    candidateResponses.forEach((response) => {
+    const participantResponseMap = responsesByCandidate.get(candidate.id) || new Map();
+    participantResponseMap.forEach((response) => {
       const mark = normalizeMark(response.mark);
       const participantEntry = participantLookup.get(response.participantId);
       const participant = participantEntry?.participant;
@@ -154,7 +157,19 @@ const scheduleViewFromState = (state, tallies) => {
 };
 
 const participantViewFromState = (state) => {
-  const participants = Array.isArray(state.participants) ? state.participants : [];
+  const rawParticipants = Array.isArray(state.participants) ? state.participants : [];
+  const participants = [];
+  const seenIds = new Set();
+  rawParticipants.forEach((participant) => {
+    if (!participant || typeof participant !== "object") return;
+    if (!participant.id) {
+      participants.push(participant);
+      return;
+    }
+    if (seenIds.has(participant.id)) return;
+    seenIds.add(participant.id);
+    participants.push(participant);
+  });
   const candidates = Array.isArray(state.candidates) ? state.candidates : [];
   const responsesByParticipant = groupResponsesByParticipant(state.responses || []);
 

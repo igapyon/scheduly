@@ -3,16 +3,20 @@
 const sharedIcalUtils = require("../shared/ical-utils");
 const projectStore = require("../store/project-store");
 const tallyService = require("./tally-service");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const projectService = require("./project-service");
 const { candidateInputSchema, collectZodIssueFields } = require("../../shared/schema");
+const { createServiceDriver } = require("./service-driver");
+const { emitMutationEvent } = require("./sync-events");
 
 const {
   DEFAULT_TZID,
   ensureICAL
 } = sharedIcalUtils;
+
+const TZID_PATTERN = /^[A-Za-z0-9_\-]+\/[A-Za-z0-9_\-]+$/;
+const CUSTOM_TZID_PATTERN = /^X-SCHEDULY-[A-Z0-9_\-]+$/i;
 
 const logDebug = sharedIcalUtils.createLogger("schedule-service");
 const syncProjectSnapshot = (projectId, reason) =>
@@ -79,8 +83,6 @@ const findCandidateById = (projectId, candidateId) => {
   const candidates = projectStore.getCandidates(projectId);
   return candidates.find((item) => item && item.id === candidateId) || null;
 };
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
-
 const ICAL_LINE_BREAK = "\r\n";
 const ICAL_HEADER_LINES = [
   "BEGIN:VCALENDAR",
@@ -373,8 +375,22 @@ const exportCandidateToIcs = (projectId, candidateId) => {
   };
 };
 
+const normalizeCandidateForPersist = (candidate) => {
+  if (!candidate || typeof candidate !== "object") return candidate;
+  const rawTzid = typeof candidate.tzid === "string" ? candidate.tzid.trim() : "";
+  const tzidValue =
+    rawTzid && (TZID_PATTERN.test(rawTzid) || CUSTOM_TZID_PATTERN.test(rawTzid)) ? rawTzid : DEFAULT_TZID;
+  return {
+    ...candidate,
+    tzid: tzidValue
+  };
+};
+
 const replaceCandidatesFromImport = (projectId, importedCandidates, sourceIcsText = null) => {
-  persistCandidates(projectId, importedCandidates, sourceIcsText);
+  const normalized = Array.isArray(importedCandidates)
+    ? importedCandidates.map((candidate) => normalizeCandidateForPersist(candidate))
+    : importedCandidates;
+  persistCandidates(projectId, normalized, sourceIcsText);
 };
 
 const apiAddCandidate = async (projectId) => {
@@ -406,6 +422,14 @@ const apiAddCandidate = async (projectId) => {
       return mapped;
     },
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "add", "conflict", error, { candidateId: placeholder.id });
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "add", "error", error, { candidateId: placeholder.id });
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate creation conflict";
@@ -451,6 +475,14 @@ const apiUpdateCandidate = async (projectId, candidateId, changes = {}) => {
       return mapped;
     },
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "update", "conflict", error, { candidateId });
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "update", "error", error, { candidateId });
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate version mismatch";
@@ -478,6 +510,14 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
         { version: expectedVersion }
       ),
     refetch: () => syncProjectSnapshot(projectId, "candidates_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyCandidateMutation(projectId, "remove", "conflict", error, { candidateId });
+      }
+    },
+    onError: (error) => {
+      notifyCandidateMutation(projectId, "remove", "error", error, { candidateId });
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Candidate removal conflict";
@@ -487,21 +527,27 @@ const apiRemoveCandidate = async (projectId, candidateId) => {
   });
 };
 
-const addCandidate = (projectId) => (
-  isApiEnabled() ? apiAddCandidate(projectId) : Promise.resolve(localAddCandidate(projectId))
-);
+const scheduleDriver = createServiceDriver({
+  local: {
+    addCandidate: (projectId) => Promise.resolve(localAddCandidate(projectId)),
+    updateCandidate: (projectId, candidateId, nextCandidate) =>
+      Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate)),
+    removeCandidate: (projectId, candidateId) => Promise.resolve(localRemoveCandidate(projectId, candidateId))
+  },
+  api: {
+    addCandidate: apiAddCandidate,
+    updateCandidate: apiUpdateCandidate,
+    removeCandidate: apiRemoveCandidate
+  }
+});
 
-const updateCandidate = (projectId, candidateId, nextCandidate) => (
-  isApiEnabled()
-    ? apiUpdateCandidate(projectId, candidateId, nextCandidate)
-    : Promise.resolve(localUpdateCandidate(projectId, candidateId, nextCandidate))
-);
+const addCandidate = (projectId) => scheduleDriver.run("addCandidate", projectId);
+const updateCandidate = (projectId, candidateId, nextCandidate) =>
+  scheduleDriver.run("updateCandidate", projectId, candidateId, nextCandidate);
+const removeCandidate = (projectId, candidateId) => scheduleDriver.run("removeCandidate", projectId, candidateId);
 
-const removeCandidate = (projectId, candidateId) => (
-  isApiEnabled()
-    ? apiRemoveCandidate(projectId, candidateId)
-    : Promise.resolve(localRemoveCandidate(projectId, candidateId))
-);
+const setScheduleServiceDriver = (driverName) => scheduleDriver.setDriverOverride(driverName);
+const clearScheduleServiceDriver = () => scheduleDriver.clearDriverOverride();
 
 module.exports = {
   addCandidate,
@@ -511,5 +557,18 @@ module.exports = {
   exportCandidateToIcs,
   createBlankCandidate,
   createCandidateFromVevent,
-  replaceCandidatesFromImport
+  replaceCandidatesFromImport,
+  setScheduleServiceDriver,
+  clearScheduleServiceDriver
+};
+const notifyCandidateMutation = (projectId, action, phase, error, meta = {}) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "candidate",
+    action,
+    phase,
+    error,
+    meta
+  });
 };

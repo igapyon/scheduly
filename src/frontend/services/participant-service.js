@@ -1,11 +1,12 @@
 // Copyright (c) Toshiki Iga. All Rights Reserved.
 
 const projectStore = require("../store/project-store");
-const runtimeConfig = require("../shared/runtime-config");
 const apiClient = require("./api-client");
 const tallyService = require("./tally-service");
 const { runOptimisticUpdate } = require("../shared/optimistic-update");
 const { participantInputSchema, collectZodIssueFields } = require("../../shared/schema");
+const { createServiceDriver } = require("./service-driver");
+const { emitMutationEvent } = require("./sync-events");
 
 const randomUUID = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -69,8 +70,6 @@ const isDuplicateDisplayName = (projectId, name, ignoreParticipantId = null) => 
     return participant.displayName.trim().toLowerCase() === normalized;
   });
 };
-
-const isApiEnabled = () => runtimeConfig.isProjectDriverApi();
 
 const parseParticipantInput = (payload) => {
   const result = participantInputSchema.safeParse(payload);
@@ -185,6 +184,10 @@ const apiAddParticipant = async (projectId, payload) => {
     comment: payload?.comment || ""
   });
   const body = { participant: { ...payload, ...participantPayload } };
+  const metaInfo = {
+    participantId: payload?.id || null,
+    displayName: participantPayload.displayName || payload?.displayName || ""
+  };
   return runOptimisticUpdate({
     request: () =>
       apiClient.post(`/api/projects/${encodeURIComponent(projectId)}/participants`, body),
@@ -199,6 +202,14 @@ const apiAddParticipant = async (projectId, payload) => {
       return participant;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "add", "conflict", error, metaInfo);
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "add", "error", error, metaInfo);
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant creation conflict";
@@ -207,10 +218,6 @@ const apiAddParticipant = async (projectId, payload) => {
     }
   });
 };
-
-const addParticipant = (projectId, payload) => (
-  isApiEnabled() ? apiAddParticipant(projectId, payload) : localAddParticipant(projectId, payload)
-);
 
 const localUpdateParticipant = (projectId, participantId, changes) => {
   const existing = getParticipant(projectId, participantId);
@@ -278,6 +285,14 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
       return participant;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "update", "conflict", error, { participantId });
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "update", "error", error, { participantId });
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant version mismatch";
@@ -286,12 +301,6 @@ const apiUpdateParticipant = async (projectId, participantId, changes) => {
     }
   });
 };
-
-const updateParticipant = (projectId, participantId, changes) => (
-  isApiEnabled()
-    ? apiUpdateParticipant(projectId, participantId, changes)
-    : localUpdateParticipant(projectId, participantId, changes)
-);
 
 const localRemoveParticipant = (projectId, participantId) => {
   projectStore.removeParticipant(projectId, participantId);
@@ -318,6 +327,14 @@ const apiRemoveParticipant = async (projectId, participantId) => {
       return true;
     },
     refetch: () => syncSnapshot(projectId, "participants_conflict"),
+    onConflict: (error) => {
+      if (error && error.status === 409) {
+        notifyParticipantMutation(projectId, "remove", "conflict", error, { participantId });
+      }
+    },
+    onError: (error) => {
+      notifyParticipantMutation(projectId, "remove", "error", error, { participantId });
+    },
     transformError: (error) => {
       if (error && error.status === 409) {
         error.message = "Participant removal conflict";
@@ -327,9 +344,29 @@ const apiRemoveParticipant = async (projectId, participantId) => {
   });
 };
 
-const removeParticipant = (projectId, participantId) => (
-  isApiEnabled() ? apiRemoveParticipant(projectId, participantId) : localRemoveParticipant(projectId, participantId)
-);
+const participantDriver = createServiceDriver({
+  local: {
+    addParticipant: localAddParticipant,
+    updateParticipant: localUpdateParticipant,
+    removeParticipant: localRemoveParticipant
+  },
+  api: {
+    addParticipant: apiAddParticipant,
+    updateParticipant: apiUpdateParticipant,
+    removeParticipant: apiRemoveParticipant
+  }
+});
+
+const addParticipant = (projectId, payload) => participantDriver.run("addParticipant", projectId, payload);
+
+const updateParticipant = (projectId, participantId, changes) =>
+  participantDriver.run("updateParticipant", projectId, participantId, changes);
+
+const removeParticipant = (projectId, participantId) =>
+  participantDriver.run("removeParticipant", projectId, participantId);
+
+const setParticipantServiceDriver = (driverName) => participantDriver.setDriverOverride(driverName);
+const clearParticipantServiceDriver = () => participantDriver.clearDriverOverride();
 
 const bulkUpsertParticipants = (projectId, list) => {
   if (!Array.isArray(list) || list.length === 0) return [];
@@ -400,5 +437,18 @@ module.exports = {
   removeParticipant,
   bulkUpsertParticipants,
   resolveByToken,
-  getToken
+  getToken,
+  setParticipantServiceDriver,
+  clearParticipantServiceDriver
+};
+const notifyParticipantMutation = (projectId, action, phase, error, meta = {}) => {
+  if (!projectId) return;
+  emitMutationEvent({
+    projectId,
+    entity: "participant",
+    action,
+    phase,
+    error,
+    meta
+  });
 };

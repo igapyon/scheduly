@@ -56,7 +56,7 @@ const responseInputSchema = z.object({
 });
 
 const projectMetaSchema = z.object({
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().max(120),
   description: preprocessString(z.string().max(2000), { defaultValue: "" }),
   defaultTzid: z.string().trim().min(1).max(120)
 });

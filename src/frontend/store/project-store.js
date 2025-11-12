@@ -14,7 +14,6 @@ const { DEFAULT_TZID } = require("../shared/ical-utils");
 const DEFAULT_PROJECT_ID = "demo-project";
 const DEFAULT_PROJECT_NAME = "";
 const DEFAULT_PROJECT_DESCRIPTION = "";
-const DEMO_ADMIN_TOKEN = "demo-admin";
 const PROJECT_EXPORT_VERSION = 1;
 const SHARE_TOKEN_TYPES = ["admin", "participant"];
 
@@ -49,15 +48,10 @@ const sanitizeShareTokenEntry = (input) => {
   return entry;
 };
 
-const normalizeShareTokens = (raw, { includeDemo = false } = {}) => {
+const normalizeShareTokens = (raw) => {
   const source = raw && typeof raw === "object" ? raw : {};
   const next = {};
-  const adminSource =
-    source.admin !== undefined
-      ? source.admin
-      : includeDemo
-        ? DEMO_ADMIN_TOKEN
-        : null;
+  const adminSource = source.admin ?? null;
   const participantSource = source.participant ?? source.guest ?? null;
 
   const adminEntry = sanitizeShareTokenEntry(adminSource);
@@ -192,7 +186,7 @@ const loadFromStorage = () => {
     const payload = JSON.parse(raw);
     Object.entries(payload).forEach(([projectId, state]) => {
       if (!state || typeof state !== "object") return;
-      const sanitized = ensureProjectStateShape(projectId, state, { includeDemoToken: true });
+      const sanitized = ensureProjectStateShape(projectId, state);
       projectStore.set(projectId, sanitized);
       rebuildParticipantTokenIndex(projectId);
       rebuildShareTokenIndex(projectId);
@@ -213,7 +207,7 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
       name,
       description,
       defaultTzid: DEFAULT_TZID,
-      shareTokens: normalizeShareTokens({ admin: DEMO_ADMIN_TOKEN }, { includeDemo: true }),
+      shareTokens: normalizeShareTokens(options.shareTokens),
       createdAt: timestamp,
       updatedAt: timestamp,
       demoSeedOptOut
@@ -227,14 +221,14 @@ const createInitialProjectState = (projectId = DEFAULT_PROJECT_ID, options = {})
   };
 };
 
-const ensureProjectStateShape = (projectId, rawState, { includeDemoToken = false } = {}) => {
+const ensureProjectStateShape = (projectId, rawState) => {
   if (!rawState || typeof rawState !== "object") {
     return createInitialProjectState(projectId);
   }
   const nextState = { ...rawState };
   const project = rawState.project && typeof rawState.project === "object" ? { ...rawState.project } : {};
   project.id = isNonEmptyString(project.id) ? project.id : projectId;
-  project.shareTokens = normalizeShareTokens(project.shareTokens, { includeDemo: includeDemoToken });
+  project.shareTokens = normalizeShareTokens(project.shareTokens);
   nextState.project = project;
   const baseDerived = rawState.derived && typeof rawState.derived === "object" ? rawState.derived : {};
   nextState.derived = {
@@ -365,7 +359,7 @@ const getCandidates = (projectId = DEFAULT_PROJECT_ID) => {
 };
 
 const setProjectState = (projectId, nextState) => {
-  const sanitized = ensureProjectStateShape(projectId, nextState, { includeDemoToken: false });
+  const sanitized = ensureProjectStateShape(projectId, nextState);
   projectStore.set(projectId, sanitized);
   rebuildParticipantTokenIndex(projectId);
   rebuildShareTokenIndex(projectId);
@@ -629,7 +623,6 @@ const subscribeProjectState = (projectId, callback) => {
 };
 
 const getDefaultProjectId = () => DEFAULT_PROJECT_ID;
-const getDemoAdminToken = () => DEMO_ADMIN_TOKEN;
 
 const resetProject = (projectId = DEFAULT_PROJECT_ID) => {
   const nextState = createInitialProjectState(projectId, { name: "", description: "", demoSeedOptOut: true });
@@ -719,7 +712,7 @@ const sanitizeProjectForImport = (projectId, project, defaultProject) => {
     if (Object.keys(importedShareTokens).length > 0) {
       nextProject.shareTokens = importedShareTokens;
     } else {
-      nextProject.shareTokens = normalizeShareTokens(defaultProject.shareTokens, { includeDemo: true });
+      nextProject.shareTokens = normalizeShareTokens(defaultProject.shareTokens);
     }
     if (typeof project.createdAt === "string") nextProject.createdAt = project.createdAt;
     if (typeof project.updatedAt === "string") nextProject.updatedAt = project.updatedAt;
@@ -1018,7 +1011,6 @@ module.exports = {
   replaceCandidates,
   getIcsText,
   getDefaultProjectId,
-  getDemoAdminToken,
   getCurrentRouteContext,
   getShareTokens,
   findProjectByShareToken,
@@ -1038,5 +1030,6 @@ module.exports = {
   exportProjectState,
   importProjectState,
   replaceStateFromApi,
-  replaceTallies
+  replaceTallies,
+  setRouteContext
 };
