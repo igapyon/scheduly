@@ -1,55 +1,95 @@
-# Architecture Overview
+# Architecture Overview (2025)
 
-Scheduly のフロントエンド構成と今後想定している拡張ポイントを簡潔にまとめます。現在は React / webpack 版アプリを主軸に開発しており、初期モックだった HTML 版は最新アプリのスナップショットを確認する静的コンテンツとして最小限維持しています。サーバーとの連携は今後の実装タスクであり、フロントとサーバーを同じ JavaScript スタック（Node.js）で統一する方針を採ります。
+Scheduly は、React/webpack 製のフロントエンドと Node.js (Express) 製の in-memory API サーバーで構成された **クライアントサーバー型** アプリです。ここでは現行構成と役割分担、モジュール間の責務、今後の拡張候補を整理します。
 
-## フロントエンド構成
+## 1. 全体構成
+
+```
+┌─────────────┐   https    ┌──────────────┐   http   ┌──────────────────┐
+│ React Admin │──────────▶│              │────────▶│ InMemory API      │
+│ React User  │◀──────────│   Nginx      │◀────────│ (Express +        │
+└─────────────┘            │ (static +   │         │  InMemoryStore)   │
+                           │  proxy)     │         └──────────────────┘
+```
+
+- フロントエンド: `src/frontend/admin.jsx`（管理画面）、`src/frontend/user.jsx`（参加者画面）。Webpack が `index.bundle.js` / `user.bundle.js` を生成し、Nginx から配信。
+- バックエンド: `src/server/` 以下の Express アプリ。`InMemoryProjectStore` が `Map<projectId, ProjectState>` を保持し、REST API で CRUD・共有トークン発行・集計を提供。
+- 共有 URL ルーティング: `/a/{token}`（管理者） / `/p/{token}`（参加者）。Nginx で `/p` / `/r` を `user.html` にリライトする。
+- `.env` で `SCHEDULY_API_BASE_URL` / `SCHEDULY_SHARE_BASE_URL` を指定し、`runtime-config` が API ベース URL を検出する。
+
+## 2. フロントエンド詳細
 
 ```
 public/
-├── index.html         # 管理者 UI (React / webpack -> index.bundle.js)
-├── user.html          # 参加者 UI (React / webpack -> user.bundle.js)
-└── legacy/            # HTML モックのスナップショット（参照・比較用）
+├── index.html     # 管理画面
+├── user.html      # 参加者画面
+└── assets/
+    └── tailwind.css  # `npm run css:build` で生成
 src/frontend/
-├── admin.jsx          # プロジェクト（候補）管理画面
-└── user.jsx           # 参加者回答一覧＋インライン編集 (共有ビュー)
+├── admin.jsx
+├── user.jsx
+├── services/        # project/schedule/participant/response/tally/summary
+├── store/project-store.js
+└── shared/          # runtime-config, date-utils, mutation-message 等
 ```
 
-- **Webpack エントリ**
-- `admin.jsx` → `index.bundle.js`（`public/index.html`を初期表示し、共有トークン発行後は `/a/{token}` へリダイレクト）
-- `user.jsx` → `user.bundle.js`（`public/user.html`を初期表示し、共有トークン利用時は `/p/{token}` へリダイレクト。旧 `/r/{token}` も後方互換で `/p/{token}` へ転送）
-- **Tailwind**
-  - 現状は CDN で読み込み、最低限の UI を構築。将来 PostCSS 化する予定。
-- **ical.js**
-  - ICS のインポート／エクスポートに利用。`admin.jsx` 側で CDN を読み込む。
+- **Tailwind**: PostCSS/Tailwind CLI で事前ビルド (`npm run css:build`)。CDN ではなくローカル CSS を読み込む。
+- **projectStore**: sessionStorage をキャッシュとして使いながら、API snapshot を反映する。`projectService` が route resolution と subscribe を担当。
+- **tallyService / summaryService**: API から受け取った state をビュー用に整形し、○△× 集計を再計算。
+- **client/services**: API 呼び出しは `api-client`（fetch ラッパー）経由で実装。`responseService.upsert` → `tallyService.recalculate` → `summaryService.build*View` のループで UI を再描画。
 
-## データレイヤー（現状の扱い）
+## 3. バックエンド詳細
 
-- プロジェクト状態は `project-store` を中心とする in-memory サービス群で管理し、`project-service` / `schedule-service` / `participant-service` / `response-service` / `tally-service` / `summary-service` が各画面から参照・更新する。
-- ICS メタデータ（UID/SEQUENCE/DTSTAMP/TZID など）は JavaScript で保持し、エクスポート時に `schedule-service` が増分管理する。
-- 既存の HTML モックに残っていたダミーデータは撤廃し、React 版アプリから JSON／ICS をエクスポート・インポートして状態を復元する運用とした。
+```
+src/server/
+├── app.js          # Express 初期化、CORS、JSON、ヘルスチェック
+├── index.js        # 起動エントリ
+├── store.js        # InMemoryProjectStore
+├── routes/projects.js
+├── logger.js / telemetry.js
+└── routes/dev-log.js (development helper)
+```
 
-将来的にはサーバー/API 層で以下のようなエンティティを扱う想定。
+- `InMemoryProjectStore`: `project`, `candidates`, `participants`, `responses`, `icsText`, `shareTokens`, `versions`, `derived.tallies` を保持。バージョン検証や競合検知、共有トークン生成、回答集計もここに実装。
+- `routes/projects.js`: `/api/projects/*` の CRUD。共有トークンを `/share/:type/:token` で解決。ICS/JSON の import/export を同期レスポンスで提供。
+- `logger` / `telemetry`: 構造化ログと簡易メトリクス (`/api/metrics`) を提供。ヘルスチェックは `/api/healthz` / `/api/readyz`。
+- データは揮発（プロセス再起動で消える）。再利用したい場合は JSON/ICS のエクスポートで外部保全する。
 
-| エンティティ | 主なフィールド | 備考 |
-|--------------|----------------|------|
-| Project      | id, summary, description, timezone, createdAt | いわゆるアンケート（調整プロジェクト）本体 |
-| Slot         | id, projectId, uid, dtstart, dtend, status, sequence, dtstamp | ICS 候補と 1:1 対応させる |
-| Participant  | id, projectId, name, contact | 回答者の識別情報（公開／非公開などの扱いは未決） |
-| Response     | id, participantId, slotId, mark, comment | ○△× とコメント、更新時刻などを保持 |
+## 4. API とデータモデル
 
-## 今後の拡張想定
+| エンティティ | 主なフィールド |
+|--------------|----------------|
+| Project      | `projectId`, `name`, `description`, `defaultTzid`, `shareTokens`, `createdAt`, `updatedAt` |
+| Candidate    | `candidateId`, `uid`, `dtstart`, `dtend`, `status`, `sequence`, `dtstamp`, `location`, `description` |
+| Participant  | `participantId`, `displayName`, `comment`, `token`, `version` |
+| Response     | `participantId`, `candidateId`, `mark`, `comment`, `version`, `updatedAt` |
 
-- **回答管理画面（`user` 系）**  
-  参加者ごとの回答を集計・編集できる UI を追加。回答ステータスを反映して確定日時を決めるループを作る。
+- バージョン管理: `metaVersion`, `candidatesVersion`, `candidatesListVersion`, `participantsVersion`, `responsesVersion`, `shareTokensVersion`。API は `version` / `If-Match` を要求し、競合時は 409 を返す。
+- 派生データ: `derived.tallies` で候補別/参加者別の ○△× 集計を保持。`summaryService` が UI 表示用に整形。
 
-- **サーバー/API 層**  
-  フロントの React state に代わって、Project / Slot / Response を永続化する API を用意。iCal ファイルのアップロード／ダウンロードは REST か WebDAV か別途検討。
+## 5. デプロイと運用
 
-- **通知／共有機能**  
-  回答締切のリマインダー、確定日時決定後の通知、ICS 添付メールなどを配る機能を検討。
+- さくら VPS（Ubuntu 24.04）での最小セットアップは `docs/internal/deploy-sakura-vps.md` を参照。Node.js 20 + systemd + Nginx + Let’s Encrypt で運用。
+- API は `Scheduly` ユーザーで常駐し、`dist/` を Nginx が配信。`/p`/`/r` の rewrite ルールを忘れず追加。
+- 監視: `journalctl -u scheduly-api`、`/var/log/nginx/`、`/api/metrics`、`certbot renew --dry-run`。
 
-## 開発ポリシー（現状の意識合わせ）
+## 6. 今後の拡張課題
 
-- React / webpack 版を主体に機能拡張する。レガシーモックは挙動比較と仕様確認のために最低限維持。
-- iCal（ICS）は UID/DTSTAMP/TZID を正しく扱うことが重要。参加者回答は ICS メタデータと紐付けて管理する。
-- 画面単位で役割を明確にし、管理者向け UI を複数画面に分割して育てる（プロジェクト管理・回答管理など）。
+| 項目 | 内容 |
+| ---- | ---- |
+| 永続化 | SQLite/PostgreSQL などへの移行。InMemoryStore のインターフェースを抽象化してバックエンドを差し替え可能にする。 |
+| 認証 | 管理者に対する最低限の認証（Basic Auth など）や参加者トークンの失効機能。 |
+| 通知 | 回答締切リマインダーや確定日時通知。ICS 添付メール配信など。 |
+| 観測 | `/api/metrics` の Prometheus 対応、エラーログアラート。 |
+| 自動テスト | E2E シナリオ (参加者回答〜エクスポート) を Cypress 等で自動化。 |
+| バックアップ | JSON/ICS の定期出力、自動アップロードの仕組み。 |
+
+## 7. 関連ドキュメント
+
+- `docs/internal/spec-server-integration.md`: サーバー側アーキテクチャと運用詳細。
+- `docs/internal/spec-api-flow.md`: API の詳細フロー、楽観更新、エラーハンドリング。
+- `docs/internal/spec-data-model.md`: ProjectState/レスポンスの型定義。
+- `docs/internal/ref-screen-tech-overview.md`: 画面別の技術構成とデータフロー。
+- `docs/internal/deploy-sakura-vps.md`: ベータ公開の手順書。
+
+本ドキュメントは実装状況に合わせて更新します。構成変更や永続化対応を行った際は、この概要も必ずキャッチアップしてください。
