@@ -111,7 +111,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ### 優先度: 高
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
-- `projectStore` を単一プロジェクト前提に再実装し、Map/逆引きインデックスを廃止して `currentState` ベースのシンプルな構造へ刷新する。
 - `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
 - ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
@@ -122,7 +121,6 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - サイズとレート制限の仮設定（候補/参加者件数・コメント長・ICSサイズ、IPベースの簡易スロットリング）
 - `docs/internal/spec-api-flow.md` に最小API I/Oスキーマと409時の返却ポリシーを追記
 - `docs/internal/DEVELOPER_NOTES.md` に ICS UID規則、楽観更新/ロールバック規約、管理/回答のスコープ分離を追記
-- About ボタンの挙動を変更し、クリック時に別タブ/別ウィンドウで開く（`target="_blank"` + `rel="noopener"` を付与）。
  - サービス層のエラー構造を `{ code, fields, message }` に統一し、UI での赤枠付け・メッセージ表示を簡素化（422 は `fields: string[]` を推奨）。
  - `docs/internal/spec-api-flow.md` に API I/O サンプルを追記（422 の返却例と UI マッピング表を含む）。
 - 共有URLの基準 `BASE_URL` の軽量検証を追加（URL 形式判定、赤枠＋ヒント表示）。
