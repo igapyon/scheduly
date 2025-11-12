@@ -39,7 +39,7 @@ su - scheduly
 ユーザーホームに clone してセットアップします。
 ```bash
 cd ~
-git clone <REPO_URL> scheduly
+git clone https://github.com/igapyon/scheduly.git scheduly
 cd scheduly
 npm ci
 npm run build     # /home/scheduly/scheduly/dist に静的ファイルが生成される
@@ -103,7 +103,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://127.0.0.1:4000/;
+        proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
