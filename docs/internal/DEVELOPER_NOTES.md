@@ -114,6 +114,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 不具合: 参加者URLをもちいて別のブラウザから開くと参加者用の共有URLが無効です が表示される。おかしい。
 - 日程が0件の場合は、共有URLを発行 ボタンを押した時にバリデーションでとどめてメッセージ表示して処理中断して。
 - ストレージを sessionStorage 単一に固定し、`projectStore` を単一 `projectId` 前提で簡略化（Map/インデックス削除 + トークン逆引きを API 依存に寄せる）。
+- projectStore を実質1プロジェクト専用に再設計し、内部 Map / インデックスを排除して `currentState` のみで管理する（共有トークン逆引きもサーバー依存に移行）。
+- `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - 設定読取ユーティリティの追加（`.env` の `API_BASE_URL`/`BASE_URL`/`NODE_ENV`/`CORS_ALLOWED_ORIGINS` を参照）
 - CORS/CSP 方針の明文化（単一オリジン前提、必要最小の許可のみ）
 - I/O の日時表現統一
