@@ -63,7 +63,7 @@ Scheduly は、iCalendar（ICS）と連携して日程候補の作成・共有�
 - **内部向け** [docs/internal/concept-architecture.md](docs/internal/concept-architecture.md): 画面構成とバンドル構造
 - **内部向け** [docs/internal/spec-data-model.md](docs/internal/spec-data-model.md): オンメモリ前提のデータモデル整理
 - **内部向け** [docs/internal/spec-api-flow.md](docs/internal/spec-api-flow.md): in-memory サービスと API 草案
-- **内部向け** [docs/internal/spec-server-integration-wip.md](docs/internal/spec-server-integration-wip.md): サーバー導入時の検討事項（WIP）
+- **内部向け** [docs/internal/spec-server-integration.md](docs/internal/spec-server-integration.md): サーバー導入時の検討事項（WIP）
 - **内部向け** [docs/internal/ref-verify-checklist.md](docs/internal/ref-verify-checklist.md): QA・目視確認の手順
 - **内部向け** [docs/internal/guide-development-process.md](docs/internal/guide-development-process.md): 現行の開発プロセス定義（WIP）と経緯の要点
 - **内部向け** [docs/internal/DEVELOPER_NOTES.md](docs/internal/DEVELOPER_NOTES.md): 作業メモと TODO の整理

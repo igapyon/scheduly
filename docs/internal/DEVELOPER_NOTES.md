@@ -38,7 +38,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - `public/index.html` / `user.html` で Tailwind CDN を読み込み、管理画面では ical.js CDN も追加読込。  
 - 現状はブラウザ `sessionStorage` に状態を保持しているが、本番想定ではサーバー側永続化（API 経由）に移行する前提。
 - UI を更新したら `docs/screenshot/*.png` を撮り直し、React 版とレガシーモックの差分を無くす。  
-- オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration-wip.md` の仕様に沿って順次拡張する。
+- オンメモリ API サーバの土台が `src/server/` にあり、`npm run api:dev`（既定ポート: 4000）で起動できる。現状は揮発性ストアと基本ルーティング（プロジェクト作成/メタ更新/共有トークン回転に加えて候補の CRUD＋並び替え、参加者の CRUD、回答の upsert/削除/集計ビュー）を提供しており、`docs/internal/spec-server-integration.md` の仕様に沿って順次拡張する。
 - `/api/metrics` で直近のアクセス統計（リクエスト数・平均応答時間・ルート別ステータス分布・最新エラー）を JSON で取得できる。簡易監視やローカル検証時に活用する。
 - API サーバは `/api/healthz`（常時 200）と `/api/readyz`（起動直後のみ 503、それ以外は 200）で監視でき、すべてのリクエストに `X-Request-ID` と構造化ログを付与している。ログは JSON 1 行形式で `ts/level/msg/...` を含む。`SCHEDULY_API_BODY_LIMIT` で `express.json` の受信上限（既定: `256kb`）を変更できる。共有URLの基準は `SCHEDULY_SHARE_BASE_URL`（または `BASE_URL`）で上書きでき、未指定の場合はフロントエンドから渡された `baseUrl` を優先する。
 - フロントエンドは常に API ドライバで動作する前提となった。ベース URL を変えたい場合は `window.__SCHEDULY_API_BASE_URL__` だけを指定する。管理画面のプロジェクト名/説明更新は約600ms のディレイ後に PUT `/meta` で同期され、サーバーの `metaVersion` をキャッシュして楽観更新する。同期中は画面上部にステータスが表示され、409/422 等のサーバーエラーはトーストで利用者に通知される。また、共有URLの再発行 (`shareService.rotate`) は API ルートを経由してトークンと `shareTokensVersion` を更新し、初回発行 (`shareService.generate`) もサーバー状態に追随する（既存トークンがない場合は自動で `rotate` を呼び出す）。
@@ -157,8 +157,8 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 参加者画面のダミー締切表示と「参加者サマリー活用メモ」を削除し、legacy モックも同様に整理
 - `projectStore` を単一 state (`currentProjectId`/`projectState`) で管理し、Map やトークン逆引きインデックスを廃止
 - `docs/external/ref-disclaimer.md` に参加者コメントの個人情報取扱い注意を追記
-- サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration-wip.md` に明記
-- 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration-wip.md` に整理
+- サーバ連携移行時の初期フェーズ前提（単一プロセス/オンメモリ運用）を `docs/internal/spec-server-integration.md` に明記
+- 揮発性バックエンド初期実装方針（in-memory Node.js サーバ、API 範囲、version 管理）を `docs/internal/spec-server-integration.md` に整理
 - REST API の CRUD/サマリーエンドポイント仕様を `docs/internal/spec-api-flow.md` に定義
 - 入力制約と並行更新時の振る舞い（version/timestamp/409 ハンドリング）を `docs/internal/spec-api-flow.md` に整理
 - エラーハンドリング標準化（409/413/401/403/ネットワーク）を `docs/internal/spec-api-flow.md` に整理
@@ -168,13 +168,13 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 - 楽観更新ヘルパーを実装し、API ドライバ操作（回答/候補/参加者/共有トークン）へ段階的に適用
 - 共有URL再発行時は常に新しい管理者URLへ遷移させる（UIトグル廃止、挙動一本化）
 - 共有URL再発行ボタンへ「REISSUE」入力必須の確認ダイアログを導入し、誤操作防止を強化
-- ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration-wip.md` に記載
+- ICS/JSON エクスポートを同期レスポンスで提供し、管理者トークンのみアクセス可とする方針を `docs/internal/spec-server-integration.md` に記載
 - 共有データ型の一本化計画（`src/shared/types.ts` と JSDoc 連携）を `docs/internal/spec-api-flow.md` に記載
 - サブリソースごとの version 粒度と 409 時の再送導線を `docs/internal/spec-api-flow.md` の 6.7 節に整理
 - 楽観更新ヘルパー設計（共通ヘルパー/ロールバック/再試行フロー）を `docs/internal/spec-api-flow.md` に記載
-- API エラーログとアクセス監視基盤の方針を `docs/internal/spec-server-integration-wip.md` に記載
+- API エラーログとアクセス監視基盤の方針を `docs/internal/spec-server-integration.md` に記載
 - 共有トークン運用ポリシー（桁数/文字種/ログ方針/回転手順）を `docs/internal/spec-share-url-generation.md` に追記
-- サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration-wip.md` に追記
+- サーバ健全性エンドポイント（`GET /api/healthz` / `GET /api/readyz`）の仕様を `docs/internal/spec-server-integration.md` に追記
 - ポーリング同期と楽観更新ロールバック方針を `docs/internal/spec-api-flow.md` に追記
 - GDPR 対応方針（保管期間・アクセス制御・ログ扱い）を `docs/internal/spec-data-model.md` に整理
 - Excel 形式でのエクスポートを実装（exceljs）
@@ -385,7 +385,7 @@ Appendix: Excel 出力（参加者 UI）
 補足ルール
 - 単語区切りはハイフン、英語ベースで簡潔にする。
 - 対象領域は末尾に付与（例: `-ics`, `-ui`, `-server`）。
-- 下書き/WIP は末尾に `-wip` を付ける（例: `spec-server-integration-wip.md`）。
+- 下書き/WIP は末尾に `-wip` を付ける（例: `concept-foo-wip.md`）。
 - 既存の拡張子や相対リンクは維持する（拡張子は `.md`）。
 
 例

@@ -21,7 +21,7 @@
   - データモデル: `docs/internal/spec-data-model.md`
   - フローと API 草案: `docs/internal/spec-api-flow.md`
   - 画面の技術概要: `docs/internal/ref-screen-tech-overview.md`
-  - サーバ統合（WIP）: `docs/internal/spec-server-integration-wip.md`
+  - サーバ統合（WIP）: `docs/internal/spec-server-integration.md`
   - 開発メモ/TODO: `docs/internal/DEVELOPER_NOTES.md`
   - 開発プロセス定義（WIP）: `docs/internal/guide-development-process.md`
   - QA/目視確認: `docs/internal/ref-verify-checklist.md`
