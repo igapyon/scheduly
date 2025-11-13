@@ -109,7 +109,13 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
+- 共有URLが長すぎる。短くする工夫が欲しい。でもセキュアさは欲しい。
+- さくらのVPS-UbuntuにSSL証明書の導入。
+- 1つのドメインで複数アプリをサーブしたい。https://example.com/scheduly とかにできるか調べる。
+- セキュリティ自己チェックの実施。
+- リロードのアイコンがちょっと好みじゃない。改善したい。
 - 参加者ごと で 最終更新、がおかしい、というかハードコード？
+- デモデータのロード時に参加者の出欠が読み込めない。フォーマット変わっちゃったかな？
 - `.env` / `bootstrap.*` / `src/frontend/shared/config.js` に散在する API ベース URL 設定を一元化し、bootstrap では環境変数注入を行わない構成に整理する。
 - `projectService.createFreshSessionProject` の API 失敗時フォールバックをやめ、エラーを利用者へ返して再試行させる（local fallback で dummy state を混入させない）。
 - ICS インポート時はサーバー import 結果を信頼し、`replaceCandidatesFromImport()` → `exportState()` → `applySyncedCandidates()` の二重更新を廃止（必要なら optimistic update とサーバー結果のマージ方針を再整理）。
