@@ -109,6 +109,7 @@ Scheduly のアプリ開発（React/webpack 版）を進める際に参照する
 ## 6. TODO バックログ
 
 ### 優先度: 高
+- GET /robots.txt への対応が必要かどうか一回考える。
 - 共有URLが長すぎる。短くする工夫が欲しい。でもセキュアさは欲しい。
 - さくらのVPS-UbuntuにSSL証明書の導入。
 - 1つのドメインで複数アプリをサーブしたい。https://example.com/scheduly とかにできるか調べる。
